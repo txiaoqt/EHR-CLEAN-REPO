@@ -10,6 +10,7 @@ import {
 } from '../utils.js';                                        // utilities
 import { useAuth } from '../AuthContext.jsx';                // auth context
 import { isPhysician } from '../accessControl.js';          // access control
+import { CloseIcon } from '../components/icons/Icons.jsx';
 
 const normalizeTheme = (value) => (typeof value === 'string' && value.trim().toLowerCase() === 'dark' ? 'dark' : 'light');
 
@@ -241,30 +242,43 @@ const Settings = () => {
 
   return (
     <main className="main">
-      {/* Backup Password Modal */}
       {showBackupPasswordModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(2px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 3000
         }}>
-          <form onSubmit={handleBackupSubmit} className="card" style={{ width: 400, padding: 20 }}>
-            <h3 style={{ marginTop: 0 }}>Verify Identity</h3>
-            <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-              Enter your password to proceed with the full data backup.
+          <form onSubmit={handleBackupSubmit} style={{ background: '#ffffff', width: 440, padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Authorize Database Backup</h3>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  setShowBackupPasswordModal(false);
+                  setBackupPasswordInput('');
+                }}
+                aria-label="Close modal"
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+              Enter your staff password to proceed with downloading the complete system backup archive.
             </p>
             <input
               type="password"
               className="input"
               autoFocus
-              placeholder="Your password"
+              placeholder="Enter your account password"
               value={backupPasswordInput}
               onChange={e => setBackupPasswordInput(e.target.value)}
-              style={{ width: '100%', marginBottom: 15 }}
+              style={{ width: '100%', marginBottom: 18, marginTop: 8 }}
             />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
@@ -278,7 +292,7 @@ const Settings = () => {
                 Cancel
               </button>
               <button type="submit" className="btn">
-                Confirm
+                Confirm & Backup
               </button>
             </div>
           </form>
@@ -288,235 +302,264 @@ const Settings = () => {
       {message && (
         <div style={{
           position: 'fixed',
-          top: 20,
-          left: '50%',
-          transform: 'translateX(-50%)',
+          bottom: 24,
+          right: 24,
           padding: '12px 20px',
           color: 'white',
-          fontWeight: 600,
-          borderRadius: 8,
+          fontWeight: 700,
+          borderRadius: 12,
           background: messageType === 'error'
-            ? '#d9534f'
+            ? '#dc2626'
             : messageType === 'success'
-            ? '#28a745'
-            : '#0d6efd',
-          zIndex: 2000
+            ? '#059669'
+            : '#2563eb',
+          boxShadow: 'var(--shadow-lg)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
         }}>
-          {message}
+          <span>{messageType === 'error' ? '⚠️' : '✓'}</span>
+          <span>{message}</span>
         </div>
       )}
 
-      <section className="page">
-        <div className="card">
-          <h2>Settings</h2>
-
-          {/* BACKUP CARD — TOP */}
-          {isPhysician(authUser) && (
-            <div
-              className="card"
-              ref={backupCardRef}
-              style={{ marginTop: 20 }}
-            >
-              <h3 style={{ marginTop: 0 }}>Backup & Export</h3>
-              <p style={{ color: 'var(--muted)' }}>
-                Create a full export of system tables for offline backup or migration.
-              </p>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div>
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>Last backup</div>
-                  <div style={{ fontWeight: 600 }}>{lastBackup}</div>
-                </div>
-
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-                  <button className="btn" disabled={backingUp} onClick={() => setShowBackupPasswordModal(true)}>
-                    {backingUp ? 'Backing up…' : 'Backup all data'}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    onClick={() => {
-                      setMessage(lastBackup === 'Never'
-                        ? 'No backup found.'
-                        : `Last backup: ${lastBackup}`);
-                      setMessageType('info');
-                      setTimeout(() => setMessage(''), 3000);
-                    }}
-                  >
-                    Info
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
-                Included: patients, encounters, appointments, inventory, users, settings, audit_logs.
-              </div>
-            </div>
-          )}
-
-          {/* MAIN GRID */}
-          <div style={{
-            marginTop: 20,
-            display: 'grid',
-            gridTemplateColumns: '1fr 420px',
-            gap: 20
-          }}>
-            {/* LEFT COLUMN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className="card">
-                <h3 style={{ marginTop: 0 }}>Account</h3>
-
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ color: 'var(--muted)', fontSize: 13 }}>Signed in as</div>
-                  <div style={{ fontWeight: 600 }}>
-                    {authUser?.name || authUser?.email || '—'}
-                  </div>
-                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>{authUser?.role}</div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                  <input
-                    type="password"
-                    placeholder="New password"
-                    className="input"
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Confirm password"
-                    className="input"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                  />
-                  <button className="btn" onClick={changePassword}>Change</button>
-                </div>
-              </div>
-
-              {/* APPEARANCE CARD (updated: active uses .btn, inactive uses .btn secondary) */}
-              <div className="card">
-                <h3 style={{ marginTop: 0 }}>Appearance</h3>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  {/* LIGHT BUTTON */}
-                  <button
-                    className={`btn ${settings.theme !== 'light' ? 'secondary' : ''}`}
-                    onClick={() => {
-                      const next = { ...settings, theme: 'light' };
-                      handleSettingChange('theme', 'light');
-                      saveSettingsUtil(next);
-                      window.applyTheme && window.applyTheme('light');
-                    }}
-                  >
-                    Light
-                  </button>
-
-                  {/* DARK BUTTON */}
-                  <button
-                    className={`btn ${settings.theme !== 'dark' ? 'secondary' : ''}`}
-                    onClick={() => {
-                      const next = { ...settings, theme: 'dark' };
-                      handleSettingChange('theme', 'dark');
-                      saveSettingsUtil(next);
-                      window.applyTheme && window.applyTheme('dark');
-                    }}
-                  >
-                    Dark
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className="card">
-                <h3 style={{ marginTop: 0 }}>Application Settings</h3>
-
-                <div style={{ marginBottom: 10 }}>
-                  <label className="label-muted">Auto-save</label>
-                  <input
-                    type="checkbox"
-                    checked={!!settings.auto_save}
-                    onChange={e => handleSettingChange('auto_save', e.target.checked)}
-                    style={{ marginLeft: 8 }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: 10 }}>
-                  <label className="label-muted">Email Notifications</label>
-                  <input
-                    type="checkbox"
-                    checked={!!settings.notifications_email}
-                    onChange={e => handleSettingChange('notifications_email', e.target.checked)}
-                    style={{ marginLeft: 8 }}
-                  />
-                </div>
-              </div>
-
-              {/* ACTIONS CARD (Revert / Save) */}
-              <div className="card">
-                <h3 style={{ marginTop: 0 }}>Actions</h3>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    className="btn secondary"
-                    onClick={revertSettings}
-                  >
-                    Revert
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={saveSettings}
-                  >
-                    Save
-                  </button>
-                </div>
-                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
-                  Revert restores settings from local saved values. Save persists settings locally and attempts to sync to the server.
-                </div>
-              </div>
+      <div className="page">
+        {/* 1. Page Header: Page identity and configuration save actions */}
+        <div className="page-header">
+          <div className="page-header-title-block">
+            <h1 className="page-header-title">System & Staff Settings</h1>
+            <div className="page-header-subtitle">
+              Manage account credentials, interface preferences, clinic backup archives, and sync options.
             </div>
           </div>
 
-          {/* PREVIEW AT BOTTOM */}
-          <div className="card" style={{ marginTop: 25, background: 'rgba(0,0,0,0.03)' }}>
-            <h3 style={{ marginTop: 0 }}>Preview</h3>
-
-            <div style={{
-              marginTop: 14,
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: 18
-            }}>
-              <div>
-                <strong>Date / Time</strong>
-                <div style={{ marginTop: 6, fontFamily: 'monospace' }}>
-                  {formatDate(new Date())} {formatTime(new Date())}
-                </div>
-              </div>
-
-              <div>
-                <strong>Sample Weight</strong>
-                <div style={{ marginTop: 6, fontFamily: 'monospace' }}>
-                  {settings.clinical_units === 'metric' ? '65.5 kg' : '144.6 lbs'}
-                </div>
-              </div>
-
-              <div>
-                <strong>Sample Height</strong>
-                <div style={{ marginTop: 6, fontFamily: 'monospace' }}>
-                  {settings.clinical_units === 'metric' ? '170 cm' : `5'7"`}
-                </div>
-              </div>
-            </div>
-
-            {settings.language === 'fil' && (
-              <div style={{ marginTop: 12, padding: 8, background: '#e3f2fd', borderRadius: 6 }}>
-                Preview: Filipino language is active.
-              </div>
-            )}
-
+          <div className="page-header-actions">
+            <button type="button" className="btn secondary" onClick={revertSettings}>
+              Reset to Saved
+            </button>
+            <button type="button" className="btn" onClick={saveSettings}>
+              Save Changes
+            </button>
           </div>
-
         </div>
-      </section>
+
+        {/* 2. Configuration Grid: Account & Security + Preferences & Appearance */}
+        <div className="settings-main-grid" style={{ marginBottom: 20 }}>
+          {/* Left Column: Account & Security */}
+          <div className="card" style={{ padding: '20px 22px' }}>
+            <div className="card-header" style={{ marginBottom: 14 }}>
+              <div>
+                <h3 className="card-title" style={{ fontSize: 16 }}>Account & Security</h3>
+                <span className="card-subtitle">Authenticated staff identity and credential management</span>
+              </div>
+              <span className="badge badge-info">{authUser?.role || 'Staff'}</span>
+            </div>
+
+            {/* Active Account Identity Block */}
+            <div style={{ padding: '14px 16px', background: 'var(--grey-100)', borderRadius: 10, marginBottom: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Active Account User</div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', marginTop: 2 }}>
+                {authUser?.name || authUser?.email || 'Logged In Staff'}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                Role: <strong style={{ color: 'var(--text)' }}>{authUser?.role}</strong> • Email: <strong style={{ color: 'var(--text)' }}>{authUser?.email || 'N/A'}</strong>
+              </div>
+            </div>
+
+            {/* Password Update Section */}
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Change Password</h4>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Update your staff portal security credentials</div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                <input
+                  type="password"
+                  placeholder="New password"
+                  className="input"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  aria-label="New password"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm password"
+                  className="input"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  aria-label="Confirm password"
+                />
+              </div>
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={changePassword}
+                disabled={!newPassword || !confirmPassword}
+              >
+                Update Password
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Preferences & Interface Appearance */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Preferences & Auto-Sync Card */}
+            <div className="card" style={{ padding: '20px 22px' }}>
+              <div className="card-header" style={{ marginBottom: 14 }}>
+                <div>
+                  <h3 className="card-title" style={{ fontSize: 16 }}>Preferences & Auto-Sync</h3>
+                  <span className="card-subtitle">Automated workflows and notification parameters</span>
+                </div>
+                <span className="badge badge-neutral">Configuration</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Auto-Save Drafts */}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Auto-Save Drafts</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Automatically preserve encounter SOAP drafts</div>
+                  </div>
+                  <div className="settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={!!settings.auto_save}
+                      onChange={e => handleSettingChange('auto_save', e.target.checked)}
+                      aria-label="Auto-Save Drafts"
+                    />
+                    <span className="settings-switch-slider" />
+                    <span className="settings-switch-text">{settings.auto_save ? 'ON' : 'OFF'}</span>
+                  </div>
+                </label>
+
+                {/* Email Notifications */}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Email Notifications</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Receive emergency triage and appointment alerts</div>
+                  </div>
+                  <div className="settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={!!settings.notifications_email}
+                      onChange={e => handleSettingChange('notifications_email', e.target.checked)}
+                      aria-label="Email Notifications"
+                    />
+                    <span className="settings-switch-slider" />
+                    <span className="settings-switch-text">{settings.notifications_email ? 'ON' : 'OFF'}</span>
+                  </div>
+                </label>
+
+                {/* Low Stock Warning Banners */}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Low Stock Warning Banners</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Show inventory reorder alerts in dashboard header</div>
+                  </div>
+                  <div className="settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={!!settings.notifications_stock}
+                      onChange={e => handleSettingChange('notifications_stock', e.target.checked)}
+                      aria-label="Low Stock Warning Banners"
+                    />
+                    <span className="settings-switch-slider" />
+                    <span className="settings-switch-text">{settings.notifications_stock ? 'ON' : 'OFF'}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Interface Appearance Card */}
+            <div className="card" style={{ padding: '20px 22px' }}>
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <div>
+                  <h3 className="card-title" style={{ fontSize: 16 }}>Interface Appearance</h3>
+                  <span className="card-subtitle">Select daylight or contrast display mode</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  type="button"
+                  className={settings.theme === 'light' ? 'btn' : 'btn secondary'}
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    const next = { ...settings, theme: 'light' };
+                    handleSettingChange('theme', 'light');
+                    saveSettingsUtil(next);
+                    window.applyTheme && window.applyTheme('light');
+                  }}
+                >
+                  Light Mode
+                </button>
+
+                <button
+                  type="button"
+                  className={settings.theme === 'dark' ? 'btn' : 'btn secondary'}
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    const next = { ...settings, theme: 'dark' };
+                    handleSettingChange('theme', 'dark');
+                    saveSettingsUtil(next);
+                    window.applyTheme && window.applyTheme('dark');
+                  }}
+                >
+                  Dark Mode
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Administration: Database Backup & Comprehensive Archive */}
+        {isPhysician(authUser) && (
+          <div
+            className="card"
+            ref={backupCardRef}
+            style={{ padding: '20px 22px', borderLeft: '4px solid var(--color-primary)' }}
+          >
+            <div className="card-header" style={{ marginBottom: 8 }}>
+              <div>
+                <h3 className="card-title" style={{ fontSize: 16 }}>Database Backup & Comprehensive Archive</h3>
+                <span className="card-subtitle">Generate an offline JSON backup of all clinical tables, patient profiles, encounters, and audit records</span>
+              </div>
+              <span className="badge badge-neutral">Offline Snapshot</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)' }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Last Backup Performed:</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginTop: 2 }}>{lastBackup}</div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={backingUp}
+                  onClick={() => setShowBackupPasswordModal(true)}
+                >
+                  {backingUp ? 'Backing up…' : 'Export Full System Backup'}
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => {
+                    setMessage(lastBackup === 'Never'
+                      ? 'No previous backup record found in this session.'
+                      : `Last system backup completed: ${lastBackup}`);
+                    setMessageType('info');
+                    setTimeout(() => setMessage(''), 3500);
+                  }}
+                >
+                  Backup History
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   );
 };

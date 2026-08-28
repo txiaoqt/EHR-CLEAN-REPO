@@ -371,7 +371,7 @@ const Encounter = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 360px', gap: 18 }}>
+          <form onSubmit={handleSubmit} className="encounter-form-grid">
             <div>
               {/* Patient selector */}
               <div className="card" style={{ marginBottom: 12 }}>

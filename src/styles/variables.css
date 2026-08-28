@@ -1,39 +1,88 @@
-:root{
-  /* spacing & typography */
-  --space-xs:4px; --space-sm:8px; --space-md:16px; --space-lg:24px;
-  --radius-sm:8px; --radius-md:12px;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+:root {
+  /* Spacing Scale */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
 
-  /* Primary brand colors (red family) */
-  --color-red: #ef4444;         /* red */
-  --color-cardinal: #8C1515;    /* cardinal red (darker) */
-  --color-cardinal-700: #6b0f0f;
+  /* Border Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
 
-  /* Accent for gradients */
-  --accent-1: #8C1515; /* cardinal */
-  --accent-2: #ef4444; /* red */
-  --accent-3: #7c3aed; /* purple for gradients (optional) */
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Greys (light theme) */
+  /* Primary Brand (TUP Red) */
+  --color-primary: #c92a2a;
+  --color-primary-hover: #a61e1e;
+  --color-primary-active: #8c1515;
+  --color-primary-tint: #fff1f2;
+  --color-primary-tint-hover: #ffe4e6;
+  --color-primary-border: rgba(201, 42, 42, 0.18);
+
+  /* Semantic Category Colors */
+  --color-purple: #7c3aed;
+  --color-purple-bg: rgba(124, 58, 237, 0.08);
+  --color-purple-text: #6d28d9;
+
+  --color-blue: #2563eb;
+  --color-blue-bg: rgba(37, 99, 235, 0.08);
+  --color-blue-text: #1d4ed8;
+
+  --color-emerald: #059669;
+  --color-emerald-bg: rgba(5, 150, 105, 0.08);
+  --color-emerald-text: #047857;
+
+  --color-amber: #d97706;
+  --color-amber-bg: rgba(217, 119, 6, 0.08);
+  --color-amber-text: #b45309;
+
+  --color-rose: #e11d48;
+  --color-rose-bg: rgba(225, 29, 72, 0.08);
+  --color-rose-text: #be123c;
+
+  /* Greys & Neutrals */
   --grey-50: #ffffff;
   --grey-100: #f8fafc;
-  --grey-200: #eef2f6;
-  --grey-300: #d1d5db;
-  --grey-400: #9ca3af;
-  --grey-500: #6b7280;
-  --grey-700: #374151;
-  --grey-900: #0f1724;
+  --grey-150: #f1f5f9;
+  --grey-200: #e2e8f0;
+  --grey-300: #cbd5e1;
+  --grey-400: #94a3b8;
+  --grey-500: #64748b;
+  --grey-600: #475569;
+  --grey-700: #334155;
+  --grey-800: #1e293b;
+  --grey-900: #0f172a;
 
-  /* Semantic tokens (light defaults) */
-  --bg: var(--grey-100);
-  --panel: var(--grey-50);
-  --text: var(--grey-900);
-  --muted: var(--grey-500);
-  --accent: var(--color-cardinal);
-  --danger: var(--color-red);
+  /* Semantic UI Tokens */
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --input-border: #e2e8f0;
+  --input-bg: #ffffff;
+  --accent: #c92a2a;
+  --danger: #dc2626;
 
-  /* layout */
-  --sidebar-width: 260px;
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -4px rgba(0, 0, 0, 0.02);
+  --shadow-card: 0 2px 10px rgba(15, 23, 42, 0.04);
+
+  /* Layout dimensions */
+  --sidebar-width: 256px;
   --topbar-height: 64px;
 }
  

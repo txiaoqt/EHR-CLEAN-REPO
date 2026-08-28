@@ -19,7 +19,9 @@ import PatientSchedule from './pages/patient/PatientSchedule.jsx';
 import PatientMessages from './pages/patient/PatientMessages.jsx';
 import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
-import KioskBooking from './pages/patient/KioskBooking.jsx';
+import PCAccessRequired from './components/PCAccessRequired.jsx';
+import { useStaffDeviceCheck } from './hooks/useStaffDeviceCheck.js';
+import { useSidebar } from './useSidebar.js';
 import './styles/main.css';
 import { exportCsv } from './utils.js';
 import { useAuth } from './AuthContext.jsx';
@@ -36,7 +38,18 @@ const normalizeTheme = (value) => {
 const getRoleHome = (role) => ((role || '').toLowerCase() === 'patient' ? '/patient/dashboard' : '/dashboard');
 const isPatientRole = (role) => (role || '').toLowerCase() === 'patient';
 
-const ProtectedRoute = ({ isAuthenticated, user, loading, initializing, allowedRoles = [], children }) => {
+const ProtectedRoute = ({
+  isAuthenticated,
+  user,
+  loading,
+  initializing,
+  allowedRoles = [],
+  isStaffProtected = false,
+  isStaffDeviceSupported = true,
+  viewport,
+  logout,
+  children
+}) => {
   const location = useLocation();
 
   // Wait for Supabase auth session to finish restoring before rendering
@@ -51,6 +64,9 @@ const ProtectedRoute = ({ isAuthenticated, user, loading, initializing, allowedR
   if (!isWithinClinicHours()) return <Navigate to="/login" replace state={{ sessionMessage: getClinicHoursMessage() }} />;
   if (!hasRequiredRole(user, allowedRoles)) {
     return <Navigate to={IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard'} replace />;
+  }
+  if (isStaffProtected && !isStaffDeviceSupported) {
+    return <PCAccessRequired viewport={viewport} onLogout={logout} />;
   }
   return children;
 };
@@ -87,34 +103,21 @@ function AppShell() {
   const [theme, setTheme] = useState(() => {
     return resolveInitialTheme();
   });
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar();
   const autoLogoutInProgressRef = useRef(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 980);
+  const { isSupported: isStaffDeviceSupported, viewport } = useStaffDeviceCheck();
 
   useEffect(() => { document.title = 'TUP Clinic EHR'; }, []);
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     persistTheme(theme);
   }, [theme]);
-  useEffect(() => { localStorage.setItem('sidebarOpen', sidebarOpen); }, [sidebarOpen]);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 980);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
-    }
-  }, [isMobile]);
-  useEffect(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [location.pathname, isMobile]);
   useEffect(() => {
     const onSettingsChanged = (ev) => {
       setTheme(normalizeTheme(ev?.detail?.theme));
@@ -164,6 +167,11 @@ function AppShell() {
     return () => { mounted = false; clearInterval(intervalId); };
   }, [isAuthenticated, logout, navigate]);
 
+  // Gating order: Evaluate PC/Laptop Access Safeguard BEFORE session initialization and Login
+  if (IS_ADMIN_SURFACE && !isStaffDeviceSupported) {
+    return <PCAccessRequired viewport={viewport} onLogout={isAuthenticated ? logout : undefined} />;
+  }
+
   // Gate entire AppShell rendering until Supabase Auth session & profile are initialized
   if (loading || initializing) {
     return (
@@ -184,10 +192,18 @@ function AppShell() {
     );
   }
 
-  console.log('[SHELL-DEBUG] AppShell mounted');
-
   const guard = (element, allowedRoles = []) => (
-    <ProtectedRoute isAuthenticated={isAuthenticated} user={user} loading={loading} initializing={initializing} allowedRoles={allowedRoles}>
+    <ProtectedRoute
+      isAuthenticated={isAuthenticated}
+      user={user}
+      loading={loading}
+      initializing={initializing}
+      allowedRoles={allowedRoles}
+      isStaffProtected={IS_ADMIN_SURFACE}
+      isStaffDeviceSupported={isStaffDeviceSupported}
+      viewport={viewport}
+      logout={logout}
+    >
       {element}
     </ProtectedRoute>
   );
@@ -200,26 +216,28 @@ function AppShell() {
     ? true
     : (IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient');
 
+  const shouldRenderSidebar = canAccessAuthenticatedHome && isRoleAllowedOnSurface && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
+
   return (
-    <div id="app-root">
-      {canAccessAuthenticatedHome && isRoleAllowedOnSurface && (
-        <div id="sidebar-container" className={`sidebar-container ${sidebarOpen ? '' : 'collapsed'}`}>
-          {IS_USER_SURFACE ? <PatientSidebar /> : <Sidebar />}
+    <div id="app-root" className={sidebarCollapsed ? 'sidebar-collapsed' : ''}>
+      {shouldRenderSidebar && (
+        <div id="sidebar-container" className={`sidebar-container ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          {IS_USER_SURFACE ? <PatientSidebar /> : <Sidebar collapsed={sidebarCollapsed} toggle={toggleSidebar} />}
         </div>
       )}
-      {canAccessAuthenticatedHome && isRoleAllowedOnSurface && isMobile && (
+      {shouldRenderSidebar && isMobile && IS_USER_SURFACE && (
         <>
-          {!sidebarOpen && (
+          {sidebarCollapsed && (
             <button
               type="button"
               className="mobile-nav-toggle"
               aria-label="Open navigation"
-              onClick={() => setSidebarOpen(true)}
+              onClick={toggleSidebar}
             >
               <span aria-hidden style={{ fontSize: 20, lineHeight: 1 }}>☰</span>
             </button>
           )}
-          {sidebarOpen && <button type="button" aria-label="Close navigation" className="mobile-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+          {!sidebarCollapsed && <button type="button" aria-label="Close navigation" className="mobile-sidebar-backdrop" onClick={toggleSidebar} />}
         </>
       )}
 
@@ -229,7 +247,7 @@ function AppShell() {
 
         {IS_ADMIN_SURFACE && (
           <>
-            <Route path="/dashboard" element={guard(<Dashboard setSidebarOpen={setSidebarOpen} sidebarOpen={sidebarOpen} />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/dashboard" element={guard(<Dashboard />, ['admin', 'physician', 'nurse'])} />
             <Route path="/appointments" element={guard(<Appointments />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patients" element={guard(<Patients />, ['admin', 'physician', 'nurse'])} />
             <Route path="/encounter" element={guard(<Encounter />, ['admin', 'physician', 'nurse'])} />

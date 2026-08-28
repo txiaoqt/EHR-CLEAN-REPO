@@ -7,6 +7,7 @@ import { canDeleteRecord, canViewSensitiveField, getSensitivityLevel, isHighSens
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
+import { SearchIcon, CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
 
 function localizedDateTime(dateStr) {
   if (!dateStr) return '—';
@@ -44,6 +45,7 @@ const Encounters = () => {
   // UI controls
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent'); // 'recent' | 'oldest'
+  const [clinicianFilter, setClinicianFilter] = useState('all');
 
   // per-row loading ids for actions (so only that row's button is disabled)
   const [loadingIds, setLoadingIds] = useState([]); // array of encIds being processed
@@ -164,10 +166,26 @@ const Encounters = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // search + sort behavior
-  const visible = useMemo(() => {
+  // Dynamically derive unique clinicians list from existing encounter records
+  const clinicians = useMemo(() => {
+    const set = new Set();
+    (encounters || []).forEach(e => {
+      if (e.clinician_name && e.clinician_name.trim()) {
+        set.add(e.clinician_name.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [encounters]);
+
+  // Active Queue (Today) - patients with encounter today not yet completed
+  const activeEncounters = useMemo(() => {
+    return (encounters || []).filter(e => isActive(e.encounter_date) && (e.status || '').toLowerCase() !== 'completed');
+  }, [encounters, todayKey]);
+
+  // Encounter History & Archived Visits - historical/completed records filtered by search, clinician, and sort
+  const historyEncounters = useMemo(() => {
     const q = (search || '').trim().toLowerCase();
-    let arr = (encounters || []).slice();
+    let arr = (encounters || []).filter(e => !isActive(e.encounter_date) || (e.status || '').toLowerCase() === 'completed');
 
     if (q) {
       arr = arr.filter(e => {
@@ -179,6 +197,10 @@ const Encounters = () => {
       });
     }
 
+    if (clinicianFilter && clinicianFilter !== 'all') {
+      arr = arr.filter(e => (e.clinician_name || '').trim() === clinicianFilter);
+    }
+
     arr.sort((a, b) => {
       const da = new Date(a.encounter_date || a.created_at).getTime();
       const db = new Date(b.encounter_date || b.created_at).getTime();
@@ -186,7 +208,7 @@ const Encounters = () => {
     });
 
     return arr;
-  }, [encounters, search, sort]);
+  }, [encounters, search, sort, clinicianFilter, todayKey]);
 
   // helper to add/remove loading id
   const setLoadingId = (id, isLoading) => {
@@ -420,158 +442,246 @@ const Encounters = () => {
   return (
     <>
       <main className="main">
-        <section className="page" aria-labelledby="encounters-title">
-          {/* Header styled like Patients page */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 25, fontWeight: 700 }}>Encounters</div>
-
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-                {/* search styled same as Patients page */}
-                <input
-                  id="patients-search"
-                  type="search"
-                  placeholder="Search by name, student number..."
-                  style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', minWidth: 260 }}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-
-                <select aria-label="Sort encounters" value={sort} onChange={e => setSort(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}>
-                  <option value="recent">Recent first</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
-
-                {/* Only show export for physicians, as it contains sensitive data */}
-                {user?.role === 'physician' && (
-                  <button className="btn secondary" onClick={exportPdfLast30Days}>Export</button>
-                )}
-
-                <button className="btn" onClick={() => navigate('/encounter')}>Create New Encounter</button>
+        <div className="page" aria-labelledby="encounters-title">
+          {/* 1. Page Header: Clean & focused with primary action only */}
+          <div className="page-header">
+            <div className="page-header-title-block">
+              <h1 id="encounters-title" className="page-header-title">Clinical Encounters</h1>
+              <div className="page-header-subtitle">
+                Manage daily patient consultations, active encounter queue, and clinical records.
               </div>
             </div>
 
-            {/* short description below heading (matches style used on Patients page) */}
-            <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 13 }}>
-              Manage today's queue, record patient encounters, and review recent history.
+            <div className="page-header-actions">
+              <button type="button" className="btn" onClick={() => navigate('/encounter')}>
+                New Encounter
+              </button>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, marginTop: 12 }}>
-            {/* Active Queue */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+            {/* 2. Active Queue (Today) */}
             <div className="card" aria-live="polite">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Active Queue</h3>
-                <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                  {visible.filter(e => isActive(e.encounter_date) && (e.status || '').toLowerCase() !== 'completed').length} active (for {todayKey})
+              <div className="card-header">
+                <div>
+                  <h3 className="card-title">Active Queue (Today)</h3>
+                  <span className="card-subtitle">Patients currently undergoing consultation or awaiting triage</span>
                 </div>
+                <span className="badge badge-purple">
+                  {activeEncounters.length} Active Visits
+                </span>
               </div>
 
-              <div style={{ overflow: 'auto', marginTop: 10 }}>
-                <table className="table" aria-label="Active Encounters table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
+              <div className="table-responsive">
+                <table className="table" aria-label="Active Encounters table">
+                  <thead>
                     <tr>
-                      <th style={{ padding: 8 }}>Name</th>
-                      <th style={{ padding: 8 }}>ID</th>
-                      <th style={{ padding: 8 }}>Date</th>
-                      <th style={{ padding: 8 }}>Clinician</th>
-                      <th style={{ padding: 8 }}>Complaint</th>
-                      <th style={{ padding: 8 }}>Actions</th>
+                      <th>Patient Name</th>
+                      <th>Student ID</th>
+                      <th>Encounter Time</th>
+                      <th>Clinician</th>
+                      <th>Chief Complaint</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={6} style={{ padding: 12 }}>Loading…</td></tr>
-                    ) : visible.filter(e => isActive(e.encounter_date) && (e.status || '').toLowerCase() !== 'completed').length === 0 ? (
-                      <tr><td colSpan={6} style={{ padding: 12, color: 'var(--muted)' }}>No active encounters for today.</td></tr>
+                      <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading queue…</td></tr>
+                    ) : activeEncounters.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No active encounters for today.</td></tr>
                     ) : (
-                      visible
-                        .filter(e => isActive(e.encounter_date) && (e.status || '').toLowerCase() !== 'completed')
-                        .map(enc => (
-                          <tr key={enc.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                            <td style={{ padding: 10 }}>{enc.patient_name || enc.patient_id || '—'}</td>
-                            <td style={{ padding: 10 }}>{enc.patient_id}</td>
-                            <td style={{ padding: 10 }} title={localizedDateTime(enc.encounter_date)}>{localizedDateTime(enc.encounter_date)}</td>
-                            <td style={{ padding: 10 }}>{enc.clinician_name || '—'}</td>
-                            <td style={{ padding: 10, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {enc.chief_complaint || 'N/A'}
-                              {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
-                                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)' }}>
-                                  ({getSensitivityLevel(enc)})
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: 10, display: 'flex', gap: 8 }}>
-                              <button className="btn secondary" onClick={() => markComplete(enc.id)} disabled={loadingIds.includes(enc.id)}>
-                                {loadingIds.includes(enc.id) ? 'Working…' : 'Mark Complete'}
+                      activeEncounters.map(enc => (
+                        <tr key={enc.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{enc.patient_name || enc.patient_id || '—'}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-neutral" style={{ fontWeight: 700 }}>{enc.patient_id}</span>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)' }} title={localizedDateTime(enc.encounter_date)}>
+                            {localizedDateTime(enc.encounter_date)}
+                          </td>
+                          <td>{enc.clinician_name || 'Staff'}</td>
+                          <td style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 500 }}>{enc.chief_complaint || 'N/A'}</span>
+                            {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
+                              <span className="badge badge-warning" style={{ marginLeft: 6 }}>
+                                {getSensitivityLevel(enc)}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: 8 }}>
+                              <button className="btn secondary small" onClick={() => markComplete(enc.id)} disabled={loadingIds.includes(enc.id)}>
+                                {loadingIds.includes(enc.id) ? 'Completing…' : 'Mark Complete'}
                               </button>
-                              <button className="btn" onClick={() => navigate(`/patient-profile?id=${enc.patient_id}`)}>Profile</button>
-                            </td>
-                          </tr>
-                        ))
+                              <button className="btn small" onClick={() => navigate(`/patient-profile?id=${enc.patient_id}`)}>
+                                Profile
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Encounter History — show ALL but with scrollbar */}
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Encounter History</h3>
-                <div style={{ color: 'var(--muted)', fontSize: 13 }}>{visible.filter(e => !isActive(e.encounter_date) || (e.status || '').toLowerCase() === 'completed').length} records</div>
+            {/* 3. Encounter History & Archived Visits Workspace */}
+            <div className="card" style={{ padding: '20px 22px' }}>
+              {/* Header & Dynamic Record Count */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                    Encounter History & Archived Visits
+                  </h2>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Comprehensive clinical records log
+                  </div>
+                </div>
+                <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
+                  Total: <strong>{historyEncounters.length}</strong> records
+                </span>
               </div>
 
-              <div style={{ marginTop: 10, maxHeight: 420, overflow: 'auto' }}>
-                <table className="table" aria-label="Encounter History table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
+              {/* Table Toolbar: Fluid Search + Sort + Clinician Filter + Export PDF */}
+              <div className="encounters-toolbar">
+                {/* 1. Full-Width Search Input */}
+                <div className="encounters-search-wrapper">
+                  <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
+                    <SearchIcon size={16} />
+                  </span>
+                  <input
+                    id="encounters-search"
+                    type="search"
+                    className="encounters-search-input"
+                    placeholder="Search patient, ID, or complaint..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    aria-label="Search patient, ID, or complaint"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                      aria-label="Clear search"
+                    >
+                      <CloseIcon size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Controls Group */}
+                <div className="encounters-filter-group">
+                  {/* 2. Sort Dropdown */}
+                  <div className="encounters-select-wrapper">
+                    <select
+                      id="encounters-sort"
+                      aria-label="Sort encounters"
+                      value={sort}
+                      onChange={e => setSort(e.target.value)}
+                      className="encounters-filter-select"
+                    >
+                      <option value="recent">Recent first</option>
+                      <option value="oldest">Oldest first</option>
+                    </select>
+                    <span className="encounters-filter-chevron">
+                      <ChevronDownIcon size={13} />
+                    </span>
+                  </div>
+
+                  {/* 3. Clinician Filter Dropdown */}
+                  <div className="encounters-select-wrapper">
+                    <select
+                      id="encounters-clinician-filter"
+                      aria-label="Filter by clinician"
+                      value={clinicianFilter}
+                      onChange={e => setClinicianFilter(e.target.value)}
+                      className="encounters-filter-select"
+                    >
+                      <option value="all">All Clinicians</option>
+                      {clinicians.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <span className="encounters-filter-chevron">
+                      <ChevronDownIcon size={13} />
+                    </span>
+                  </div>
+
+                  {/* 4. Export PDF Button (text-only, secondary button) */}
+                  {user?.role === 'physician' && (
+                    <button
+                      type="button"
+                      id="encounters-export-pdf-btn"
+                      className="btn secondary"
+                      onClick={exportPdfLast30Days}
+                    >
+                      Export PDF
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="table-responsive" style={{ maxHeight: 480 }}>
+                <table className="table" aria-label="Encounter History table">
+                  <thead>
                     <tr>
-                      <th style={{ padding: 8 }}>Name</th>
-                      <th style={{ padding: 8 }}>ID</th>
-                      <th style={{ padding: 8 }}>Date</th>
-                      <th style={{ padding: 8 }}>Clinician</th>
-                      <th style={{ padding: 8 }}>Complaint</th>
-                      <th style={{ padding: 8 }}>Actions</th>
+                      <th>Patient Name</th>
+                      <th>Student ID</th>
+                      <th>Date & Time</th>
+                      <th>Clinician</th>
+                      <th>Chief Complaint</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={6} style={{ padding: 12 }}>Loading…</td></tr>
-                    ) : visible.filter(e => !isActive(e.encounter_date) || (e.status || '').toLowerCase() === 'completed').length === 0 ? (
-                      <tr><td colSpan={6} style={{ padding: 12, color: 'var(--muted)' }}>No history records.</td></tr>
+                      <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading history records…</td></tr>
+                    ) : historyEncounters.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No history records.</td></tr>
                     ) : (
-                      visible
-                        .filter(e => !isActive(e.encounter_date) || (e.status || '').toLowerCase() === 'completed')
-                        .map(enc => (
-                          <tr key={enc.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                            <td style={{ padding: 10 }}>{enc.patient_name || enc.patient_id || '—'}</td>
-                            <td style={{ padding: 10 }}>{enc.patient_id}</td>
-                            <td style={{ padding: 10 }} title={localizedDateTime(enc.encounter_date)}>{localizedDateTime(enc.encounter_date)}</td>
-                            <td style={{ padding: 10 }}>{enc.clinician_name || '—'}</td>
-                            <td style={{ padding: 10, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {enc.chief_complaint || 'N/A'}
-                              {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
-                                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)' }}>
-                                  ({getSensitivityLevel(enc)})
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: 10, display: 'flex', gap: 8 }}>
-                              <button className="btn" onClick={() => navigate(`/patient-profile?id=${enc.patient_id}`)}>Profile</button>
+                      historyEncounters.map(enc => (
+                        <tr key={enc.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{enc.patient_name || enc.patient_id || '—'}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-neutral" style={{ fontWeight: 700 }}>{enc.patient_id}</span>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)' }} title={localizedDateTime(enc.encounter_date)}>
+                            {localizedDateTime(enc.encounter_date)}
+                          </td>
+                          <td>{enc.clinician_name || 'Staff'}</td>
+                          <td style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 500 }}>{enc.chief_complaint || 'N/A'}</span>
+                            {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
+                              <span className="badge badge-warning" style={{ marginLeft: 6 }}>
+                                {getSensitivityLevel(enc)}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: 8 }}>
+                              <button className="btn secondary small" onClick={() => navigate(`/patient-profile?id=${enc.patient_id}`)}>
+                                Profile
+                              </button>
 
-                              {/* DELETE BUTTON - only available to physicians */}
                               {canDeleteRecord(user) && (
                                 <button
-                                  className="btn secondary"
+                                  className="btn danger small"
                                   onClick={() => openDeleteModal(enc)}
                                   title="Delete Encounter"
                                 >
                                   Delete
                                 </button>
                               )}
-                            </td>
-                          </tr>
-                        ))
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
@@ -579,16 +689,28 @@ const Encounters = () => {
             </div>
           </div>
 
-          {/* toast */}
+          {/* Toast */}
           {toast && (
             <div style={{
-              position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 7000, padding: '10px 16px', borderRadius: 8, color: 'white', fontWeight: 700,
-              backgroundColor: toast.type === 'error' ? '#dc3545' : '#28a745', boxShadow: '0 6px 18px rgba(0,0,0,0.12)'
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              zIndex: 7000,
+              padding: '12px 20px',
+              borderRadius: 12,
+              color: 'white',
+              fontWeight: 700,
+              backgroundColor: toast.type === 'error' ? '#dc2626' : '#059669',
+              boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
             }}>
-              {toast.text}
+              <span>{toast.type === 'error' ? '⚠️' : '✓'}</span>
+              <span>{toast.text}</span>
             </div>
           )}
-        </section>
+        </div>
       </main>
 
       {/* Hidden export container for PDF (styled inline for reliable rendering)

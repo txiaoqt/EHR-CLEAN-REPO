@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { getSensitivityLevel, isPhysician } from '../accessControl.js';
 import { useAuth } from '../AuthContext.jsx';
+import { SearchIcon, CloseIcon, ChevronDownIcon, ArrowUpIcon, ArrowDownIcon } from '../components/icons/Icons.jsx';
 
 const Patients = () => {
   const navigate = useNavigate();
@@ -14,9 +15,10 @@ const Patients = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // search & sort
+  // search & sort (separate field and direction)
   const [search, setSearch] = useState('');
-  const [sortOption, setSortOption] = useState('name_desc');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   // register modal
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -150,21 +152,20 @@ const Patients = () => {
 
   const sortedPatients = React.useMemo(() => {
     const arr = (filteredPatients || []).slice();
-    const [field, dir] = (sortOption || 'name_desc').split('_');
     arr.sort((a, b) => {
       const get = (obj, f) => {
         if (f === 'last') return new Date(obj.last_visit_date || 0).getTime();
         if (f === 'year') return Number(obj.year || 0);
         return (obj[f] || '').toString().toLowerCase();
       };
-      const va = get(a, field === 'last' ? 'last' : field);
-      const vb = get(b, field === 'last' ? 'last' : field);
-      if (va > vb) return dir === 'asc' ? 1 : -1;
-      if (va < vb) return dir === 'asc' ? -1 : 1;
+      const va = get(a, sortField);
+      const vb = get(b, sortField);
+      if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+      if (va < vb) return sortDirection === 'asc' ? -1 : 1;
       return 0;
     });
     return arr;
-  }, [filteredPatients, sortOption]);
+  }, [filteredPatients, sortField, sortDirection]);
 
   // create student (manual tab) - insert into students table and select it automatically
   const submitCreateStudent = async () => {
@@ -284,50 +285,26 @@ const Patients = () => {
   // preview item (student to show in modal)
   const previewStudent = selectedStudent ? selectedStudent : (manualStudent.name ? manualStudent : null);
 
-  // UI helpers
-  const sortOptions = [
-    { value: 'name_asc', label: 'Name ↑' },
-    { value: 'name_desc', label: 'Name ↓' },
-    { value: 'year_asc', label: 'Year ↑' },
-    { value: 'year_desc', label: 'Year ↓' },
-    { value: 'last_asc', label: 'Last Visit ↑' },
-    { value: 'last_desc', label: 'Last Visit ↓' }
-  ];
-
   return (
     <main className="main">
-      <section className="page">
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 25, fontWeight: 700 }}>Patients</div>
-
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                id="patients-search"
-                type="search"
-                placeholder="Search by name, student number..."
-                style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', minWidth: 260 }}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
-              >
-                {sortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-
-              <button className="btn" onClick={() => { setShowRegisterModal(true); setRegisterTab('search'); setSelectedStudent(null); setManualStudent({ name: '', id: '', year: 1 }); }}>
-                Register / Add
-              </button>
+      <div className="page">
+        {/* Header Bar: Clean & focused with primary action only */}
+        <div className="page-header">
+          <div className="page-header-title-block">
+            <h1 className="page-header-title">Patients Directory</h1>
+            <div className="page-header-subtitle">
+              Manage registered patient records, student profiles, and clinical encounters.
             </div>
           </div>
 
-          {/* short description below the header (matches Appointments header style) */}
-          <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 13 }}>
-            Manage patient records — register patients, view records, and start new encounters.
+          <div className="page-header-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => { setShowRegisterModal(true); setRegisterTab('search'); setSelectedStudent(null); setManualStudent({ name: '', id: '', year: 1 }); }}
+            >
+              Register Patient
+            </button>
           </div>
         </div>
 
@@ -335,43 +312,41 @@ const Patients = () => {
         {showRegisterModal && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.35)', padding: 16
+            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)', padding: 16
           }}>
-            <div style={{ width: 940, maxWidth: '98%', background: 'var(--panel)', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', gap: 12, padding: 16, borderBottom: '1px solid rgba(0,0,0,0.04)', alignItems: 'center' }}>
-                <div style={{ fontSize: 16, fontWeight: 800 }}>Register Patient</div>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                  <button className="btn secondary" onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}>
-                    Close
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={() => submitRegisterPatient(previewStudent)}
-                    disabled={!previewStudent || registering}
-                    title={!previewStudent ? 'Preview a student first' : 'Register the previewed student'}
-                  >
-                    {registering ? 'Registering…' : `Register`}
-                  </button>
+            <div style={{ width: 880, maxWidth: '98%', background: '#ffffff', borderRadius: 16, boxShadow: 'var(--shadow-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Register New Patient</h3>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Search existing student directory or create manual patient entry</div>
                 </div>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}
+                  aria-label="Close modal"
+                >
+                  <CloseIcon size={18} />
+                </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 0, minHeight: 360 }}>
-                <div style={{ padding: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 0, minHeight: 360 }}>
+                <div style={{ padding: 24 }}>
                   {/* Tabs */}
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
                     <button
-                      className={registerTab === 'search' ? 'btn' : 'btn secondary'}
+                      className={registerTab === 'search' ? 'btn small' : 'btn secondary small'}
                       onClick={() => {
                         setRegisterTab('search');
                         setSelectedStudent(null);
                         setManualStudent({ name: '', id: '', year: 1 });
                       }}
                     >
-                      Search Patient
+                      Search Student Directory
                     </button>
 
                     <button
-                      className={registerTab === 'manual' ? 'btn' : 'btn secondary'}
+                      className={registerTab === 'manual' ? 'btn small' : 'btn secondary small'}
                       onClick={() => {
                         setRegisterTab('manual');
                         setStudentSearch('');
@@ -379,45 +354,44 @@ const Patients = () => {
                         setSelectedStudent(null);
                       }}
                     >
-                      Add Patient
+                      Manual Entry
                     </button>
                   </div>
 
                   {/* Search tab */}
                   {registerTab === 'search' && (
                     <>
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Search students</label>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Search students</label>
                         <input
-                          placeholder="Type name or ID (min 2 chars)"
+                          placeholder="Type name or ID (min 2 chars)..."
                           value={studentSearch}
                           onChange={(e) => { setStudentSearch(e.target.value); setShowNewStudentForm(false); setSelectedStudent(null); }}
-                          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
+                          className="input"
+                          style={{ width: '100%' }}
                         />
                       </div>
 
-                      <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 8 }}>
+                      <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
                         {studentSuggestions.length > 0 ? (
                           studentSuggestions.map(s => (
-                            <div key={s.id} onClick={() => { setSelectedStudent(s); setStudentSearch(`${s.name} (${s.id})`); setStudentSuggestions([]); }} style={{ padding: 12, borderBottom: '1px solid rgba(0,0,0,0.04)', cursor: 'pointer' }}>
-                              <div style={{ fontWeight: 700 }}>{s.name}</div>
-                              <div style={{ color: 'var(--muted)', fontSize: 13 }}>{s.id} — Year {s.year}</div>
+                            <div key={s.id} onClick={() => { setSelectedStudent(s); setStudentSearch(`${s.name} (${s.id})`); setStudentSuggestions([]); }} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.12s' }}>
+                              <div style={{ fontWeight: 700, color: 'var(--text)' }}>{s.name}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.id} — Year {s.year}</div>
                             </div>
                           ))
                         ) : (
-                          <div style={{ padding: 12, color: 'var(--muted)' }}>
-                            No suggestions.
+                          <div style={{ padding: 18, color: 'var(--text-muted)', textAlign: 'center', fontSize: 13 }}>
+                            Type at least 2 characters to search students.
                           </div>
                         )}
                       </div>
 
                       {selectedStudent && (
-                        <div style={{ marginTop: 12, padding: 12, border: '1px dashed rgba(0,0,0,0.06)', borderRadius: 8 }}>
-                          <div style={{ fontWeight: 800 }}>Selected</div>
-                          <div style={{ marginTop: 6 }}>{selectedStudent.name} — <span style={{ color: 'var(--muted)' }}>{selectedStudent.id}</span> • Year {selectedStudent.year}</div>
-                          <div style={{ marginTop: 10 }}>
-                            <button className="btn" onClick={() => { setSelectedStudent(null); setStudentSearch(''); }}>Change</button>
-                          </div>
+                        <div style={{ marginTop: 16, padding: 14, background: 'var(--color-primary-tint)', border: '1px solid var(--color-primary-border)', borderRadius: 10 }}>
+                          <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 12, textTransform: 'uppercase' }}>Selected Student</div>
+                          <div style={{ marginTop: 4, fontWeight: 700, color: 'var(--text)' }}>{selectedStudent.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedStudent.id} • Year {selectedStudent.year}</div>
                         </div>
                       )}
                     </>
@@ -425,131 +399,211 @@ const Patients = () => {
 
                   {/* Manual tab */}
                   {registerTab === 'manual' && (
-                    <>
-                      <div style={{ display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Full name</label>
+                        <input
+                          value={manualStudent.name}
+                          onChange={(e) => setManualStudent(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="e.g. Juan Dela Cruz"
+                          className="input"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Full name</label>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Student ID</label>
                           <input
-                            value={manualStudent.name}
-                            onChange={(e) => setManualStudent(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Patient full name"
-                            style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
+                            value={manualStudent.id}
+                            onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value }))}
+                            placeholder="e.g. 2023-01234"
+                            className="input"
+                            style={{ width: '100%' }}
                           />
                         </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8 }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Student ID</label>
-                            <input
-                              value={manualStudent.id}
-                              onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value }))}
-                              placeholder="e.g. TUPM-XX-XXXX"
-                              style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Year</label>
-                            <input value={manualStudent.year} onChange={(e) => setManualStudent(prev => ({ ...prev, year: Number(e.target.value || 1) }))} type="number" min={1} max={5} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }} />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
-                          <button className="btn secondary" onClick={() => { setManualStudent({ name: '', id: '', year: 1 }); }}>Reset</button>
-                          <button className="btn" onClick={async () => { await submitCreateStudent(); }}>
-                            Create
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* right column: preview */}
-                <div style={{ padding: 18, borderLeft: '1px solid rgba(0,0,0,0.04)', background: '#fff' }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Preview</div>
-
-                  {!previewStudent ? (
-                    <div style={{ color: 'var(--muted)' }}>No patient selected. Use the Search tab or Manual Entry to build the patient's profile, then click Register.</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ fontWeight: 800, fontSize: 16 }}>{previewStudent.name}</div>
-                      <div style={{ color: 'var(--muted)' }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
-                      <div style={{ marginTop: 8 }}>
-                        <div style={{ fontWeight: 700 }}>Register Preview</div>
-                        <div style={{ color: 'var(--muted)', marginTop: 6 }}>
-                          This will create a patient record with the student details shown and set last visit to today's date.
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Year</label>
+                          <input value={manualStudent.year} onChange={(e) => setManualStudent(prev => ({ ...prev, year: Number(e.target.value || 1) }))} type="number" min={1} max={5} className="input" style={{ width: '100%' }} />
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            if (registerTab !== 'manual') setRegisterTab('manual');
-                            if (previewStudent && previewStudent.id && previewStudent.name && (!selectedStudent || selectedStudent.id !== previewStudent.id)) {
-                              setManualStudent(prev => ({ ...(previewStudent.id ? previewStudent : prev) }));
-                              setRegisterTab('manual');
-                            }
-                          }}
-                        >
-                          Edit
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                        <button className="btn secondary small" onClick={() => { setManualStudent({ name: '', id: '', year: 1 }); }}>Reset</button>
+                        <button className="btn small" onClick={async () => { await submitCreateStudent(); }}>
+                          Create & Select
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
+
+                {/* Right column: preview */}
+                <div style={{ padding: 24, borderLeft: '1px solid var(--border-subtle)', background: 'var(--grey-100)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Patient Preview</div>
+
+                  {!previewStudent ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
+                      No patient selected. Search or enter details on the left to preview the patient profile before registering.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div className="card" style={{ padding: 16, background: '#ffffff' }}>
+                        <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{previewStudent.name}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
+                        <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 12, color: 'var(--text-light)' }}>
+                          Clicking register will create an active EHR record and log the registration date.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Form Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid var(--border-subtle)', background: '#fafafa' }}>
+                <button
+                  className="btn secondary"
+                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => submitRegisterPatient(previewStudent)}
+                  disabled={!previewStudent || registering}
+                  title={!previewStudent ? 'Preview a student first' : 'Register the previewed student'}
+                >
+                  {registering ? 'Registering…' : 'Register Patient'}
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Card containing Results header (right-aligned) and table */}
-        <div className="card" style={{ marginTop: 12, padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Patients List</div>
-            <div style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 13 }}>
-              Results: <strong>{sortedPatients.length}</strong>
+        {/* Patients Table Card */}
+        <div className="card" style={{ padding: '20px 22px' }}>
+          {/* Card Header & Dynamic Count */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                Registered Patients
+              </h2>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                Student directory and clinical patient registry
+              </div>
+            </div>
+
+            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
+              Total: <strong>{sortedPatients.length}</strong>
+            </span>
+          </div>
+
+          {/* Table Toolbar: Fluid Search + Sort Field + Sort Direction */}
+          <div className="patients-toolbar">
+            {/* 1. Full-Width Search Input (Single visible input shell) */}
+            <div className="patients-search-wrapper">
+              <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
+                <SearchIcon size={16} />
+              </span>
+              <input
+                id="patients-search"
+                type="search"
+                className="patients-search-input"
+                placeholder="Search patients by name or student ID..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search patients by name or student ID"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  aria-label="Clear search"
+                >
+                  <CloseIcon size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* 2. Filter Controls Group: Sort Field + Direction */}
+            <div className="patients-filter-group">
+              <div className="patients-select-wrapper">
+                <select
+                  id="patients-sort-field"
+                  className="patients-filter-select"
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value)}
+                  aria-label="Sort patients by field"
+                >
+                  <option value="name">Sort By: Name</option>
+                  <option value="year">Sort By: Year Level</option>
+                  <option value="last">Sort By: Last Visit</option>
+                </select>
+                <span className="patients-filter-chevron">
+                  <ChevronDownIcon size={13} />
+                </span>
+              </div>
+
+              <button
+                type="button"
+                id="patients-sort-direction-btn"
+                className="patients-direction-btn"
+                onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                title={sortDirection === 'asc' ? 'Sort ascending' : 'Sort descending'}
+                aria-label={sortDirection === 'asc' ? 'Sort ascending' : 'Sort descending'}
+              >
+                {sortDirection === 'asc' ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
+              </button>
             </div>
           </div>
 
-          <div style={{ marginTop: 12, overflow: 'auto' }}>
-            {/* Use the same table class as Appointments so colors & hover match */}
+          <div className="table-responsive">
             <table className="table" aria-label="Patients table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>ID</th>
-                  <th>Year</th>
+                  <th>Patient Name</th>
+                  <th>Student ID</th>
+                  <th>Year Level</th>
                   <th>Last Visit</th>
-                  <th>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} style={{ padding: 12 }}>Loading…</td></tr>
+                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patient records…</td></tr>
                 ) : sortedPatients.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: 12, color: 'var(--muted)' }}>No patients found.</td></tr>
+                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No patients found.</td></tr>
                 ) : (
                   sortedPatients.map(pat => (
-                    // Allow the table's hover/row styles to apply (no inline borders)
                     <tr key={pat.id}>
                       <td>
-                        <div>{pat.name}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{pat.name}</div>
                         {isPhysician(user) && getSensitivityLevel(pat) && getSensitivityLevel(pat) !== 'normal' && (
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          <span className="badge badge-warning" style={{ marginTop: 4 }}>
                             Sensitivity: {getSensitivityLevel(pat)}
-                          </div>
+                          </span>
                         )}
                       </td>
                       <td>
-                        <div>{pat.id}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{/* optional secondary */}</div>
+                        <span className="badge badge-neutral" style={{ fontWeight: 700 }}>{pat.id}</span>
                       </td>
-                      <td>{pat.year}</td>
-                      <td className="label-muted">{pat.last_visit_date || '—'}</td>
-                      <td style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn secondary" onClick={() => handleOpenProfile(pat.id)}>Open</button>
-                        <button className="btn" onClick={() => handleNewEncounter(pat)}>New Encounter</button>
+                      <td>
+                        <span className="badge badge-info">Year {pat.year}</span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>
+                        {pat.last_visit_date || '—'}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 8 }}>
+                          <button className="btn secondary small" onClick={() => handleOpenProfile(pat.id)}>
+                            View Profile
+                          </button>
+                          <button className="btn small" onClick={() => handleNewEncounter(pat)}>
+                            Encounter
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -559,25 +613,28 @@ const Patients = () => {
           </div>
         </div>
 
-        {/* toast */}
+        {/* Toast */}
         {toast && (
           <div style={{
             position: 'fixed',
-            top: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: 24,
+            right: 24,
             zIndex: 6000,
-            padding: '10px 16px',
-            borderRadius: 8,
+            padding: '12px 20px',
+            borderRadius: 12,
             color: 'white',
             fontWeight: 700,
-            backgroundColor: toast.type === 'error' ? '#dc3545' : '#28a745',
-            boxShadow: '0 6px 18px rgba(0,0,0,0.12)'
+            backgroundColor: toast.type === 'error' ? '#dc2626' : '#059669',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
           }}>
-            {toast.text}
+            <span>{toast.type === 'error' ? '⚠️' : '✓'}</span>
+            <span>{toast.text}</span>
           </div>
         )}
-      </section>
+      </div>
     </main>
   );
 };

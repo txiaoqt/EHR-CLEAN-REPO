@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord } from '../accessControl.js';
+import { SearchIcon, AlertIcon, CloseIcon, ChevronDownIcon, HistoryIcon } from '../components/icons/Icons.jsx';
 
 const Inventory = () => {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ const Inventory = () => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({
     item_name: '',
@@ -451,420 +453,626 @@ const Inventory = () => {
 
   return (
     <main className="main">
-      <section className="page">
-        {/* Header card (matches Patients header style) */}
-        <div className="card" style={{ padding: 16, marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 25, fontWeight: 700 }}>Inventory</div>
+      <div className="page">
+        {/* 1. Page Header: Title with integrated History utility icon + Add Item primary action */}
+        <div className="page-header">
+          <div className="page-header-title-block">
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <h1 className="page-header-title" style={{ margin: 0 }}>Pharmacy & Supplies Inventory</h1>
+              <button
+                type="button"
+                id="inventory-history-btn"
+                className="inventory-history-icon-btn"
+                onClick={() => setShowHistoryModal(true)}
+                title="Inventory History"
+                aria-label="Inventory History"
+              >
+                <HistoryIcon size={19} />
+              </button>
+            </div>
+            <div className="page-header-subtitle">
+              Track medicine inventory, medical supplies, reorder levels, and dispensing logs.
+            </div>
+          </div>
 
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="page-header-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={addStock}
+            >
+              Add Item
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Summary Metrics (4 Mini Cards) */}
+        <div className="inventory-kpi-grid">
+          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
+            <div className="kpi-title" style={{ fontSize: 12 }}>Total Cataloged Items</div>
+            <div className="kpi-value" style={{ fontSize: 22 }}>{items.length}</div>
+          </div>
+          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
+            <div className="kpi-title" style={{ fontSize: 12 }}>Low Stock Alerts</div>
+            <div className="kpi-value" style={{ fontSize: 22, color: reorderItems.length > 0 ? 'var(--danger)' : 'var(--color-emerald-text)' }}>
+              {reorderItems.length}
+            </div>
+          </div>
+          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
+            <div className="kpi-title" style={{ fontSize: 12 }}>Adequate Stock</div>
+            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-emerald-text)' }}>
+              {items.length - reorderItems.length}
+            </div>
+          </div>
+          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
+            <div className="kpi-title" style={{ fontSize: 12 }}>Recent Log Entries</div>
+            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-purple-text)' }}>
+              {transactions.length}
+            </div>
+          </div>
+        </div>
+
+        {/* Reorder Alerts */}
+        {reorderItems.length > 0 && (
+          <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--danger)', background: '#fff5f5' }}>
+            <div className="card-header" style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
+                  <AlertIcon size={18} />
+                </span>
+                <h3 className="card-title" style={{ color: 'var(--danger)' }}>Reorder Attention Required</h3>
+              </div>
+              <span className="badge badge-danger">{reorderItems.length} items below minimum</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+              {reorderItems.map(item => (
+                <div key={item.id} style={{ background: '#ffffff', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca', fontSize: 13 }}>
+                  <strong>{item.item_name}</strong>: Current stock <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{item.stock_quantity} {item.unit}</span> (Reorder threshold: {item.reorder_level})
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. Stock Levels & Inventory Directory Workspace */}
+        <div className="card" style={{ padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                Stock Levels & Inventory Directory
+              </h2>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                Clinic medicine catalog and consumable supply status
+              </div>
+            </div>
+
+            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
+              Showing: <strong>{filteredItems.length}</strong> items
+            </span>
+          </div>
+
+          {/* Stock Toolbar: Fluid Search + All Categories Dropdown */}
+          <div className="inventory-toolbar">
+            {/* 1. Full-Width Search Input (Single visible input shell) */}
+            <div className="inventory-search-wrapper">
+              <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
+                <SearchIcon size={16} />
+              </span>
               <input
                 id="inventory-search"
                 type="search"
-                placeholder="Search inventory (item name)"
-                style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', minWidth: 260 }}
+                className="inventory-search-input"
+                placeholder="Search item name..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                aria-label="Search item name"
               />
-
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
-              >
-                <option value="All">All Categories</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-
-              <button className="btn" onClick={addStock}>Add Stock</button>
-            </div>
-          </div>
-
-          {/* short description below the header (matches Appointments / Patients header style) */}
-          <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 13 }}>
-            Manage inventory — view stock levels, add items, adjust stock, and review transactions.
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Stock Levels */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0 }}>Stock Levels</h3>
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  aria-label="Clear search"
+                >
+                  <CloseIcon size={14} />
+                </button>
+              )}
             </div>
 
-            <div style={{ overflow: 'auto', marginBottom: '18px' }}>
-              <table className="table" aria-label="Inventory table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Category</th>
-                    <th>Stock</th>
-                    <th>Unit</th>
-                    <th>Reorder Level</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>
-                        No inventory items found.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredItems.map(item => (
-                      <tr key={item.id}>
-                        <td style={{ fontWeight: 700 }}>{item.item_name}</td>
-                        <td>{item.category || 'Uncategorized'}</td>
-                        <td>{item.stock_quantity}</td>
-                        <td>{item.unit}</td>
-                        <td className="label-muted">{item.reorder_level}</td>
-                        <td style={{ color: Number(item.stock_quantity) < Number(item.reorder_level) ? 'red' : 'green' }}>
-                          {Number(item.stock_quantity) < Number(item.reorder_level) ? 'Low Stock' : 'Adequate'}
-                        </td>
-                        <td style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn secondary" onClick={() => adjust(item)}>Adjust</button>
-
-                          {/* Delete button */}
-                          {canDeleteRecord(user) && (
-                            <button
-                              className="btn"
-                              onClick={() => openDeleteModal(item)}
-                              title="Delete this item"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Reorder Alerts */}
-          {reorderItems.length > 0 && (
-            <div className="card">
-              <h3 style={{ margin: 0 }}>Reorder Alerts</h3>
-              <div style={{ marginTop: '12px' }}>
-                <ul>
-                  {reorderItems.map(item => (
-                    <li key={item.id} style={{ color: 'red' }}>
-                      {item.item_name}: Current stock {item.stock_quantity} {item.unit}, reorder at {item.reorder_level}
-                    </li>
+            {/* 2. Category Filter Dropdown */}
+            <div className="inventory-filter-group">
+              <div className="inventory-select-wrapper">
+                <select
+                  id="inventory-category-filter"
+                  className="inventory-filter-select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  aria-label="Filter by category"
+                >
+                  <option value="All">All Categories</option>
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
-                </ul>
+                </select>
+                <span className="inventory-filter-chevron">
+                  <ChevronDownIcon size={13} />
+                </span>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Consumables Log */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Consumables Log</h3>
-            <div style={{ overflow: 'auto' }}>
-              <table className="table" aria-label="Inventory transactions table">
-                <thead>
+          <div className="table-responsive">
+            <table className="table" aria-label="Inventory table">
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Stock Quantity</th>
+                  <th>Unit</th>
+                  <th>Reorder Level</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.length === 0 ? (
                   <tr>
-                    <th>Item</th>
-                    <th>Type</th>
-                    <th>Quantity</th>
-                    <th>Reason</th>
-                    <th>Performed By</th>
-                    <th>Date</th>
+                    <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No inventory items found matching filters.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>No transactions yet.</td>
-                    </tr>
-                  ) : (
-                    transactions.map(trans => (
-                      <tr key={trans.id}>
-                        <td>{trans.item_name}</td>
-                        <td>{trans.transaction_type}</td>
-                        <td>{trans.quantity}</td>
-                        <td>{trans.reason || 'N/A'}</td>
-                        <td>{trans.performed_by}</td>
-                        <td>{new Date(trans.created_at).toLocaleString()}</td>
+                ) : (
+                  filteredItems.map(item => {
+                    const isLow = Number(item.stock_quantity) < Number(item.reorder_level);
+                    return (
+                      <tr key={item.id}>
+                        <td style={{ fontWeight: 700, color: 'var(--text)' }}>{item.item_name}</td>
+                        <td>
+                          <span className="badge badge-info">{item.category || 'Supplies'}</span>
+                        </td>
+                        <td style={{ fontWeight: 700, fontSize: 15 }}>{item.stock_quantity}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{item.unit}</td>
+                        <td style={{ color: 'var(--text-light)' }}>{item.reorder_level}</td>
+                        <td>
+                          <span className={isLow ? 'badge badge-danger' : 'badge badge-success'}>
+                            {isLow ? 'Low Stock' : 'Adequate'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 8 }}>
+                            <button className="btn secondary small" onClick={() => adjust(item)}>
+                              Adjust
+                            </button>
+
+                            {canDeleteRecord(user) && (
+                              <button
+                                className="btn danger small"
+                                onClick={() => openDeleteModal(item)}
+                                title="Delete this item"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </section>
 
-      {/* Add Item Modal */}
-      {showAddModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
+        {/* 4. History Modal (On-Demand Transactions Log) */}
+        {showHistoryModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: 16
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowHistoryModal(false); }}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                boxShadow: 'var(--shadow-lg)',
+                maxWidth: '1100px',
+                width: '100%',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>
+                    Inventory Transactions & Consumables Log
+                  </h3>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Total Logs: <strong>{transactions.length}</strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="inventory-history-close-btn"
+                  className="modal-close-btn"
+                  onClick={() => setShowHistoryModal(false)}
+                  aria-label="Close modal"
+                >
+                  <CloseIcon size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body: Scrollable Table */}
+              <div style={{ overflowY: 'auto', padding: '16px 24px', flex: 1 }}>
+                <div className="table-responsive">
+                  <table className="table" aria-label="Inventory transactions history table">
+                    <thead>
+                      <tr>
+                        <th>Item Name</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Reason / Notes</th>
+                        <th>Performed By</th>
+                        <th>Date & Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No transactions logged yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        transactions.map(trans => {
+                          const isAdd = (trans.transaction_type || '').toLowerCase().includes('add');
+                          return (
+                            <tr key={trans.id}>
+                              <td style={{ fontWeight: 700, color: 'var(--text)' }}>{trans.item_name}</td>
+                              <td>
+                                <span className={isAdd ? 'badge badge-success' : 'badge badge-purple'}>
+                                  {isAdd ? 'Stock Added' : 'Stock Deducted'}
+                                </span>
+                              </td>
+                              <td style={{ fontWeight: 700 }}>{trans.quantity}</td>
+                              <td style={{ color: 'var(--text-muted)' }}>{trans.reason || 'Routine Adjustment'}</td>
+                              <td>{trans.performed_by || 'Staff'}</td>
+                              <td style={{ color: 'var(--text-light)', fontSize: 12.5 }}>
+                                {new Date(trans.created_at).toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--grey-50, #f8fafc)' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Item Modal */}
+        {showAddModal && (
           <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-            maxWidth: '400px',
-            width: '100%'
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200
           }}>
-            <h3>Add New Inventory Item</h3>
-            <form onSubmit={(e) => { e.preventDefault(); submitNewItem(); }}>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Item Name:</label>
+            <div style={{
+              background: '#ffffff',
+              padding: '24px',
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-lg)',
+              maxWidth: '440px',
+              width: '100%'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Add Inventory Item</h3>
+                <button type="button" className="modal-close-btn" onClick={() => setShowAddModal(false)} aria-label="Close modal">
+                  <CloseIcon size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); submitNewItem(); }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Item Name</label>
+                  <input
+                    name="item_name"
+                    type="text"
+                    className="input"
+                    value={newItem.item_name}
+                    onChange={handleNewItemChange}
+                    placeholder="e.g., Paracetamol 500mg"
+                    style={{ width: '100%' }}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Category</label>
+                  <select
+                    name="category"
+                    className="input"
+                    value={newItem.category}
+                    onChange={handleNewItemChange}
+                    style={{ width: '100%' }}
+                  >
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Initial Stock</label>
+                    <input
+                      name="stock_quantity"
+                      type="number"
+                      className="input"
+                      value={newItem.stock_quantity}
+                      onChange={handleNewItemChange}
+                      min="0"
+                      max={STOCK_MAX}
+                      style={{ width: '100%' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Unit</label>
+                    <select
+                      name="unit"
+                      className="input"
+                      value={newItem.unit}
+                      onChange={handleNewItemChange}
+                      style={{ width: '100%' }}
+                    >
+                      <option value="pcs">pcs</option>
+                      <option value="boxes">boxes</option>
+                      <option value="ml">ml</option>
+                      <option value="mg">mg</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Reorder Threshold Level</label>
+                  <input
+                    name="reorder_level"
+                    type="number"
+                    className="input"
+                    value={newItem.reorder_level}
+                    onChange={handleNewItemChange}
+                    min="1"
+                    max={REORDER_MAX}
+                    style={{ width: '100%' }}
+                    required
+                  />
+                </div>
+
+                {modalMessage && (
+                  <div style={{
+                    padding: '10px 14px',
+                    marginBottom: '14px',
+                    borderRadius: '10px',
+                    color: modalMessageType === 'error' ? 'var(--danger)' : '#059669',
+                    background: modalMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
+                    fontSize: '13px',
+                    fontWeight: 600
+                  }}>
+                    {modalMessage}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button type="submit" className="btn">Add Item</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Adjust Stock Modal */}
+        {showAdjustModal && adjustItem && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200
+          }}>
+            <div style={{
+              background: '#ffffff',
+              padding: '24px',
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-lg)',
+              maxWidth: '440px',
+              width: '100%'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Adjust Stock: {adjustItem.item_name}</h3>
+                <button type="button" className="modal-close-btn" onClick={() => setShowAdjustModal(false)} aria-label="Close modal">
+                  <CloseIcon size={18} />
+                </button>
+              </div>
+
+              <div style={{ padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+                Current stock: <strong>{adjustItem.stock_quantity} {adjustItem.unit}</strong>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); submitAdjust(); }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Action</label>
+                  <select
+                    name="type"
+                    className="input"
+                    value={adjustData.type}
+                    onChange={handleAdjustChange}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="add">Add Stock (Restock)</option>
+                    <option value="remove">Remove Stock (Dispense / Used)</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Quantity</label>
+                  <input
+                    name="quantity"
+                    type="number"
+                    className="input"
+                    value={adjustData.quantity}
+                    onChange={handleAdjustChange}
+                    min="1"
+                    max={ADJUST_QTY_MAX}
+                    style={{ width: '100%' }}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Reason / Remarks</label>
+                  <input
+                    name="reason"
+                    type="text"
+                    className="input"
+                    value={adjustData.reason}
+                    onChange={handleAdjustChange}
+                    placeholder="e.g., Routine Restock, Dispensed to patient"
+                    style={{ width: '100%' }}
+                    required
+                  />
+                </div>
+
+                {adjustModalMessage && (
+                  <div style={{
+                    padding: '10px 14px',
+                    marginBottom: '14px',
+                    borderRadius: '10px',
+                    color: adjustModalMessageType === 'error' ? 'var(--danger)' : '#059669',
+                    background: adjustModalMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
+                    fontSize: '13px',
+                    fontWeight: 600
+                  }}>
+                    {adjustModalMessage}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn secondary" onClick={() => setShowAdjustModal(false)}>Cancel</button>
+                  <button type="submit" className="btn">Confirm Adjustment</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete confirmation modal */}
+        {showDeleteModal && deleteItem && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1250
+          }}>
+            <div style={{
+              background: '#ffffff',
+              padding: '24px',
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-lg)',
+              maxWidth: '480px',
+              width: '100%'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Item: {deleteItem.item_name}</h3>
+                <button type="button" className="modal-close-btn" onClick={() => setShowDeleteModal(false)} aria-label="Close modal">
+                  <CloseIcon size={18} />
+                </button>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+                This will permanently remove the item from inventory catalog. To confirm, type the item name <strong>{deleteItem.item_name}</strong> below.
+              </p>
+
+              <div style={{ marginBottom: 14 }}>
                 <input
-                  name="item_name"
+                  className="input"
                   type="text"
-                  className="input"
-                  value={newItem.item_name}
-                  onChange={handleNewItemChange}
-                  placeholder="Enter item name"
-                  required
+                  placeholder="Type exact item name to confirm"
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(sanitizeName(e.target.value))}
+                  style={{ width: '100%' }}
                 />
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label>Category:</label>
-                <select
-                  name="category"
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify:</label>
+                <input
+                  type="password"
                   className="input"
-                  value={newItem.category}
-                  onChange={handleNewItemChange}
-                >
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                  style={{ width: '100%' }}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                />
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label>Stock Quantity:</label>
-                <input
-                  name="stock_quantity"
-                  type="number"
-                  className="input"
-                  value={newItem.stock_quantity}
-                  onChange={handleNewItemChange}
-                  min="0"
-                  max={STOCK_MAX}
-                  required
-                />
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Unit:</label>
-                <select
-                  name="unit"
-                  className="input"
-                  value={newItem.unit}
-                  onChange={handleNewItemChange}
-                >
-                  <option value="pcs">pcs</option>
-                  <option value="boxes">boxes</option>
-                  <option value="ml">ml</option>
-                  <option value="mg">mg</option>
-                </select>
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Reorder Level:</label>
-                <input
-                  name="reorder_level"
-                  type="number"
-                  className="input"
-                  value={newItem.reorder_level}
-                  onChange={handleNewItemChange}
-                  min="1"
-                  max={REORDER_MAX}
-                  required
-                />
-              </div>
-              {modalMessage && (
+              {deleteMessage && (
                 <div style={{
-                  padding: '8px',
-                  marginBottom: '12px',
-                  borderRadius: '4px',
-                  color: modalMessageType === 'error' ? 'red' : 'green',
-                  border: `1px solid ${modalMessageType === 'error' ? 'red' : 'green'}`,
-                  fontSize: '14px'
+                  padding: '10px 14px',
+                  marginBottom: '14px',
+                  borderRadius: '10px',
+                  color: deleteMessageType === 'error' ? 'var(--danger)' : '#059669',
+                  background: deleteMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
+                  fontSize: '13px',
+                  fontWeight: 600
                 }}>
-                  {modalMessage}
+                  {deleteMessage}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn">Add Item</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Adjust Stock Modal */}
-      {showAdjustModal && adjustItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-            maxWidth: '420px',
-            width: '100%'
-          }}>
-            <h3>Adjust Stock: {adjustItem.item_name}</h3>
-            <p>Current Stock: {adjustItem.stock_quantity} {adjustItem.unit}</p>
-            <form onSubmit={(e) => { e.preventDefault(); submitAdjust(); }}>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Action:</label>
-                <select
-                  name="type"
-                  className="input"
-                  value={adjustData.type}
-                  onChange={handleAdjustChange}
-                >
-                  <option value="add">Add Stock</option>
-                  <option value="remove">Remove Stock</option>
-                </select>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="btn secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
+                <button className="btn danger" onClick={submitDelete} disabled={deleting}>
+                  {deleting ? 'Deleting...' : 'Delete Item'}
+                </button>
               </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Quantity:</label>
-                <input
-                  name="quantity"
-                  type="number"
-                  className="input"
-                  value={adjustData.quantity}
-                  onChange={handleAdjustChange}
-                  min="1"
-                  max={ADJUST_QTY_MAX}
-                  required
-                />
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label>Reason:</label>
-                <input
-                  name="reason"
-                  type="text"
-                  className="input"
-                  value={adjustData.reason}
-                  onChange={handleAdjustChange}
-                  placeholder="e.g., Restock, Used in treatment"
-                  required
-                />
-              </div>
-              {adjustModalMessage && (
-                <div style={{
-                  padding: '8px',
-                  marginBottom: '12px',
-                  borderRadius: '4px',
-                  color: adjustModalMessageType === 'error' ? 'red' : 'green',
-                  border: `1px solid ${adjustModalMessageType === 'error' ? 'red' : 'green'}`,
-                  fontSize: '14px'
-                }}>
-                  {adjustModalMessage}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn" onClick={() => setShowAdjustModal(false)}>Cancel</button>
-                <button type="submit" className="btn">Adjust Stock</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation modal */}
-      {showDeleteModal && deleteItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-            maxWidth: '480px',
-            width: '100%'
-          }}>
-            <h3 style={{ marginTop: 0 }}>Delete Item: {deleteItem.item_name}</h3>
-            <p style={{ color: 'var(--muted)' }}>
-              This will permanently remove the item from inventory. To confirm, type the item name <strong>{deleteItem.item_name}</strong> below.
-            </p>
-
-            <div style={{ marginBottom: 12 }}>
-              <input
-                className="input"
-                type="text"
-                placeholder="Type exact item name to confirm"
-                value={deleteConfirmName}
-                onChange={(e) => setDeleteConfirmName(sanitizeName(e.target.value))}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Enter your password to verify:</label>
-              <input
-                type="password"
-                className="input"
-                style={{ width: '100%' }}
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-              />
-            </div>
-
-            {deleteMessage && (
-              <div style={{
-                padding: '8px',
-                marginBottom: '12px',
-                borderRadius: '4px',
-                color: deleteMessageType === 'error' ? 'red' : 'green',
-                border: `1px solid ${deleteMessageType === 'error' ? 'red' : 'green'}`,
-                fontSize: '14px'
-              }}>
-                {deleteMessage}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              {/* Cancel first, then Delete (swapped) */}
-              <button className="btn" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
-              <button className="btn" onClick={submitDelete} disabled={deleting}>
-                {deleting ? 'Deleting...' : 'Delete Item'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 };

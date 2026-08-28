@@ -13,11 +13,12 @@ import {
   ArcElement,
   Title,
   Tooltip,
-  Legend,
+  Legend
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import 'jspdf-autotable';
 import { formatDate, logAudit } from '../utils.js';
+import { CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
 ChartJS.register(
@@ -542,124 +543,251 @@ const Reports = () => {
 
   return (
     <main className="main">
-      <section className="page">
-        {/* Header card with short description */}
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>Reports & Analytics</div>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label style={{ color: 'var(--muted)', fontSize: 13 }}>From</label>
-              <input id="r-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-              <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
-              <input id="r-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-
-              <select id="r-type" value={type} onChange={(e) => setType(e.target.value)}>
-                <option value="census">Census</option>
-                <option value="diagnoses">Top Diagnoses</option>
-                <option value="visits">Visit Trends</option>
-              </select>
-
-              {/* Export menu only available for physicians - contains sensitive patient data */}
-              {user?.role === 'physician' && (
-                <div style={{ position: 'relative' }}>
-                  <button className="btn" onClick={() => setShowExportMenu(s => !s)}>Export</button>
-                  {showExportMenu && (
-                    <div style={{
-                      position: 'absolute', right: 0, marginTop: 6, background: 'var(--panel)',
-                      border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
-                      borderRadius: 6, zIndex: 2000, overflow: 'hidden', minWidth: 220
-                    }}>
-                      <button onClick={() => requestReportExport('csv-full')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>CSV (Full)</button>
-                      <button onClick={() => requestReportExport('pdf-selected')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>PDF (Selected)</button>
-                      <button onClick={() => requestReportExport('pdf-full')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>PDF (Full)</button>
-                    </div>
-                  )}
-                </div>
-              )}
+      <div className="page">
+        {/* 1. Page Header: Focused on page identity */}
+        <div className="page-header">
+          <div className="page-header-title-block">
+            <h1 className="page-header-title">Reports & Clinical Analytics</h1>
+            <div className="page-header-subtitle">
+              Generate census metrics, diagnosis distributions, and date-filtered clinic reporting.
             </div>
-          </div>
-
-          <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 14 }}>
-            Generate clinic analytics (census, top diagnoses, visit trends) across a date range.
-            Use Export → PDF (Selected) to create a cover + selected chart (with its raw data), or PDF (Full) to generate a cover + Census / Diagnoses / Visits each on their own pages with their raw data.
           </div>
         </div>
 
-        <div className="card" style={{ padding: 12 }}>
-          <div className="grid-2col" style={{ gap: 12 }}>
-            <div id="report-output">
-              <h3 style={{ marginTop: 0 }}>Report Preview</h3>
+        {/* 2. Report Overview & Control Toolbar */}
+        <div className="card" style={{ padding: '20px 22px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                Report Overview
+              </h2>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                Configure date range, analytical view, and generate official clinical records
+              </div>
+            </div>
 
-              {dateError && <div style={{ color: '#b71c1c', marginBottom: 8 }}>{dateError}</div>}
+            <span className="badge badge-purple" style={{ fontSize: 12, padding: '4px 10px' }}>
+              <strong>{reportData.length}</strong> records analyzed
+            </span>
+          </div>
 
-              {chartData ? (
-                <div style={{ marginBottom: 12 }}>
+          {/* Report Controls Toolbar */}
+          <div className="reports-toolbar">
+            {/* Date Range Inputs */}
+            <div className="reports-date-group">
+              <div className="reports-date-field">
+                <label htmlFor="r-from" className="reports-date-label">From</label>
+                <input
+                  id="r-from"
+                  type="date"
+                  className="reports-date-input"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  aria-label="From date"
+                />
+              </div>
+              <span style={{ color: 'var(--border)', fontWeight: 600 }}>|</span>
+              <div className="reports-date-field">
+                <label htmlFor="r-to" className="reports-date-label">To</label>
+                <input
+                  id="r-to"
+                  type="date"
+                  className="reports-date-input"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  aria-label="To date"
+                />
+              </div>
+            </div>
+
+            {/* Report Type Selector */}
+            <div className="reports-select-wrapper">
+              <select
+                id="r-type"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="reports-filter-select"
+                aria-label="Report type"
+              >
+                <option value="census">Monthly Census</option>
+                <option value="diagnoses">Top Diagnoses</option>
+                <option value="visits">Daily Visit Trends</option>
+              </select>
+              <span className="reports-filter-chevron">
+                <ChevronDownIcon size={13} />
+              </span>
+            </div>
+
+            {/* Export menu (Physician Gated) */}
+            {user?.role === 'physician' && (
+              <div style={{ position: 'relative', display: 'inline-flex', marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  id="reports-export-btn"
+                  className="btn"
+                  onClick={() => setShowExportMenu(s => !s)}
+                >
+                  Export Report
+                </button>
+                {showExportMenu && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: '100%', marginTop: 6, background: '#ffffff',
+                    border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+                    borderRadius: 12, zIndex: 2000, overflow: 'hidden', minWidth: 220, padding: '6px 0'
+                  }}>
+                    <button onClick={() => requestReportExport('csv-full')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>Export CSV (Full)</button>
+                    <button onClick={() => requestReportExport('pdf-selected')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>Export PDF (Selected Chart)</button>
+                    <button onClick={() => requestReportExport('pdf-full')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>Export PDF (Complete Census)</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {dateError && (
+            <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: 'var(--danger)', fontSize: 13, marginTop: 12 }}>
+              {dateError}
+            </div>
+          )}
+        </div>
+
+        {/* 3. Analytics & Clinical Guide Layout */}
+        <div className="reports-main-grid">
+          {/* Main Visuals & Drill-down Table */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Analytics Visualization Card */}
+            <div className="card" style={{ padding: '20px 22px' }}>
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <div>
+                  <h3 className="card-title" style={{ fontSize: 16 }}>Analytics Visualization</h3>
+                  <span className="card-subtitle">
+                    Showing {type === 'census' ? 'case counts' : (type === 'diagnoses' ? 'diagnostic breakdown' : 'daily trends')} for selected range
+                  </span>
+                </div>
+              </div>
+
+              {loading ? (
+                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  Generating visualization…
+                </div>
+              ) : (!reportData || reportData.length === 0) ? (
+                <div style={{
+                  minHeight: 180,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '36px 20px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+                    No report data available
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.5 }}>
+                    There are no encounter records within the selected date range. Try selecting a different date range.
+                  </div>
+                </div>
+              ) : chartData ? (
+                <div style={{ minHeight: 280, padding: 10 }}>
                   {chartData.type === 'bar' ? <Bar data={chartData.data} options={chartData.options} /> :
                    chartData.type === 'pie' ? <Pie data={chartData.data} options={chartData.options} /> : null}
                 </div>
               ) : (
-                <div style={{ minHeight: 140, color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {loading ? 'Loading chart…' : 'No chart for this report type.'}
+                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  No chart available for the specified range.
                 </div>
               )}
-
-              <div style={{ marginTop: 16 }}>
-                <h4>Raw Data</h4>
-                {(!reportData || reportData.length === 0) ? (
-                  <div style={{ color: 'var(--muted)' }}>No data for the selected range.</div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="table" aria-label="Report data table">
-                      <thead>
-                        <tr><th>Date</th><th>Patient</th><th>Clinician</th><th>Complaint</th></tr>
-                      </thead>
-                      <tbody>
-                        {reportData.map(enc => (
-                          <tr key={enc.id || Math.random()}>
-                            <td>{new Date(enc.encounter_date).toLocaleString()}</td>
-                            <td>{enc.patient_name || enc.patient_id}</td>
-                            <td>{enc.clinician_name}</td>
-                            <td style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{enc.chief_complaint || 'N/A'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
 
-            <aside style={{ width: 360 }}>
-              <div style={{ marginBottom: 12 }}>
-                <h4 style={{ marginTop: 0 }}>Clinical Guide</h4>
-                <div style={{ marginBottom: 12 }}>
-                  <strong>Auto 30-day view:</strong> this page loads the last {DEFAULT_LOOKBACK_DAYS} days automatically.
+            {/* Raw Encounters Drill-Down Card */}
+            <div className="card" style={{ padding: '20px 22px' }}>
+              <div className="card-header" style={{ marginBottom: 12 }}>
+                <div>
+                  <h3 className="card-title" style={{ fontSize: 16 }}>Raw Encounters Data</h3>
+                  <span className="card-subtitle">Granular clinical records within active date filter</span>
                 </div>
-                <div style={{ marginBottom: 12 }}>
-                  <strong>Interpretation tips:</strong>
-                  <ul style={{ marginTop: 8 }}>
-                    <li>Rising visit trend → consider staffing/triage review.</li>
-                    <li>High-frequency diagnosis → investigate for clusters or follow-up needs.</li>
-                    <li>Use the "Raw Data" table to drill into specific encounters.</li>
-                  </ul>
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <strong>Export notes:</strong>
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                    PDFs: cover page shows clinic title/logo; subsequent pages contain chart + raw data and only a small page-number footer.
-                  </div>
-                </div>
+                <span className="badge badge-neutral">
+                  Rows: <strong>{reportData.length}</strong>
+                </span>
               </div>
-            </aside>
+
+              {(!reportData || reportData.length === 0) ? (
+                <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  No data records found for the selected date range.
+                </div>
+              ) : (
+                <div className="table-responsive" style={{ maxHeight: 360 }}>
+                  <table className="table" aria-label="Report data table">
+                    <thead>
+                      <tr>
+                        <th>Date & Time</th>
+                        <th>Patient ID / Name</th>
+                        <th>Clinician</th>
+                        <th>Chief Complaint</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.map(enc => (
+                        <tr key={enc.id || Math.random()}>
+                          <td style={{ color: 'var(--text-muted)' }}>{new Date(enc.encounter_date).toLocaleString()}</td>
+                          <td>
+                            <span style={{ fontWeight: 700 }}>{enc.patient_name || enc.patient_id}</span>
+                          </td>
+                          <td>{enc.clinician_name || 'Staff'}</td>
+                          <td style={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {enc.chief_complaint || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Side Guide Card */}
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <h3 className="card-title" style={{ fontSize: 15, marginBottom: 12 }}>
+              Clinical Intelligence Guide
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+              <div>
+                <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 2 }}>Auto 30-Day Lookback</strong>
+                By default, queries the last {DEFAULT_LOOKBACK_DAYS} days of clinic operations to ensure responsive analysis.
+              </div>
+
+              <div>
+                <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 2 }}>Clinical Indicators</strong>
+                <ul style={{ paddingLeft: 16, margin: '4px 0 0' }}>
+                  <li>Spike in respiratory complaints may indicate seasonal influenza cluster.</li>
+                  <li>Track recurring consultations to assess chronic illness follow-up compliance.</li>
+                  <li>Use exported reports for quarterly university health census compliance.</li>
+                </ul>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 2 }}>Confidentiality Policy</strong>
+                Exporting full census reports requires staff authorization credentials due to sensitive medical information.
+              </div>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {showExportPasswordModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2100 }}>
-          <div style={{ background:'white', padding:20, borderRadius:8, maxWidth:420, width:'92%' }}>
-            <h3 style={{ marginTop: 0 }}>Reports Export Password</h3>
-            <p style={{ color: 'var(--muted)' }}>Enter password to export this report.</p>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2100 }}>
+          <div style={{ background:'#ffffff', padding:24, borderRadius:16, maxWidth:420, width:'92%', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Reports Export Authorization</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setShowExportPasswordModal(false)} aria-label="Close modal">
+                <CloseIcon size={18} />
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+              Enter staff export security password to download the protected clinic census.
+            </p>
             <input
               type="password"
               className="input"
@@ -669,15 +797,16 @@ const Reports = () => {
                 if (exportPasswordError) setExportPasswordError('');
               }}
               onKeyDown={(e) => { if (e.key === 'Enter') confirmReportExport(); }}
-              placeholder="Enter export password"
+              placeholder="Enter export password..."
+              style={{ width: '100%', marginTop: 8 }}
               autoFocus
             />
             {exportPasswordError && (
-              <div style={{ color: '#b42318', marginTop: 8, fontSize: 13 }}>{exportPasswordError}</div>
+              <div style={{ color: 'var(--danger)', marginTop: 8, fontSize: 13, fontWeight: 600 }}>{exportPasswordError}</div>
             )}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop: 14 }}>
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop: 20 }}>
               <button className="btn secondary" onClick={() => setShowExportPasswordModal(false)}>Cancel</button>
-              <button className="btn" onClick={confirmReportExport}>Confirm Export</button>
+              <button className="btn" onClick={confirmReportExport}>Confirm & Export</button>
             </div>
           </div>
         </div>

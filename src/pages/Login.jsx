@@ -307,30 +307,41 @@ const Login = () => {
 
   return (
     <main
-      className="main"
+      className="login-page-main"
       style={{
         minHeight: '100vh',
-        // keep bg1 as requested
-        background: `url(${bg1Image}) no-repeat center center fixed`,
+        width: '100%',
+        backgroundImage: `url(${bg1Image})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center center',
         backgroundSize: 'cover',
         backgroundAttachment: 'fixed',
-        filter: 'brightness(0.95)',
+        backgroundColor: '#f6f7f8',
+        filter: 'brightness(0.98)',
         fontFamily: `"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
-      {/* Outer shell identical to your HTML structure so CSS applies */}
-      <div id="login-screen" style={{ width: '100%' }}>
-        {/* Force the two-column layout and spacing so placement matches the screenshot */}
+      {/* Outer shell */}
+      <div id="login-screen" style={{ width: '100%', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+        {/* Two-column layout with balanced spacing */}
         <div
           className="wrap"
           style={{
+            width: '100%',
+            maxWidth: 1360,
+            margin: '0 auto',
             display: 'flex',
-            gap: isMobile ? 16 : (isTablet ? 28 : 56),
-            padding: isMobile ? '16px 14px' : (isTablet ? '24px 28px' : '48px 80px'),
-            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isTablet ? 36 : 64,
+            padding: isTablet ? '32px 40px' : '48px 64px',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             minHeight: '100vh',
             boxSizing: 'border-box',
-            justifyContent: 'space-between',
             flexDirection: isMobile ? 'column' : 'row',
           }}
         >
@@ -339,25 +350,27 @@ const Login = () => {
             className="hero"
             aria-hidden="false"
             style={{
-              width: isMobile ? '100%' : (isTablet ? '52%' : '58%'),
-              padding: isMobile ? '8px 6px' : '18px 28px',
+              flex: 1,
+              maxWidth: 720,
+              minWidth: 0,
+              padding: '16px 0',
               boxSizing: 'border-box',
               display: isMobile ? 'none' : 'block',
             }}
           >
-            <div className="brand-row" style={{ display: 'flex', gap: 18, alignItems: 'center', marginBottom: 10 }}>
+            <div className="brand-row" style={{ display: 'flex', gap: 18, alignItems: 'center', marginBottom: 12 }}>
               <img
                 src={tupehrlogo}
                 alt="TUP EHR Logo"
                 className="brand-logo"
-                style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'contain', padding: 8 }}
+                style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'contain', padding: 4, flexShrink: 0 }}
               />
               <div>
                 {IS_USER_SURFACE ? (
                   <h1 style={{
                     margin: 0,
-                    fontSize: isTablet ? 26 : 34,
-                    lineHeight: 1.05,
+                    fontSize: isTablet ? 26 : 32,
+                    lineHeight: 1.15,
                     fontWeight: 900,
                     fontFamily: `"Merriweather", serif`,
                     color: '#111',
@@ -368,8 +381,8 @@ const Login = () => {
                 ) : (
                 <h1 style={{
                   margin: 0,
-                  fontSize: isTablet ? 26 : 34,
-                  lineHeight: 1.05,
+                  fontSize: isTablet ? 26 : 32,
+                  lineHeight: 1.15,
                   fontWeight: 900,
                   fontFamily: `"Merriweather", serif`,
                   color: '#111',
@@ -384,15 +397,14 @@ const Login = () => {
             </div>
 
             <p className="lead" style={{
-              marginTop: 22,
-              color: 'rgba(68,68,68,1)',
-              maxWidth: 760,
-              fontSize: isTablet ? 15 : 17,
-              lineHeight: 1.9,
+              marginTop: 20,
+              color: 'rgba(51,51,51,1)',
+              maxWidth: 680,
+              fontSize: isTablet ? 14.5 : 16,
+              lineHeight: 1.8,
               fontWeight: 400,
               opacity: 0.95,
-              textAlign: 'justify',
-              textJustify: 'inter-word'
+              textAlign: 'left'
             }}>
               {IS_USER_SURFACE ? (
                 'The TUP Manila Clinic Online Patient Portal helps students, faculty, staff, and authorized TUP personnel access clinic services online. Users can book same-day or future appointments, view clinic visit history, and send non-emergency messages to doctors or clinic staff. The portal is built to make clinic coordination faster, easier, and more convenient for the whole TUP community.'
@@ -407,18 +419,18 @@ const Login = () => {
             </p>
 
             <div
-  className="tagline"
-  style={{
-    marginTop: 26,
-    fontStyle: 'italic',
-    color: '#333',
-    fontSize: 15,
-    textAlign: 'center',
-    width: '100%'
-  }}
->
-  “Where records don’t get lost—just students.”
-</div>
+              className="tagline"
+              style={{
+                marginTop: 20,
+                fontStyle: 'italic',
+                color: '#444',
+                fontSize: 14.5,
+                textAlign: 'left',
+                width: '100%'
+              }}
+            >
+              “Where records don’t get lost—just students.”
+            </div>
 
           </div>
 
@@ -427,29 +439,35 @@ const Login = () => {
             className="login-wrap"
             aria-hidden="false"
             style={{
-              width: isMobile ? '100%' : (isTablet ? '48%' : '40%'),
+              flexShrink: 0,
+              width: isTablet ? 380 : 420,
+              maxWidth: '100%',
               display: 'flex',
-              justifyContent: isMobile ? 'center' : 'flex-start',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
             }}
           >
-            <div
+            <form
               className="login-card"
-              role="form"
-              aria-labelledby="login-title"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (signupMode && IS_USER_SURFACE) handlePatientSignup();
+                else handleLogin();
+              }}
               style={{
-                width: isMobile ? '100%' : (isTablet ? 420 : 460),
+                width: '100%',
                 background: 'linear-gradient(180deg, #931b1b, #b92a2a)',
                 color: '#fff',
-                padding: isMobile ? 20 : 32,
-                borderRadius: isMobile ? 20 : 28,
-                boxShadow: '0 20px 50px rgba(0,0,0,0.14)',
+                padding: '32px 28px',
+                borderRadius: 24,
+                boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
                 boxSizing: 'border-box',
               }}
             >
               <h2 id="login-title" style={{
                 textAlign: 'center',
-                margin: '6px 0 14px 0',
-                fontSize: isMobile ? 22 : 28,
+                margin: '0 0 16px 0',
+                fontSize: 26,
                 fontWeight: 800,
                 fontFamily: `"Merriweather", serif`
               }}>{IS_USER_SURFACE ? (signupMode ? 'Create Account' : 'Patient Log In') : 'Staff Log In'}</h2>
@@ -457,6 +475,7 @@ const Login = () => {
               {IS_USER_SURFACE && (
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10, justifyContent: 'center' }}>
                   <button
+                    type="button"
                     onClick={() => setSignupMode(false)}
                     disabled={loading}
                     style={{
@@ -468,6 +487,7 @@ const Login = () => {
                     Log In
                   </button>
                   <button
+                    type="button"
                     onClick={() => setSignupMode(true)}
                     disabled={loading}
                     style={{
@@ -508,7 +528,7 @@ const Login = () => {
                     <input className="input" style={authInputStyle} type="password" value={signupData.confirmPassword} onChange={(e) => setSignupData((p) => ({ ...p, confirmPassword: e.target.value }))} />
                   </div>
                   <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                    <button className="btn" onClick={handlePatientSignup} disabled={loading}>
+                    <button type="submit" className="btn" disabled={loading}>
                       {loading ? 'Creating…' : 'Create Account'}
                     </button>
                   </div>
@@ -526,7 +546,6 @@ const Login = () => {
                   autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={onKeyDown}
                   style={{
                     ...authInputStyle,
                   }}
@@ -543,7 +562,6 @@ const Login = () => {
                   autoComplete="current-password"
                   value={pass}
                   onChange={(e) => setPass(e.target.value)}
-                  onKeyDown={onKeyDown}
                   style={{
                     ...authInputStyle,
                   }}
@@ -553,8 +571,8 @@ const Login = () => {
               <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 12 }}>
                 <button
                   id="loginBtn"
+                  type="submit"
                   className="btn"
-                  onClick={handleLogin}
                   disabled={loading}
                   style={{
                     background: '#fff',
@@ -579,7 +597,7 @@ const Login = () => {
               <div className="footer-note" style={{ marginTop: 14, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: 12.5 }}>
                 © Technological University of the Philippines
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </div>

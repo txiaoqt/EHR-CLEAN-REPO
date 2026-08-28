@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, canViewSensitiveField, getSensitivityLevel, isPhysician } from '../accessControl.js';
+import { CloseIcon } from '../components/icons/Icons.jsx';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -390,7 +391,7 @@ const PatientProfile = () => {
           </div>
 
           {/* Main grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="patient-profile-grid">
             {/* encounters */}
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -551,19 +552,21 @@ const PatientProfile = () => {
           {/* preview modal */}
           {previewSrc && (
             <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
             }}>
-              <div style={{ width: '90%', maxWidth: 960, background: 'var(--panel)', borderRadius: 8, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong>Preview</strong>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" onClick={() => download(previewSrc)}>Download</button>
-                    <button className="btn" onClick={() => { setPreviewSrc(null); setPreviewType(null); }}>Close</button>
+              <div style={{ width: '90%', maxWidth: 960, background: '#ffffff', borderRadius: 16, padding: 20, boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong style={{ fontSize: 17 }}>Preview</strong>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <button className="btn secondary small" onClick={() => download(previewSrc)}>Download</button>
+                    <button type="button" className="modal-close-btn" onClick={() => { setPreviewSrc(null); setPreviewType(null); }} aria-label="Close preview">
+                      <CloseIcon size={18} />
+                    </button>
                   </div>
                 </div>
-                <div style={{ height: '70vh', overflow: 'auto' }}>
+                <div style={{ height: '70vh', overflow: 'auto', background: 'var(--grey-100)', borderRadius: 10, padding: 8 }}>
                   {previewType === 'image' ? (
-                    <img src={previewSrc} alt="preview" style={{ maxWidth: '100%', maxHeight: '100%', display: 'block', margin: '0 auto' }} />
+                    <img src={previewSrc} alt="preview" style={{ maxWidth: '100%', maxHeight: '100%', display: 'block', margin: '0 auto', borderRadius: 6 }} />
                   ) : (
                     <iframe src={previewSrc} title="Preview" style={{ width: '100%', height: '100%', border: 'none' }} />
                   )}
@@ -574,15 +577,20 @@ const PatientProfile = () => {
 
           {/* delete modal */}
           {showDeleteModal && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 420, background: 'var(--panel)', padding: 18, borderRadius: 8 }}>
-                <h3 style={{ marginTop: 0 }}>Delete patient record</h3>
-                <div style={{ color: 'var(--muted)', marginBottom: 12 }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 440, maxWidth: '92%', background: '#ffffff', padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Patient Record</h3>
+                  <button type="button" className="modal-close-btn" onClick={() => { setShowDeleteModal(false); setDeletePassword(''); setDeleteMessage(''); }} aria-label="Close modal">
+                    <CloseIcon size={18} />
+                  </button>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
                   Are you sure you want to delete <strong>{patient.name}</strong> ({patient.id})? This action cannot be undone.
                 </div>
 
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ display: 'block', marginBottom: 4 }}>Enter your password to verify:</label>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify:</label>
                   <input
                     type="password"
                     className="input"
@@ -593,15 +601,15 @@ const PatientProfile = () => {
                 </div>
 
                 {deleteMessage && (
-                  <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>
+                  <div style={{ color: 'var(--danger)', fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
                     {deleteMessage}
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button className="btn" onClick={() => { setShowDeleteModal(false); setDeletePassword(''); setDeleteMessage(''); }}>Cancel</button>
-                  <button className="btn" onClick={handleDeletePatient} disabled={deleting} style={{ background: 'var(--danger)', color: '#fff' }}>
-                    {deleting ? 'Deleting…' : 'Yes, delete'}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <button className="btn secondary" onClick={() => { setShowDeleteModal(false); setDeletePassword(''); setDeleteMessage(''); }}>Cancel</button>
+                  <button className="btn danger" onClick={handleDeletePatient} disabled={deleting}>
+                    {deleting ? 'Deleting…' : 'Delete Record'}
                   </button>
                 </div>
               </div>

@@ -91,14 +91,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
-    console.log('[AUTH-DEBUG] initializing=true');
 
     // Safety timeout: Never keep loading/initializing blocked for more than 3s
     const timeoutId = setTimeout(() => {
       if (mounted) {
         setLoading(false);
         setInitializing(false);
-        console.log('[AUTH-DEBUG] initializing=false (timeout fallback)');
       }
     }, 3000);
 
@@ -107,29 +105,20 @@ export const AuthProvider = ({ children }) => {
       clearTimeout(timeoutId);
       if (!mounted) return;
       if (error) console.warn('[AUTH] Error retrieving session:', error);
-      console.log('[AUTH-DEBUG] session exists:', !!initSession);
-      console.log('[AUTH-DEBUG] user id:', initSession?.user?.id || null);
-      console.log('[AUTH-DEBUG] session expires_at:', initSession?.expires_at || null);
-      console.log('[AUTH-DEBUG] access token exists:', !!initSession?.access_token);
       setSession(initSession);
 
       if (initSession?.user) {
         const profile = await fetchUserProfile(initSession.user);
         if (mounted && profile) {
           setUser(profile);
-          console.log('[AUTH-DEBUG] profile loaded:', !!profile);
-          console.log('[AUTH-DEBUG] profile role:', profile?.role || null);
           try {
             localStorage.setItem('ehr_user', JSON.stringify(profile));
             localStorage.setItem('authUser', JSON.stringify(profile));
           } catch (_) {}
-        } else if (mounted) {
-          console.log('[AUTH-DEBUG] profile loaded: false');
         }
       } else {
         // No active Supabase session — clear cached user so we don't show
         // a stale authenticated state with no valid JWT
-        console.log('[AUTH-DEBUG] no active session, clearing cached user');
         setUser(null);
         try {
           localStorage.removeItem('ehr_user');
@@ -139,15 +128,13 @@ export const AuthProvider = ({ children }) => {
       if (mounted) {
         setLoading(false);
         setInitializing(false);
-        console.log('[AUTH-DEBUG] initializing=false');
       }
     }).catch((err) => {
       clearTimeout(timeoutId);
-      console.warn('[AUTH-DEBUG] getSession error:', err);
+      console.warn('[AUTH] getSession error:', err);
       if (mounted) {
         setLoading(false);
         setInitializing(false);
-        console.log('[AUTH-DEBUG] initializing=false (error)');
       }
     });
 
