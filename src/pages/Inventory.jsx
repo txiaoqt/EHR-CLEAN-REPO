@@ -100,6 +100,16 @@ const Inventory = () => {
       }
     };
     fetchData();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const refreshData = async () => {

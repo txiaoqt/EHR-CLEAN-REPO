@@ -55,6 +55,16 @@ const Appointments = () => {
       setLoading(false);
     };
     fetchAppointments();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAppointments();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // patient suggestions

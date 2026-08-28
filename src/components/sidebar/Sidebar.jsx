@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { translate } from '../../utils';
 import { useAuth } from '../../AuthContext.jsx';
 import { supabase } from '../../supabaseClient.js';
@@ -8,8 +8,19 @@ import { isPhysician } from '../../accessControl.js';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 
+const NAV_ITEMS = [
+  { page: 'dashboard', label: 'dashboard', icon: '🏠' },
+  { page: 'appointments', label: 'appointments', icon: '📅' },
+  { page: 'patients', label: 'patients', icon: '🧑‍🤝‍🧑' },
+  { page: 'encounters', label: 'encounters', icon: '🩺' },
+  { page: 'reports', label: 'reports', icon: '📈' },
+  { page: 'inventory', label: 'inventory', icon: '🧾' },
+  { page: 'help', label: 'help', icon: '❓' },
+];
+
 const Sidebar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout, user } = useAuth();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [languageChange, setLanguageChange] = useState(0);
@@ -105,10 +116,6 @@ const Sidebar = () => {
   }, []);
 
   const handleNavigation = (page) => {
-    const menuItems = document.querySelectorAll('.menu-item');
-    menuItems.forEach(i => i.classList.remove('active'));
-    const target = document.querySelector(`[data-page="${page}"]`);
-    if (target) target.classList.add('active');
     navigate('/' + page);
   };
 
@@ -183,27 +190,19 @@ const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="menu" role="navigation">
-          <div className="menu-item active" data-page="dashboard" onClick={() => handleNavigation('dashboard')}>
-            🏠 {translate('dashboard')}
-          </div>
-          <div className="menu-item" data-page="appointments" onClick={() => handleNavigation('appointments')}>
-            📅 {translate('appointments')}
-          </div>
-          <div className="menu-item" data-page="patients" onClick={() => handleNavigation('patients')}>
-            🧑‍🤝‍🧑 {translate('patients')}
-          </div>
-          <div className="menu-item" data-page="encounters" onClick={() => handleNavigation('encounters')}>
-            🩺 {translate('encounters')}
-          </div>
-          <div className="menu-item" data-page="reports" onClick={() => handleNavigation('reports')}>
-            📈 {translate('reports')}
-          </div>
-          <div className="menu-item" data-page="inventory" onClick={() => handleNavigation('inventory')}>
-            🧾 {translate('inventory')}
-          </div>
-          <div className="menu-item" data-page="help" onClick={() => handleNavigation('help')}>
-            ❓ {translate('help')}
-          </div>
+          {NAV_ITEMS.map(({ page, label, icon }) => {
+            const isActive = location.pathname === `/${page}` || (page === 'dashboard' && location.pathname === '/');
+            return (
+              <div
+                key={page}
+                className={`menu-item ${isActive ? 'active' : ''}`}
+                data-page={page}
+                onClick={() => handleNavigation(page)}
+              >
+                {icon} {translate(label)}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}

@@ -119,6 +119,13 @@ const Encounters = () => {
     mountedRef.current = true;
     fetchEncounters();
 
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && mountedRef.current) {
+        fetchEncounters();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     // realtime subscription (Supabase channel API)
     const channel = supabase
       .channel('public:encounters')
@@ -146,6 +153,7 @@ const Encounters = () => {
 
     return () => {
       mountedRef.current = false;
+      document.removeEventListener('visibilitychange', onVisibility);
       try {
         supabase.removeChannel(channel);
       } catch {

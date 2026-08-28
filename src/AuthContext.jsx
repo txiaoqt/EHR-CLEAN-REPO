@@ -104,6 +104,7 @@ export const AuthProvider = ({ children }) => {
 
     // 1. Initialize session from Supabase
     supabase.auth.getSession().then(async ({ data: { session: initSession }, error }) => {
+      clearTimeout(timeoutId);
       if (!mounted) return;
       if (error) console.warn('[AUTH] Error retrieving session:', error);
       console.log('[AUTH-DEBUG] session exists:', !!initSession);
@@ -141,6 +142,7 @@ export const AuthProvider = ({ children }) => {
         console.log('[AUTH-DEBUG] initializing=false');
       }
     }).catch((err) => {
+      clearTimeout(timeoutId);
       console.warn('[AUTH-DEBUG] getSession error:', err);
       if (mounted) {
         setLoading(false);
@@ -154,16 +156,7 @@ export const AuthProvider = ({ children }) => {
       if (!mounted) return;
       setSession(currentSession);
 
-      if (currentSession?.user) {
-        const profile = await fetchUserProfile(currentSession.user);
-        if (mounted && profile) {
-          setUser(profile);
-          try {
-            localStorage.setItem('ehr_user', JSON.stringify(profile));
-            localStorage.setItem('authUser', JSON.stringify(profile));
-          } catch (_) {}
-        }
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
         console.log('[Auth] SIGNED_OUT received');
         if (mounted) {
           setUser(null);
@@ -177,6 +170,23 @@ export const AuthProvider = ({ children }) => {
             sessionStorage.clear();
           } catch (_) {}
         }
+      } else if (currentSession?.user) {
+        // Avoid re-fetching profile if user already exists with matching ID
+        setUser((prevUser) => {
+          if (prevUser && (prevUser.auth_user_id === currentSession.user.id || prevUser.email === currentSession.user.email)) {
+            return prevUser;
+          }
+          fetchUserProfile(currentSession.user).then((profile) => {
+            if (mounted && profile) {
+              setUser(profile);
+              try {
+                localStorage.setItem('ehr_user', JSON.stringify(profile));
+                localStorage.setItem('authUser', JSON.stringify(profile));
+              } catch (_) {}
+            }
+          });
+          return prevUser;
+        });
       }
       if (mounted) setLoading(false);
     });

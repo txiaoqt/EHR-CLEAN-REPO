@@ -215,14 +215,21 @@ const Dashboard = ({ setSidebarOpen, sidebarOpen }) => {
     console.log('[DASHBOARD-DEBUG] Dashboard mounted');
     fetchDashboardData();
     const handler = () => fetchDashboardData();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDashboardData();
+      }
+    };
     window.addEventListener('appointmentAdded', handler);
     window.addEventListener('appointmentUpdated', handler);
     window.addEventListener('encounterAdded', handler);
+    document.addEventListener('visibilitychange', onVisibility);
     const poll = setInterval(fetchDashboardData, 30000);
     return () => {
       window.removeEventListener('appointmentAdded', handler);
       window.removeEventListener('appointmentUpdated', handler);
       window.removeEventListener('encounterAdded', handler);
+      document.removeEventListener('visibilitychange', onVisibility);
       clearInterval(poll);
     };
   }, [fetchDashboardData]);

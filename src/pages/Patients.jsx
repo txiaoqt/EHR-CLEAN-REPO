@@ -93,7 +93,16 @@ const Patients = () => {
 
   useEffect(() => {
     fetchPatients();
-    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchPatients();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
