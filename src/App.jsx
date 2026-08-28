@@ -36,9 +36,17 @@ const normalizeTheme = (value) => {
 const getRoleHome = (role) => ((role || '').toLowerCase() === 'patient' ? '/patient/dashboard' : '/dashboard');
 const isPatientRole = (role) => (role || '').toLowerCase() === 'patient';
 
-const ProtectedRoute = ({ isAuthenticated, user, allowedRoles = [], children }) => {
+const ProtectedRoute = ({ isAuthenticated, user, loading, initializing, allowedRoles = [], children }) => {
   const location = useLocation();
 
+  // Wait for Supabase auth session to finish restoring before rendering
+  if (loading || initializing) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--muted)' }}>
+        Loading session...
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (!isWithinClinicHours()) return <Navigate to="/login" replace state={{ sessionMessage: getClinicHoursMessage() }} />;
   if (!hasRequiredRole(user, allowedRoles)) {
@@ -48,7 +56,7 @@ const ProtectedRoute = ({ isAuthenticated, user, allowedRoles = [], children }) 
 };
 
 function AppShell() {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, loading, initializing, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const resolveInitialTheme = () => {
@@ -156,8 +164,30 @@ function AppShell() {
     return () => { mounted = false; clearInterval(intervalId); };
   }, [isAuthenticated, logout, navigate]);
 
+  // Gate entire AppShell rendering until Supabase Auth session & profile are initialized
+  if (loading || initializing) {
+    return (
+      <div
+        id="app-loading"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          color: 'var(--muted)',
+          fontFamily: 'inherit',
+          fontSize: '15px'
+        }}
+      >
+        Loading session...
+      </div>
+    );
+  }
+
+  console.log('[SHELL-DEBUG] AppShell mounted');
+
   const guard = (element, allowedRoles = []) => (
-    <ProtectedRoute isAuthenticated={isAuthenticated} user={user} allowedRoles={allowedRoles}>
+    <ProtectedRoute isAuthenticated={isAuthenticated} user={user} loading={loading} initializing={initializing} allowedRoles={allowedRoles}>
       {element}
     </ProtectedRoute>
   );

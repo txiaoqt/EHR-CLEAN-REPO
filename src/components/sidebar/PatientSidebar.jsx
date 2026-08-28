@@ -34,8 +34,12 @@ const PatientSidebar = () => {
 
   const confirmLogout = async () => {
     setShowConfirm(false);
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
+    navigate('/login', { replace: true });
   };
 
   return (

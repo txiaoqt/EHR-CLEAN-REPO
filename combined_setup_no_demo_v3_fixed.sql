@@ -1,4 +1,4 @@
-﻿-- Combined SQL v3 FIXED (dependency-safe order, patient-role compatible)
+-- Combined SQL v3 FIXED (dependency-safe order, patient-role compatible)
 -- Generated on 2026-05-19
 -- Order: schema -> security migration -> auth/rls -> seeds
 
@@ -1035,6 +1035,11 @@ as $$
 declare
   v_manila_now time;
 begin
+  -- DEVELOPMENT MODE: Temporarily bypass clinic hours so development and testing can proceed 24/7.
+  -- To re-enable production clinic hours (07:00–19:00 Asia/Manila), remove "return true;" below.
+  return true;
+
+  /* PRODUCTION LOGIC:
   if current_user in ('postgres', 'supabase_admin', 'service_role') then
     return true;
   end if;
@@ -1045,6 +1050,7 @@ begin
 
   v_manila_now := (now() at time zone 'Asia/Manila')::time;
   return v_manila_now >= time '07:00' and v_manila_now < time '19:00';
+  */
 end;
 $$;
 
@@ -1621,21 +1627,225 @@ for each row execute function public.guard_encounter_assessment_plan_updates();
 --   nurse@tupclinic.local
 -- Then run the role updates below.
 
-insert into public.users (id, name, email, role, active, created_at, updated_at)
-values
-  (gen_random_uuid(), 'Dr. Rivera', 'physician@tupclinic.local', 'physician', true, now(), now()),
-  (gen_random_uuid(), 'Nurse Santos', 'nurse@tupclinic.local', 'nurse', true, now(), now())
-on conflict (email) do update set
-  name = excluded.name,
-  role = excluded.role,
-  active = excluded.active,
-  updated_at = now();
+do $$
+declare
+  v_physician_id uuid;
+  v_nurse_id uuid;
+  v_encrypted_pass_physician text;
+  v_encrypted_pass_nurse text;
+begin
+  -- Bcrypt hashed passwords
+  v_encrypted_pass_physician := crypt('Physician@123', gen_salt('bf'));
+  v_encrypted_pass_nurse := crypt('Nurse@123', gen_salt('bf'));
 
-update public.users u
-set auth_user_id = au.id
-from auth.users au
-where lower(u.email) = lower(au.email)
-  and lower(u.email) in ('physician@tupclinic.local', 'nurse@tupclinic.local');
+  -- Provision Physician: physician@tupclinic.local / Physician@123
+  select id into v_physician_id from auth.users where lower(email) = 'physician@tupclinic.local';
+  if v_physician_id is null then
+    v_physician_id := gen_random_uuid();
+    insert into auth.users (
+      id,
+      instance_id,
+      aud,
+      role,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      confirmation_token,
+      recovery_token,
+      email_change_token_new,
+      email_change
+    ) values (
+      v_physician_id,
+      '00000000-0000-0000-0000-000000000000',
+      'authenticated',
+      'authenticated',
+      'physician@tupclinic.local',
+      v_encrypted_pass_physician,
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"name":"Dr. Rivera","role":"physician"}'::jsonb,
+      now(),
+      now(),
+      '', '', '', ''
+    );
+  else
+    update auth.users
+    set
+      encrypted_password = v_encrypted_pass_physician,
+      email_confirmed_at = coalesce(email_confirmed_at, now()),
+      raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{name}', '"Dr. Rivera"'),
+      updated_at = now()
+    where id = v_physician_id;
+  end if;
+
+  -- Ensure identity for physician
+  if not exists (select 1 from auth.identities where user_id = v_physician_id) then
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'auth' and table_name = 'identities' and column_name = 'provider_id'
+    ) then
+      execute $dyn$
+        insert into auth.identities (
+          id,
+          user_id,
+          identity_data,
+          provider,
+          provider_id,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        ) values (
+          $1,
+          $1,
+          json_build_object('sub', $1::text, 'email', 'physician@tupclinic.local'),
+          'email',
+          $1::text,
+          now(),
+          now(),
+          now()
+        )
+      $dyn$ using v_physician_id;
+    else
+      execute $dyn$
+        insert into auth.identities (
+          id,
+          user_id,
+          identity_data,
+          provider,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        ) values (
+          $1,
+          $1,
+          json_build_object('sub', $1::text, 'email', 'physician@tupclinic.local'),
+          'email',
+          now(),
+          now(),
+          now()
+        )
+      $dyn$ using v_physician_id;
+    end if;
+  end if;
+
+  -- Provision Nurse: nurse@tupclinic.local / Nurse@123
+  select id into v_nurse_id from auth.users where lower(email) = 'nurse@tupclinic.local';
+  if v_nurse_id is null then
+    v_nurse_id := gen_random_uuid();
+    insert into auth.users (
+      id,
+      instance_id,
+      aud,
+      role,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      confirmation_token,
+      recovery_token,
+      email_change_token_new,
+      email_change
+    ) values (
+      v_nurse_id,
+      '00000000-0000-0000-0000-000000000000',
+      'authenticated',
+      'authenticated',
+      'nurse@tupclinic.local',
+      v_encrypted_pass_nurse,
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"name":"Nurse Santos","role":"nurse"}'::jsonb,
+      now(),
+      now(),
+      '', '', '', ''
+    );
+  else
+    update auth.users
+    set
+      encrypted_password = v_encrypted_pass_nurse,
+      email_confirmed_at = coalesce(email_confirmed_at, now()),
+      raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{name}', '"Nurse Santos"'),
+      updated_at = now()
+    where id = v_nurse_id;
+  end if;
+
+  -- Ensure identity for nurse
+  if not exists (select 1 from auth.identities where user_id = v_nurse_id) then
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'auth' and table_name = 'identities' and column_name = 'provider_id'
+    ) then
+      execute $dyn$
+        insert into auth.identities (
+          id,
+          user_id,
+          identity_data,
+          provider,
+          provider_id,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        ) values (
+          $1,
+          $1,
+          json_build_object('sub', $1::text, 'email', 'nurse@tupclinic.local'),
+          'email',
+          $1::text,
+          now(),
+          now(),
+          now()
+        )
+      $dyn$ using v_nurse_id;
+    else
+      execute $dyn$
+        insert into auth.identities (
+          id,
+          user_id,
+          identity_data,
+          provider,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        ) values (
+          $1,
+          $1,
+          json_build_object('sub', $1::text, 'email', 'nurse@tupclinic.local'),
+          'email',
+          now(),
+          now(),
+          now()
+        )
+      $dyn$ using v_nurse_id;
+    end if;
+  end if;
+
+  -- Link public.users profile records to auth.users
+  insert into public.users (id, auth_user_id, name, email, role, active, created_at, updated_at)
+  values
+    (gen_random_uuid(), v_physician_id, 'Dr. Rivera', 'physician@tupclinic.local', 'physician', true, now(), now()),
+    (gen_random_uuid(), v_nurse_id, 'Nurse Santos', 'nurse@tupclinic.local', 'nurse', true, now(), now())
+  on conflict (email) do update set
+    auth_user_id = excluded.auth_user_id,
+    name = excluded.name,
+    role = excluded.role,
+    active = excluded.active,
+    updated_at = now();
+
+  -- Backfill any remaining auth_user_ids by email
+  update public.users u
+  set auth_user_id = au.id
+  from auth.users au
+  where lower(u.email) = lower(au.email)
+    and (u.auth_user_id is null or u.auth_user_id <> au.id);
+
+end $$;
 
 update public.appointments a
 set clinician_auth_user_id = u.auth_user_id

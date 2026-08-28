@@ -92,160 +92,127 @@ const Dashboard = ({ setSidebarOpen, sidebarOpen }) => {
     const timeStr = now.toLocaleTimeString();
     setCurrentDateTime(`${dateStr} — ${timeStr}`);
   }, []);
+
   useEffect(() => {
     updateDateTime();
     const id = setInterval(updateDateTime, 1000);
     return () => clearInterval(id);
   }, [updateDateTime]);
 
-  // fetch dashboard data (kept your existing data fetch logic)
+  // fetch dashboard data in parallel for high performance
   const fetchDashboardData = useCallback(async () => {
+    console.log('[DASHBOARD-DEBUG] fetch started');
     const todayIso = new Date().toISOString().split('T')[0];
     const tomorrowIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // checked-in appointments today
-    const { data: checkedInData } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('appointment_date', todayIso)
-      .eq('status', 'Checked-in');
-    setCheckedInToday(checkedInData ? checkedInData.length : 0);
+    try {
+      const results = await Promise.allSettled([
+        supabase.from('appointments').select('*').eq('appointment_date', todayIso).eq('status', 'Checked-in'),
+        supabase.from('encounters').select('*', { head: true, count: 'exact' }).gte('encounter_date', todayIso).lt('encounter_date', tomorrowIso),
+        supabase.from('appointments').select('*', { head: true, count: 'exact' }).gt('appointment_date', todayIso).eq('status', 'Scheduled'),
+        supabase.from('students').select('*', { head: true, count: 'exact' }),
+        supabase.from('encounters').select('*').order('created_at', { ascending: false }).limit(6),
+        supabase.from('encounters').select('encounter_date'),
+        supabase.from('encounters').select('chief_complaint').not('chief_complaint', 'is', null)
+      ]);
 
-    // encounters today
-    const { count: encToday } = await supabase
-      .from('encounters')
-      .select('*', { head: true, count: 'exact' })
-      .gte('encounter_date', todayIso)
-      .lt('encounter_date', tomorrowIso);
-    setEncountersToday(encToday || 0);
+      const [
+        checkedInRes,
+        encTodayRes,
+        futureApptsRes,
+        patientsCountRes,
+        recentEncRes,
+        visitsRes,
+        complaintsRes
+      ] = results.map(r => (r.status === 'fulfilled' ? r.value : { data: null, count: null, error: r.reason }));
 
-    // future scheduled appointments
-    const { count: futureCount } = await supabase
-      .from('appointments')
-      .select('*', { head: true, count: 'exact' })
-      .gt('appointment_date', todayIso)
-      .eq('status', 'Scheduled');
-    setFutureScheduledAppointments(futureCount || 0);
+      if (checkedInRes?.data) setCheckedInToday(checkedInRes.data.length);
+      if (encTodayRes?.count !== undefined && encTodayRes?.count !== null) setEncountersToday(encTodayRes.count);
+      if (futureApptsRes?.count !== undefined && futureApptsRes?.count !== null) setFutureScheduledAppointments(futureApptsRes.count);
+      if (patientsCountRes?.count !== undefined && patientsCountRes?.count !== null) setTotalPatients(patientsCountRes.count);
+      if (recentEncRes?.data) setRecentEncounters(recentEncRes.data);
 
-    // total patients
-    const { count: patientsCount } = await supabase
-      .from('students')
-      .select('*', { head: true, count: 'exact' });
-    setTotalPatients(patientsCount || 0);
+      console.log('[DASHBOARD-DEBUG] rows received:', {
+        students: patientsCountRes?.count,
+        encounters: visitsRes?.data?.length,
+        recent: recentEncRes?.data?.length,
+        checkedIn: checkedInRes?.data?.length
+      });
 
-    // recent encounters
-    const { data: recents, error: recError } = await supabase
-      .from('encounters')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(6);
-    if (!recError) setRecentEncounters(recents || []);
-
-    // visits data
-    const { data: visits } = await supabase.from('encounters').select('encounter_date');
-    const dateCounts = {};
-    if (visits && Array.isArray(visits)) {
+      // Process visits data
+      const visits = visitsRes?.data || [];
+      const dateCounts = {};
       visits.forEach(enc => {
         if (!enc?.encounter_date) return;
         const date = enc.encounter_date.split('T')[0];
         dateCounts[date] = (dateCounts[date] || 0) + 1;
       });
-    }
-    const labels = Object.keys(dateCounts).sort();
-    setVisitsData({
-      labels,
-      datasets: [{
-        label: 'Visits',
-        data: labels.map(l => dateCounts[l]),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75,192,192,0.06)',
-        tension: 0.15,
-        fill: true
-      }]
-    });
-
-    // total visits last week
-    const now = new Date();
-    const last7 = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      last7.push(d.toISOString().split('T')[0]);
-    }
-    const weekTotal = last7.reduce((s, d) => s + (dateCounts[d] || 0), 0);
-    setTotalVisitsWeek(weekTotal);
-
-    // complaints
-    const { data: complaints } = await supabase.from('encounters').select('chief_complaint').not('chief_complaint', 'is', null);
-    const compCounts = {};
-    if (complaints && Array.isArray(complaints)) {
-      complaints.forEach(c => { compCounts[c.chief_complaint] = (compCounts[c.chief_complaint] || 0) + 1; });
-    }
-    const top10 = Object.entries(compCounts).sort((a,b) => b[1]-a[1]).slice(0,10);
-    setComplaintsData({
-      labels: top10.map(([k]) => k),
-      datasets: [{ label: 'Count', data: top10.map(([,v]) => v), backgroundColor: 'rgba(54,162,235,0.6)', borderColor: 'rgba(54,162,235,1)', borderWidth: 1 }]
-    });
-
-    // ------------ DIAGNOSES (CHANGED) ------------
-    // Use the same logic as Reports: count chief_complaint over last 30 days so Dashboard matches Reports.
-    try {
-      // compute 30-day window (inclusive)
-      const nowD = new Date();
-      const fromD = new Date(nowD);
-      fromD.setDate(nowD.getDate() - 29); // last 30 days (today + preceding 29 days)
-      const fromIso = fromD.toISOString().slice(0,10);
-      const toIso = nowD.toISOString().slice(0,10);
-
-      // query chief_complaint within the 30-day window
-      const { data: diagnoses30 } = await supabase
-        .from('encounters')
-        .select('chief_complaint')
-        .gte('encounter_date', fromIso)
-        .lte('encounter_date', toIso + 'T23:59:59')
-        .not('chief_complaint', 'is', null);
-
-      // fallback for seeded/demo datasets that may be outside the last 30 days
-      let diagnoses = diagnoses30 || [];
-      if (!diagnoses.length) {
-        const { data: diagnosesAll } = await supabase
-          .from('encounters')
-          .select('chief_complaint')
-          .not('chief_complaint', 'is', null);
-        diagnoses = diagnosesAll || [];
-      }
-
-      const diagCounts = {};
-      if (diagnoses && Array.isArray(diagnoses)) {
-        diagnoses.forEach(d => {
-          const diagRaw = (d.chief_complaint || '').trim();
-          const label = diagRaw ? diagRaw : 'Unknown';
-          diagCounts[label] = (diagCounts[label] || 0) + 1;
-        });
-      }
-      const diagTop = Object.entries(diagCounts).sort((a,b) => b[1]-a[1]).slice(0,10);
-
-      setDiagnosesData({
-        labels: diagTop.map(([k]) => k),
+      const labels = Object.keys(dateCounts).sort();
+      setVisitsData({
+        labels,
         datasets: [{
-          data: diagTop.map(([,v]) => v),
+          label: 'Visits',
+          data: labels.map(l => dateCounts[l]),
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75,192,192,0.06)',
+          tension: 0.15,
+          fill: true
+        }]
+      });
+
+      // Total visits last week
+      const now = new Date();
+      const last7 = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        last7.push(d.toISOString().split('T')[0]);
+      }
+      const weekTotal = last7.reduce((s, d) => s + (dateCounts[d] || 0), 0);
+      setTotalVisitsWeek(weekTotal);
+
+      // Process complaints data
+      const complaints = complaintsRes?.data || [];
+      const compCounts = {};
+      complaints.forEach(c => {
+        if (c?.chief_complaint) {
+          compCounts[c.chief_complaint] = (compCounts[c.chief_complaint] || 0) + 1;
+        }
+      });
+      const top10 = Object.entries(compCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      setComplaintsData({
+        labels: top10.map(([k]) => k),
+        datasets: [{
+          label: 'Count',
+          data: top10.map(([, v]) => v),
+          backgroundColor: 'rgba(54,162,235,0.6)',
+          borderColor: 'rgba(54,162,235,1)',
+          borderWidth: 1
+        }]
+      });
+
+      // Process diagnoses data
+      setDiagnosesData({
+        labels: top10.map(([k]) => k),
+        datasets: [{
+          data: top10.map(([, v]) => v),
           backgroundColor: [
-            'rgba(255,99,132,0.6)','rgba(54,162,235,0.6)','rgba(255,205,86,0.6)','rgba(75,192,192,0.6)',
-            'rgba(153,102,255,0.6)','rgba(255,159,64,0.6)','rgba(75,192,192,0.6)','rgba(54,162,235,0.6)',
-            'rgba(255,205,86,0.6)','rgba(255,99,132,0.6)'
+            'rgba(255,99,132,0.6)', 'rgba(54,162,235,0.6)', 'rgba(255,205,86,0.6)', 'rgba(75,192,192,0.6)',
+            'rgba(153,102,255,0.6)', 'rgba(255,159,64,0.6)', 'rgba(75,192,192,0.6)', 'rgba(54,162,235,0.6)',
+            'rgba(255,205,86,0.6)', 'rgba(255,99,132,0.6)'
           ],
           borderWidth: 1
         }]
       });
-    } catch (diagErr) {
-      console.warn('Diagnoses fetch error', diagErr);
-      setDiagnosesData(null);
-    }
-    // ------------ end DIAGNOSES ------------
 
-  }, []); // no dependencies — called on mount by effect below
+      console.log('[DASHBOARD-DEBUG] state updated');
+    } catch (err) {
+      console.warn('[DASHBOARD-DEBUG] fetch error:', err);
+    }
+  }, []);
 
   useEffect(() => {
+    console.log('[DASHBOARD-DEBUG] Dashboard mounted');
     fetchDashboardData();
     const handler = () => fetchDashboardData();
     window.addEventListener('appointmentAdded', handler);

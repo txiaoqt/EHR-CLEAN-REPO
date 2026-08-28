@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
+import { logAudit } from '../utils.js';
 import {
   getClinicHoursMessage,
   getLockoutMessage,
@@ -32,7 +33,7 @@ const USER_TEST_ACCOUNT = {
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, fetchUserProfile } = useAuth();
   const [vw, setVw] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -77,120 +78,107 @@ const Login = () => {
         return;
       }
 
-      const now = new Date();
-      let users = null;
-      let error = null;
-      const primaryQuery = await supabase
-        .from('users')
-        .select('id, name, email, password, avatar, role, patient_id, failed_login_attempts, locked_until, last_failed_login_at')
-        .ilike('email', normalizedEmail)
-        .eq('active', true);
-
-      if (primaryQuery.error && (primaryQuery.error.message || '').toLowerCase().includes('patient_id')) {
-        const fallback = await supabase
-          .from('users')
-          .select('id, name, email, password, avatar, role, failed_login_attempts, locked_until, last_failed_login_at')
-          .ilike('email', normalizedEmail)
-          .eq('active', true);
-        users = fallback.data;
-        error = fallback.error;
-      } else {
-        users = primaryQuery.data;
-        error = primaryQuery.error;
+      // Check lockout status before attempting sign in if RPC is available
+      try {
+        const { data: lockStatus } = await supabase.rpc('get_login_lockout_status', { p_email: normalizedEmail });
+        if (lockStatus && lockStatus.length > 0 && lockStatus[0].is_locked) {
+          setMsg(getLockoutMessage(lockStatus[0].locked_until, new Date()));
+          setLoading(false);
+          return;
+        }
+      } catch (_) {
+        // Continue if RPC is not deployed yet
       }
 
-      if (error) {
-        console.error(error);
-        setMsg('Login failed');
-        return;
-      }
+      // 1. Authenticate with Supabase Auth (validates password securely)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: pass,
+      });
 
-      if (!users || users.length === 0) {
+      if (authError) {
+        console.warn('Authentication error:', authError.message);
+        // Track failed attempt via security lockout RPC if available
+        try {
+          const { data: lockData } = await supabase.rpc('register_failed_login', {
+            p_email: normalizedEmail,
+            p_lock_after: MAX_FAILED_ATTEMPTS,
+            p_lock_minutes: LOCKOUT_MINUTES
+          });
+          if (lockData && lockData.length > 0 && lockData[0].is_locked) {
+            setMsg(getLockoutMessage(lockData[0].locked_until, new Date()));
+            setLoading(false);
+            return;
+          }
+        } catch (_) {}
+
+        try {
+          await logAudit('LOGIN_FAILED', `Failed login attempt for ${normalizedEmail}`, normalizedEmail);
+        } catch (_) {}
+
         setMsg('Invalid email or password');
         return;
       }
 
-      const user = users[0];
-      const normalizedRole = (user.role || '').toLowerCase();
+      if (!authData?.user) {
+        setMsg('Invalid email or password');
+        return;
+      }
 
-      if (IS_ADMIN_SURFACE && normalizedRole === 'patient') {
+      const authUser = authData.user;
+
+      // 2. Load user profile from public.users via fetchUserProfile
+      const profile = await fetchUserProfile(authUser);
+
+      if (!profile) {
+        setMsg('User profile not found. Please contact an administrator.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (profile.active === false) {
+        setMsg('Your account has been deactivated. Please contact an administrator.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const userRole = (profile.role || '').toLowerCase();
+
+      // Surface compatibility check
+      if (IS_ADMIN_SURFACE && userRole === 'patient') {
         setMsg('Patient accounts are not allowed on this portal.');
+        await supabase.auth.signOut();
         return;
       }
-      if (IS_USER_SURFACE && normalizedRole !== 'patient') {
+      if (IS_USER_SURFACE && userRole !== 'patient') {
         setMsg('Only patient accounts can log in on this portal.');
-        return;
-      }
-      const lockedUntil = user.locked_until ? new Date(user.locked_until) : null;
-      const isLocked = lockedUntil && !Number.isNaN(lockedUntil.getTime()) && lockedUntil.getTime() > now.getTime();
-
-      if (isLocked) {
-        setMsg(getLockoutMessage(user.locked_until, now));
+        await supabase.auth.signOut();
         return;
       }
 
-      if (pass === user.password) {
-        const { error: resetError } = await supabase
-          .from('users')
-          .update({
-            failed_login_attempts: 0,
-            locked_until: null,
-            last_failed_login_at: null,
-          })
-          .eq('id', user.id);
-
-        if (resetError) {
-          console.error(resetError);
-          setMsg('Login failed');
-          return;
-        }
-
-        login({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-          role: user.role,
-          patient_id: user.patient_id || null,
-        });
-        navigate((user.role || '').toLowerCase() === 'patient' ? '/patient/dashboard' : '/dashboard');
-      } else {
-        const currentFailedAttempts = Number(user.failed_login_attempts || 0);
-        const lastFailedAt = user.last_failed_login_at ? new Date(user.last_failed_login_at) : null;
-        const isLastFailedStale =
-          !lastFailedAt ||
-          Number.isNaN(lastFailedAt.getTime()) ||
-          now.getTime() - lastFailedAt.getTime() > LOCKOUT_MINUTES * 60 * 1000;
-        const baselineAttempts = isLastFailedStale ? 0 : currentFailedAttempts;
-        const nextFailedAttempts = baselineAttempts + 1;
-        const shouldLock = nextFailedAttempts >= MAX_FAILED_ATTEMPTS;
-        const lockUntilIso = shouldLock ? new Date(now.getTime() + LOCKOUT_MINUTES * 60 * 1000).toISOString() : null;
-
-        const { error: failedUpdateError } = await supabase
-          .from('users')
-          .update({
-            failed_login_attempts: nextFailedAttempts,
-            last_failed_login_at: now.toISOString(),
-            locked_until: lockUntilIso,
-          })
-          .eq('id', user.id);
-
-        if (failedUpdateError) {
-          console.error(failedUpdateError);
-          setMsg('Login failed');
-          return;
-        }
-
-        if (shouldLock) {
-          setMsg(getLockoutMessage(lockUntilIso, now));
-          return;
-        }
-
-        setMsg('Invalid email or password');
+      // 3. Clear failed login lockout counters on success
+      try {
+        await supabase.rpc('clear_login_lockout', { p_email: normalizedEmail, p_touch_last_login: true });
+      } catch (_) {
+        try {
+          await supabase
+            .from('users')
+            .update({ failed_login_attempts: 0, locked_until: null, last_failed_login_at: null, last_login_at: new Date().toISOString() })
+            .eq('id', profile.id);
+        } catch (__) {}
       }
+
+      // 4. Record audit log
+      try {
+        await logAudit('LOGIN_SUCCESS', `User ${profile.name || normalizedEmail} logged in as ${userRole}`, profile.name || normalizedEmail);
+      } catch (_) {}
+
+      // 5. Update AuthContext & navigate
+      login(profile);
+      navigate(userRole === 'patient' ? '/patient/dashboard' : '/dashboard');
     } catch (e) {
-      console.error(e);
-      setMsg('Login failed');
+      console.error('Login error:', e);
+      setMsg('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -214,44 +202,55 @@ const Login = () => {
       setMsg('Passwords do not match.');
       return;
     }
+    if (payload.password.length < 6) {
+      setMsg('Password must be at least 6 characters.');
+      return;
+    }
 
     setLoading(true);
     setMsg('');
     try {
-      const { data: existing, error: existingErr } = await supabase
-        .from('users')
-        .select('id')
-        .ilike('email', payload.email)
-        .limit(1);
-      if (existingErr) throw existingErr;
-      if (existing && existing.length > 0) {
-        setMsg('Email is already registered.');
-        return;
-      }
+      // 1. Sign up with Supabase Auth
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          data: {
+            name: payload.fullName,
+            role: 'patient',
+            patient_id: payload.studentId,
+          }
+        }
+      });
+      if (authErr) throw authErr;
 
+      const authUserId = authData?.user?.id;
+
+      // 2. Ensure student & patient records exist
       const { error: studentErr } = await supabase
         .from('students')
         .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
-      if (studentErr) throw studentErr;
+      if (studentErr) console.warn('Student record error:', studentErr);
 
       const { error: patientErr } = await supabase
         .from('patients')
         .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
-      if (patientErr) throw patientErr;
+      if (patientErr) console.warn('Patient record error:', patientErr);
 
+      // 3. Upsert public.users profile
       const { error: userErr } = await supabase
         .from('users')
-        .insert([{
+        .upsert([{
+          auth_user_id: authUserId,
           name: payload.fullName,
           email: payload.email,
-          password: payload.password,
           role: 'patient',
           active: true,
           patient_id: payload.studentId,
-        }]);
-      if (userErr) throw userErr;
+        }], { onConflict: 'email' });
+      if (userErr) console.warn('Public user profile sync error:', userErr);
 
-      setMsg('Account created. You can now log in.');
+      setMsg('Account created successfully! You can now log in.');
       setSignupMode(false);
       setEmail(payload.email);
       setPass('');

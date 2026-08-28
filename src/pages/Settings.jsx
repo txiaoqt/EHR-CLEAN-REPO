@@ -67,7 +67,6 @@ const Settings = () => {
   const revertSettings = () => {
     const saved = loadSettings();
     setSettings({ ...saved, theme: normalizeTheme(saved.theme) });
-    // apply theme from saved settings
     if (saved.theme) window.applyTheme && window.applyTheme(normalizeTheme(saved.theme));
     setMessage('Reverted to saved settings.');
     setMessageType('info');
@@ -75,13 +74,11 @@ const Settings = () => {
   };
 
   const saveSettings = async () => {
-    // Save to local storage / app utils
     saveSettingsUtil(settings);
     setMessage(translate('settings_saved'));
     setMessageType('success');
     setTimeout(() => setMessage(''), 3000);
 
-    // Try to persist settings to Supabase (per-key upsert)
     try {
       for (const [key, value] of Object.entries(settings)) {
         await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' });
@@ -106,11 +103,7 @@ const Settings = () => {
     }
 
     try {
-      if (!authUser?.id) throw new Error('No user');
-      const { error } = await supabase
-        .from('users')
-        .update({ password: newPassword })
-        .eq('id', authUser.id);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
       setMessage('Password changed successfully!');
@@ -119,7 +112,8 @@ const Settings = () => {
       setConfirmPassword('');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
-      setMessage('Error changing password.');
+      console.error('Error changing password:', err);
+      setMessage(`Error changing password: ${err.message || 'Unknown error'}`);
       setMessageType('error');
       setTimeout(() => setMessage(''), 3000);
     }
@@ -130,25 +124,18 @@ const Settings = () => {
     if (!backupPasswordInput) return;
 
     try {
-      // For this specific setup, we check the 'users' table for the current user's password
-      // In a real Supabase Auth setup, you'd use signInWithPassword, but this project
-      // uses a custom 'users' table with plain passwords for this demo.
-      const { data, error } = await supabase
-        .from('users')
-        .select('password')
-        .eq('id', authUser?.id)
-        .single();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authUser?.email,
+        password: backupPasswordInput
+      });
 
-      if (error || !data) throw new Error('Could not verify identity.');
-
-      if (data.password !== backupPasswordInput) {
+      if (error) {
         setMessage('Incorrect password.');
         setMessageType('error');
         setTimeout(() => setMessage(''), 3000);
         return;
       }
 
-      // Success
       setShowBackupPasswordModal(false);
       setBackupPasswordInput('');
       backupAll();
@@ -228,11 +215,9 @@ const Settings = () => {
         console.warn('Failed to upsert last_backup:', e);
       }
 
-      // Dispatch a global event so other components (Sidebar) can update immediately.
       try {
         window.dispatchEvent(new CustomEvent('backupCompleted', { detail: ts }));
       } catch (e) {
-        // fallback to simple Event if CustomEvent is not available
         try {
           const ev = new Event('backupCompleted');
           window.dispatchEvent(ev);

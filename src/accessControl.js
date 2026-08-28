@@ -4,6 +4,11 @@ export const CLINIC_CLOSE_HOUR = 19;
 const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
 
+// DEVELOPMENT ONLY:
+// Clinic-hours enforcement is temporarily bypassed during development/testing.
+// Set to false before production deployment.
+export const BYPASS_CLINIC_HOURS = true;
+
 const manilaFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: CLINIC_TIMEZONE,
   hour12: false,
@@ -63,6 +68,9 @@ export const getManilaClock = (date = new Date()) => {
 };
 
 export const isWithinClinicHours = (date = new Date()) => {
+  // Temporary bypass for testing
+  if (BYPASS_CLINIC_HOURS) return true;
+
   // User/patient portal has no time restriction.
   if (IS_USER_SURFACE) return true;
 

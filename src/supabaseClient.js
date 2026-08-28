@@ -9,5 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  // default options are fine for most projects; configure per your needs
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    // Safe lock handler that avoids navigator.locks deadlocking during browser reloads
+    lock: async (name, acquireTimeout, fn) => {
+      return await fn();
+    }
+  }
 });

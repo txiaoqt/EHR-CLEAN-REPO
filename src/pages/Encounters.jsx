@@ -279,15 +279,13 @@ const Encounters = () => {
 
     setDeleting(true);
     try {
-      // Verify password
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('password')
-        .eq('id', user?.id)
-        .single();
+      // Verify password with Supabase Auth
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user?.email,
+        password: deletePassword,
+      });
 
-      if (userError || !userData) throw new Error('Could not verify identity.');
-      if (userData.password !== deletePassword) {
+      if (verifyError) {
         setDeleteMessage('Incorrect password.');
         setDeleteMessageType('error');
         setDeleting(false);
