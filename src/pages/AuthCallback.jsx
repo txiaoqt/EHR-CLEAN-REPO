@@ -10,7 +10,7 @@ const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, initializing, isPasswordRecoverySession, user } = useAuth();
+  const { isAuthenticated, initializing, isPasswordRecoverySession, setIsPasswordRecoverySession, user } = useAuth();
 
   useEffect(() => {
     let mounted = true;
@@ -22,25 +22,63 @@ const AuthCallback = () => {
         return;
       }
 
-      // 2. Check URL for candidate recovery tokens (PKCE code or implicit hash tokens)
-      const hash = typeof window !== 'undefined' ? window.location.hash || '' : '';
-      const search = typeof window !== 'undefined' ? window.location.search || '' : '';
-      const isRecoveryCandidate =
-        hash.includes('type=recovery') ||
-        search.includes('type=recovery') ||
-        hash.includes('access_token=') ||
-        search.includes('code=');
+      // 2. Parse URL parameters from search query and hash
+      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search || '' : '');
+      const rawHash = typeof window !== 'undefined' ? window.location.hash || '' : '';
+      const hashParams = new URLSearchParams(rawHash.startsWith('#') ? rawHash.slice(1) : rawHash);
 
-      if (isRecoveryCandidate) {
-        // Forward to /reset-password preserving query and hash parameters so Supabase Auth can process them
-        navigate(`/reset-password${search}${hash}`, { replace: true });
+      const code = searchParams.get('code') || hashParams.get('code');
+      const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
+      const type = searchParams.get('type') || hashParams.get('type');
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+
+      const isRecoveryRequest =
+        type === 'recovery' ||
+        rawHash.includes('type=recovery') ||
+        searchParams.toString().includes('type=recovery') ||
+        (code && type === 'recovery') ||
+        (tokenHash && type === 'recovery');
+
+      // 3. If recovery flow is detected, establish session and mark recovery state
+      if (isRecoveryRequest) {
+        try {
+          if (code) {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            if (!error && data?.session) {
+              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+              if (mounted) navigate('/reset-password', { replace: true });
+              return;
+            }
+          } else if (tokenHash) {
+            const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+            if (!error && data?.session) {
+              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+              if (mounted) navigate('/reset-password', { replace: true });
+              return;
+            }
+          } else if (accessToken && refreshToken) {
+            const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            if (!error && data?.session) {
+              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+              if (mounted) navigate('/reset-password', { replace: true });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[AuthCallback] Recovery establishment error:', err);
+        }
+
+        // Forward candidate tokens to /reset-password if active establishment is still ongoing
+        if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+        if (mounted) navigate('/reset-password', { replace: true });
         return;
       }
 
-      // 3. Wait until auth initialization has finished
+      // 4. Wait until auth initialization has finished for standard logins
       if (initializing) return;
 
-      // 4. If normal authenticated user, route to surface home
+      // 5. If normal authenticated user, route to surface home
       if (isAuthenticated) {
         const role = (user?.role || '').toLowerCase();
         const surfaceHome = IS_USER_SURFACE
@@ -50,7 +88,7 @@ const AuthCallback = () => {
         return;
       }
 
-      // 5. Unauthenticated fallback -> Login
+      // 6. Unauthenticated fallback -> Login
       navigate('/login', { replace: true });
     };
 
@@ -59,7 +97,7 @@ const AuthCallback = () => {
     return () => {
       mounted = false;
     };
-  }, [isAuthenticated, initializing, isPasswordRecoverySession, user, navigate]);
+  }, [isAuthenticated, initializing, isPasswordRecoverySession, setIsPasswordRecoverySession, user, navigate]);
 
   return (
     <div

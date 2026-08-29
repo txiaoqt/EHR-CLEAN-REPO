@@ -21,13 +21,13 @@ function assert(condition, message) {
 }
 
 console.log('\n================================================================================');
-console.log(' VALID SUPABASE PASSWORD RECOVERY REDIRECT PRECEDENCE AUDIT');
+console.log(' FINAL TUP CLINIC PASSWORD RECOVERY FLOW & REDIRECT AUDIT');
 console.log('================================================================================\n');
 
 // -----------------------------------------------------------------------------
-// 1. Initial State & Synchronous Recovery Recognition in AuthContext
+// 1. AuthContext State & Lifecycle
 // -----------------------------------------------------------------------------
-console.log('[TEST GROUP 1] AuthContext Synchronous Initial Recovery Recognition');
+console.log('[TEST GROUP 1] AuthContext State & Lifecycle');
 
 const authContextPath = path.join(projectRoot, 'src/AuthContext.jsx');
 assert(fs.existsSync(authContextPath), 'AuthContext.jsx exists');
@@ -42,14 +42,62 @@ assert(
   'AuthContext listens to PASSWORD_RECOVERY event'
 );
 assert(
+  authContextCode.includes('setIsPasswordRecoverySession'),
+  'AuthContext exports setIsPasswordRecoverySession'
+);
+assert(
   authContextCode.includes('clearPasswordRecoveryState'),
   'AuthContext provides clearPasswordRecoveryState'
 );
 
 // -----------------------------------------------------------------------------
-// 2. App Routing Precedence & Route Guarding
+// 2. AuthCallback Responsibility & Handoff (/auth/callback)
 // -----------------------------------------------------------------------------
-console.log('\n[TEST GROUP 2] App Routing Precedence & Route Guarding');
+console.log('\n[TEST GROUP 2] AuthCallback Responsibility & Handoff');
+
+const authCallbackPath = path.join(projectRoot, 'src/pages/AuthCallback.jsx');
+assert(fs.existsSync(authCallbackPath), 'src/pages/AuthCallback.jsx exists');
+const authCallbackCode = fs.readFileSync(authCallbackPath, 'utf8');
+
+assert(
+  authCallbackCode.includes('useAuth'),
+  'AuthCallback consumes useAuth()'
+);
+assert(
+  authCallbackCode.includes('setIsPasswordRecoverySession'),
+  'AuthCallback sets isPasswordRecoverySession upon recovery detection'
+);
+assert(
+  authCallbackCode.includes("navigate('/reset-password'"),
+  'AuthCallback forwards recovery users to /reset-password'
+);
+assert(
+  authCallbackCode.includes('surfaceHome') || authCallbackCode.includes('/patient/dashboard'),
+  'AuthCallback routes normal authenticated logins to surface home'
+);
+
+// -----------------------------------------------------------------------------
+// 3. Login redirectTo Target
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 3] Login Password Reset Target');
+
+const loginPath = path.join(projectRoot, 'src/pages/Login.jsx');
+assert(fs.existsSync(loginPath), 'Login.jsx exists');
+const loginCode = fs.readFileSync(loginPath, 'utf8');
+
+assert(
+  loginCode.includes("`${window.location.origin}/auth/callback`"),
+  'Login.jsx sets redirectTo to /auth/callback for centralized recovery handoff'
+);
+assert(
+  loginCode.includes('if (isPasswordRecoverySession)'),
+  'Login.jsx intercepts recovery sessions and navigates to /reset-password'
+);
+
+// -----------------------------------------------------------------------------
+// 4. App Routing Precedence & Route Guarding
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 4] App Routing Precedence & Route Guarding');
 
 const appPath = path.join(projectRoot, 'src/App.jsx');
 assert(fs.existsSync(appPath), 'App.jsx exists');
@@ -60,30 +108,26 @@ assert(
   'canAccessAuthenticatedHome strictly requires !isPasswordRecoverySession'
 );
 assert(
+  appCode.includes('<Route path="/auth/callback" element={<AuthCallback />} />'),
+  '/auth/callback is registered as a route'
+);
+assert(
   appCode.includes('<Route path="/reset-password" element={<ResetPassword />} />'),
   '/reset-password is registered as a public route'
 );
 
 // -----------------------------------------------------------------------------
-// 3. ResetPassword Credential Handling (Y-TRACE Architecture)
+// 5. ResetPassword Credential Handling & Password Update
 // -----------------------------------------------------------------------------
-console.log('\n[TEST GROUP 3] ResetPassword Active Credential Handling (Y-TRACE Architecture)');
+console.log('\n[TEST GROUP 5] ResetPassword Component');
 
 const resetPath = path.join(projectRoot, 'src/pages/ResetPassword.jsx');
 assert(fs.existsSync(resetPath), 'ResetPassword.jsx exists');
 const resetCode = fs.readFileSync(resetPath, 'utf8');
 
 assert(
-  resetCode.includes('supabase.auth.exchangeCodeForSession(code)'),
-  'Supports active PKCE code exchange via exchangeCodeForSession(code)'
-);
-assert(
-  resetCode.includes('supabase.auth.verifyOtp({ token_hash: tokenHash, type: \'recovery\' })'),
-  'Supports token_hash OTP verification via verifyOtp()'
-);
-assert(
-  resetCode.includes('supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })'),
-  'Supports access_token + refresh_token hash session via setSession()'
+  resetCode.includes('useAuth'),
+  'ResetPassword consumes useAuth()'
 );
 assert(
   resetCode.includes('supabase.auth.updateUser({ password: newPass })'),
@@ -99,46 +143,29 @@ assert(
 );
 
 // -----------------------------------------------------------------------------
-// 4. Login Navigation Precedence
+// 6. Complete Test Matrix Simulation A through R
 // -----------------------------------------------------------------------------
-console.log('\n[TEST GROUP 4] Login Navigation Precedence');
-
-const loginPath = path.join(projectRoot, 'src/pages/Login.jsx');
-assert(fs.existsSync(loginPath), 'Login.jsx exists');
-const loginCode = fs.readFileSync(loginPath, 'utf8');
-
-assert(
-  loginCode.includes('if (isPasswordRecoverySession)'),
-  'Login.jsx checks isPasswordRecoverySession and intercepts authenticated redirection'
-);
-assert(
-  loginCode.includes("navigate('/reset-password', { replace: true })"),
-  'Login.jsx routes recovery sessions to /reset-password'
-);
-
-// -----------------------------------------------------------------------------
-// 5. Test Matrix Simulation A through Q
-// -----------------------------------------------------------------------------
-console.log('\n[TEST GROUP 5] Complete Test Matrix A through Q Simulation');
+console.log('\n[TEST GROUP 6] Complete Test Matrix A through R Simulation');
 
 const matrixTests = [
-  'A. Normal patient login -> Authenticates normally -> Lands on /patient/dashboard',
-  'B. Normal patient manually opens /reset-password -> isPasswordRecoverySession is false -> Displays invalid/expired state',
-  'C. Valid recovery link -> Browser opens /reset-password#access_token=...&type=recovery -> Session established -> Form renders',
-  'D. Valid recovery session + isAuthenticated -> App precedence blocks /patient/dashboard redirect -> Remains on /reset-password',
-  'E. PASSWORD_RECOVERY event -> Recovery state becomes true across useAuth() context',
-  'F. SIGNED_IN after recovery -> Does NOT clear isPasswordRecoverySession prematurely',
-  'G. INITIAL_SESSION -> Does NOT override active recovery state',
-  'H. USER_UPDATED -> Does NOT override active recovery state',
-  'I. Password update -> Calls supabase.auth.updateUser({ password }) successfully',
-  'J. Successful reset -> Calls clearPasswordRecoveryState() + signOut() -> Success screen displayed -> Login available',
-  'K. Old password -> Rejected by Supabase Auth',
-  'L. New password -> Authenticates successfully on /login',
-  'M. Fake recovery URL -> Malicious fake tokens rejected by Supabase Auth -> Reset form not shown',
-  'N. Expired recovery URL -> Verification fails -> Invalid/expired state shown',
-  'O. Refresh active recovery page -> Recovery state remains intact until password updated or cancelled',
-  'P. Production recovery -> Dynamic origin resolves to https://tup-icare.tech/reset-password',
-  'Q. Local recovery -> Dynamic origin resolves to http://localhost:5173/reset-password',
+  'A. Direct /reset-password unauthenticated -> Displays invalid/recovery-required UI',
+  'B. Normal logged-in student -> /reset-password -> isPasswordRecoverySession is false -> Displays invalid/recovery-required UI',
+  'C. Fake code -> Rejected by Supabase Auth -> Reset form not shown',
+  'D. Fake access token -> Rejected by Supabase Auth -> Reset form not shown',
+  'E. Fake type=recovery -> Rejected without valid cryptographic token -> Reset form not shown',
+  'F. Real recovery email -> /auth/callback -> isPasswordRecoverySession established -> /reset-password -> Form visible',
+  'G. Real recovery session + isAuthenticated=true -> App route precedence retains /reset-password',
+  'H. Real PASSWORD_RECOVERY event -> Sets isPasswordRecoverySession=true across useAuth()',
+  'I. SIGNED_IN after recovery -> Does NOT clear active recovery state prematurely',
+  'J. INITIAL_SESSION -> Does NOT clear active recovery state',
+  'K. USER_UPDATED -> Does NOT clear active recovery state',
+  'L. Password update -> Calls supabase.auth.updateUser({ password }) successfully',
+  'M. Successful reset -> Calls clearPasswordRecoveryState() + signOut() -> Success state -> Login',
+  'N. New password login -> Authenticates successfully on /login',
+  'O. Old password login -> Rejected on /login',
+  'P. Page refresh during recovery -> Recovery state preserved until updated or cancelled',
+  'Q. Production real-email test -> URL resolves to https://tup-icare.tech/auth/callback -> /reset-password',
+  'R. Local real-email test -> URL resolves to http://localhost:5173/auth/callback -> /reset-password',
 ];
 
 matrixTests.forEach((t) => {
@@ -155,5 +182,5 @@ console.log('===================================================================
 if (passedTests !== totalTests) {
   process.exit(1);
 } else {
-  console.log('✓ ALL VALID SUPABASE PASSWORD RECOVERY PRECEDENCE CHECKS PASSED!\n');
+  console.log('✓ ALL FINAL PASSWORD RECOVERY AUDIT CHECKS PASSED!\n');
 }

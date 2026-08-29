@@ -491,7 +491,7 @@ const Login = () => {
     setForgotLoading(true);
     setMsg('');
     try {
-      const resetUrl = `${window.location.origin}/reset-password`;
+      const resetUrl = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
         redirectTo: resetUrl,
       });

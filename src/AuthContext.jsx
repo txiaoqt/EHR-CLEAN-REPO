@@ -32,14 +32,92 @@ export const AuthProvider = ({ children }) => {
   // This is NOT based on localStorage — it represents whether the Supabase
   // client internally has a restored auth session/JWT.
   const [initializing, setInitializing] = useState(true);
-  const [isPasswordRecoverySession, setIsPasswordRecoverySession] = useState(() => {
+
+  // Cross-tab recovery synchronization helpers (non-sensitive state marker)
+  const RECOVERY_STORAGE_KEY = 'ehr_recovery_active';
+  const RECOVERY_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+  const checkCrossTabRecoveryActive = () => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem(RECOVERY_STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.active === true && typeof parsed.timestamp === 'number') {
+        if (Date.now() - parsed.timestamp < RECOVERY_MAX_AGE_MS) {
+          return true;
+        }
+      }
+      localStorage.removeItem(RECOVERY_STORAGE_KEY);
+    } catch (_) {}
+    return false;
+  };
+
+  const setCrossTabRecoveryActive = (active) => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (active) {
+        localStorage.setItem(
+          RECOVERY_STORAGE_KEY,
+          JSON.stringify({ active: true, timestamp: Date.now() })
+        );
+      } else {
+        localStorage.removeItem(RECOVERY_STORAGE_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const [isPasswordRecoverySession, setIsPasswordRecoverySessionState] = useState(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
-      return hash.includes('type=recovery') || search.includes('type=recovery');
+      if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+        setCrossTabRecoveryActive(true);
+        return true;
+      }
+      return checkCrossTabRecoveryActive();
     }
     return false;
   });
+
+  const setIsPasswordRecoverySession = useCallback((val) => {
+    const active = Boolean(val);
+    setIsPasswordRecoverySessionState(active);
+    setCrossTabRecoveryActive(active);
+    try {
+      const channel = new BroadcastChannel('ehr_auth_channel');
+      channel.postMessage({ type: 'RECOVERY_STATE_CHANGED', active });
+      channel.close();
+    } catch (_) {}
+  }, []);
+
+  // Listen for storage events & broadcast channel to sync recovery state across tabs
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorage = (e) => {
+      if (e.key === RECOVERY_STORAGE_KEY) {
+        const active = checkCrossTabRecoveryActive();
+        setIsPasswordRecoverySessionState(active);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    let channel;
+    try {
+      channel = new BroadcastChannel('ehr_auth_channel');
+      channel.onmessage = (event) => {
+        if (event?.data?.type === 'RECOVERY_STATE_CHANGED') {
+          setIsPasswordRecoverySessionState(Boolean(event.data.active));
+        }
+      };
+    } catch (_) {}
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      channel?.close();
+    };
+  }, []);
 
   // Helper to fetch user profile from public.admins (staff) or public.users (patients)
   const fetchUserProfile = useCallback(async (authUser) => {
@@ -323,6 +401,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         initializing,
         isPasswordRecoverySession,
+        setIsPasswordRecoverySession,
         clearPasswordRecoveryState,
         login,
         logout,

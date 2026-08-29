@@ -9,10 +9,10 @@ import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  const { isPasswordRecoverySession, clearPasswordRecoveryState } = useAuth();
+  const { isPasswordRecoverySession, setIsPasswordRecoverySession, clearPasswordRecoveryState } = useAuth();
 
   // Explicit Recovery State Model: 'checking' | 'valid' | 'invalid' | 'success'
-  const [recoveryState, setRecoveryState] = useState('checking');
+  const [recoveryState, setRecoveryState] = useState(() => (isPasswordRecoverySession ? 'valid' : 'checking'));
 
   const [newPass, setNewPass] = useState('');
   const [confirmNewPass, setConfirmNewPass] = useState('');
@@ -50,18 +50,21 @@ const ResetPassword = () => {
         if (code) {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
             if (mounted) setRecoveryState('valid');
             return;
           }
         } else if (tokenHash && type === 'recovery') {
           const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
           if (!error && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
             if (mounted) setRecoveryState('valid');
             return;
           }
         } else if (accessToken && refreshToken && type === 'recovery') {
           const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
           if (!error && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
             if (mounted) setRecoveryState('valid');
             return;
           }
@@ -89,6 +92,7 @@ const ResetPassword = () => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === 'PASSWORD_RECOVERY') {
+        if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
         setRecoveryState('valid');
       }
     });
@@ -99,7 +103,7 @@ const ResetPassword = () => {
       mounted = false;
       data?.subscription?.unsubscribe();
     };
-  }, [isPasswordRecoverySession]);
+  }, [isPasswordRecoverySession, setIsPasswordRecoverySession]);
 
   useEffect(() => {
     if (msg) setMsgOpen(true);
@@ -136,13 +140,18 @@ const ResetPassword = () => {
     setMsg('');
 
     try {
+      // 1. Authoritative password update via Supabase Auth
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) throw error;
 
-      // Clear recovery state & cleanly sign out recovery session
-      clearPasswordRecoveryState();
+      // 2. Sign out the temporary recovery session BEFORE clearing recovery state
+      // This prevents any brief flash of authenticated UI during state transitions
       await supabase.auth.signOut().catch(() => {});
 
+      // 3. Clear recovery state across all tabs
+      clearPasswordRecoveryState();
+
+      // 4. Mark success state
       setRecoveryState('success');
       setMsg('Password updated successfully.');
     } catch (err) {
@@ -151,6 +160,11 @@ const ResetPassword = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBackToLogin = () => {
+    clearPasswordRecoveryState();
+    navigate('/login');
   };
 
   const authInputStyle = {
@@ -277,7 +291,7 @@ const ResetPassword = () => {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/login')}
+              onClick={handleBackToLogin}
               style={{
                 width: '100%',
                 background: '#ffffff',
@@ -308,7 +322,7 @@ const ResetPassword = () => {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/login')}
+              onClick={handleBackToLogin}
               style={{
                 width: '100%',
                 background: '#ffffff',
@@ -461,7 +475,7 @@ const ResetPassword = () => {
             <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
               <button
                 type="button"
-                onClick={() => navigate('/login')}
+                onClick={handleBackToLogin}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -517,7 +531,16 @@ const ResetPassword = () => {
               <button
                 type="button"
                 className="btn secondary"
-                style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: '#f1f5f9',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
+                }}
                 onClick={() => setMsgOpen(false)}
               >
                 Close

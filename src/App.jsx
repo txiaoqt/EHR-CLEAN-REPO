@@ -46,6 +46,7 @@ const isPatientRole = (role) => (role || '').toLowerCase() === 'patient';
 
 const ProtectedRoute = ({
   isAuthenticated,
+  isPasswordRecoverySession,
   user,
   loading,
   initializing,
@@ -57,6 +58,11 @@ const ProtectedRoute = ({
   children
 }) => {
   const location = useLocation();
+
+  // If password recovery is active across any tab, block protected portal routes and redirect to /reset-password
+  if (isPasswordRecoverySession) {
+    return <Navigate to="/reset-password" replace />;
+  }
 
   // Wait for Supabase auth session to finish restoring before rendering
   if (loading || initializing) {
@@ -201,6 +207,7 @@ function AppShell() {
   const guard = (element, allowedRoles = []) => (
     <ProtectedRoute
       isAuthenticated={isAuthenticated}
+      isPasswordRecoverySession={isPasswordRecoverySession}
       user={user}
       loading={loading}
       initializing={initializing}
