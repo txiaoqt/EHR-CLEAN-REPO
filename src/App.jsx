@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import PatientSidebar from './components/sidebar/PatientSidebar.jsx';
+import PatientHeader from './components/header/PatientHeader.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Appointments from './pages/Appointments.jsx';
 import Patients from './pages/Patients.jsx';
@@ -11,14 +12,17 @@ import PatientProfile from './pages/PatientProfile.jsx';
 import Reports from './pages/Reports.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Help from './pages/Help.jsx';
+import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import PatientDashboard from './pages/patient/PatientDashboard.jsx';
+import PatientEvents from './pages/patient/PatientEvents.jsx';
 import PatientSchedule from './pages/patient/PatientSchedule.jsx';
 import PatientMessages from './pages/patient/PatientMessages.jsx';
 import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
+import KioskBooking from './pages/patient/KioskBooking.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import { useStaffDeviceCheck } from './hooks/useStaffDeviceCheck.js';
 import { useSidebar } from './useSidebar.js';
@@ -222,21 +226,12 @@ function AppShell() {
     <div id="app-root" className={sidebarCollapsed ? 'sidebar-collapsed' : ''}>
       {shouldRenderSidebar && (
         <div id="sidebar-container" className={`sidebar-container ${sidebarCollapsed ? 'collapsed' : ''}`}>
-          {IS_USER_SURFACE ? <PatientSidebar /> : <Sidebar collapsed={sidebarCollapsed} toggle={toggleSidebar} />}
+          {IS_USER_SURFACE ? <PatientSidebar onClose={isMobile && !sidebarCollapsed ? toggleSidebar : undefined} /> : <Sidebar collapsed={sidebarCollapsed} toggle={toggleSidebar} />}
         </div>
       )}
       {shouldRenderSidebar && isMobile && IS_USER_SURFACE && (
         <>
-          {sidebarCollapsed && (
-            <button
-              type="button"
-              className="mobile-nav-toggle"
-              aria-label="Open navigation"
-              onClick={toggleSidebar}
-            >
-              <span aria-hidden style={{ fontSize: 20, lineHeight: 1 }}>☰</span>
-            </button>
-          )}
+          <PatientHeader onToggleNav={toggleSidebar} />
           {!sidebarCollapsed && <button type="button" aria-label="Close navigation" className="mobile-sidebar-backdrop" onClick={toggleSidebar} />}
         </>
       )}
@@ -254,6 +249,7 @@ function AppShell() {
             <Route path="/encounters" element={guard(<Encounters />, ['admin', 'physician', 'nurse'])} />
             <Route path="/reports" element={guard(<Reports />, ['admin', 'physician', 'nurse'])} />
             <Route path="/inventory" element={guard(<Inventory />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/events" element={guard(<Events />, ['admin', 'physician', 'nurse'])} />
             <Route path="/help" element={guard(<Help />, ['admin', 'physician', 'nurse'])} />
             <Route path="/settings" element={guard(<Settings />, ['admin', 'physician', 'nurse'])} />
             <Route path="/my-profile" element={guard(<MyProfile />, ['admin', 'physician', 'nurse'])} />
@@ -265,6 +261,7 @@ function AppShell() {
           <>
             <Route path="/kiosk" element={<KioskBooking />} />
             <Route path="/patient/dashboard" element={guard(<PatientDashboard />, ['patient'])} />
+            <Route path="/patient/events" element={guard(<PatientEvents />, ['patient'])} />
             <Route path="/patient/schedule" element={guard(<PatientSchedule />, ['patient'])} />
             <Route path="/patient/messages" element={guard(<PatientMessages />, ['patient'])} />
             <Route path="/patient/records" element={guard(<PatientRecords />, ['patient'])} />

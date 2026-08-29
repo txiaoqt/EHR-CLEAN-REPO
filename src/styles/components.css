@@ -796,7 +796,50 @@ textarea::placeholder {
   color: var(--color-primary);
 }
 
-/* Mobile Nav Toggle */
+/* Patient Application Mobile Header */
+.patient-app-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--panel, #ffffff);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  z-index: 1200;
+  padding: 0 16px;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+@media (max-width: 980px) {
+  .patient-app-header {
+    display: flex;
+  }
+}
+
+.patient-header-menu-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md, 8px);
+  min-height: 38px;
+  min-width: 38px;
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.patient-header-menu-btn:hover {
+  background: var(--bg, #f1f5f9);
+}
+
+/* Mobile Nav Toggle (Legacy/Fallback) */
 .mobile-nav-toggle {
   display: none;
   position: fixed;
@@ -815,9 +858,30 @@ textarea::placeholder {
 
 @media (max-width: 980px) {
   .mobile-nav-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: none;
+  }
+}
+
+/* Mobile Sidebar Backdrop */
+.mobile-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1250;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

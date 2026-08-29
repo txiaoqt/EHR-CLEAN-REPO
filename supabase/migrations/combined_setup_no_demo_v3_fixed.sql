@@ -16,15 +16,45 @@ end $$;
 -- ============================================================================
 -- TUP EHR Supabase schema
 -- Paste this whole file into the Supabase SQL Editor.
--- USERS
-create table if not exists public.users (
+-- ADMINS (Staff Accounts: admin, physician, nurse)
+create table if not exists public.admins (
   id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique references auth.users(id) on delete set null,
   name text not null,
-  email text not null unique,
-  password text not null,
-  role text not null default 'nurse' check (role in ('admin', 'physician', 'nurse', 'patient')),
+  email text unique not null,
+  role text not null check (role in ('admin', 'physician', 'nurse')),
   avatar text,
   active boolean not null default true,
+  failed_login_attempts integer not null default 0,
+  last_failed_login_at timestamptz,
+  locked_until timestamptz,
+  lockout_reason text,
+  last_login_at timestamptz,
+  clearance_level smallint,
+  department text,
+  abac_attributes jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_admins_auth_user_id on public.admins (auth_user_id);
+create index if not exists idx_admins_email on public.admins (email);
+create index if not exists idx_admins_role on public.admins (role);
+
+-- USERS (Patient Accounts ONLY)
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique references auth.users(id) on delete set null,
+  name text not null,
+  email text not null unique,
+  role text not null default 'patient' check (role = 'patient'),
+  avatar text,
+  active boolean not null default true,
+  failed_login_attempts integer not null default 0,
+  last_failed_login_at timestamptz,
+  locked_until timestamptz,
+  lockout_reason text,
+  last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -45,7 +75,7 @@ create table if not exists public.role_permissions (
 
 -- STUDENTS (master list)
 create table if not exists public.students (
-  id text primary key,
+  id text primary key check (id ~ '^TUPM-[0-9]{2}-[0-9]{4}$'),
   name text not null,
   year integer not null check (year >= 1 and year <= 5),
   created_at timestamptz not null default now(),
@@ -186,7 +216,8 @@ alter table if exists public.appointments
   add column if not exists reference_code text;
 
 alter table if exists public.patient_messages
-  add column if not exists concern_type text not null default 'General clinic inquiry';
+  add column if not exists concern_type text not null default 'General clinic inquiry',
+  add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
 
 -- PROFILES (optional helper table read by Dashboard fallback)
 create table if not exists public.profiles (
@@ -196,6 +227,75 @@ create table if not exists public.profiles (
   avatar_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- PATIENT PROFILES (extended clinical profile information)
+create table if not exists public.patient_profiles (
+  id uuid primary key default gen_random_uuid(),
+  patient_id text unique not null references public.patients(id) on update cascade on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  student_id text not null,
+  full_name text not null,
+  email text,
+  year integer check (year between 1 and 6),
+  contact_number text,
+  address text,
+  emergency_contact text,
+  emergency_contact_number text,
+  blood_type text,
+  allergies text,
+  medications text,
+  medical_history text,
+  immunization_history text,
+  notes text,
+  avatar_url text,
+  profile_data jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Ensure all columns exist if table was already created in prior run
+alter table if exists public.patient_profiles
+  add column if not exists notes text,
+  add column if not exists avatar_url text,
+  add column if not exists contact_number text,
+  add column if not exists address text,
+  add column if not exists emergency_contact text,
+  add column if not exists emergency_contact_number text,
+  add column if not exists blood_type text,
+  add column if not exists allergies text,
+  add column if not exists medications text,
+  add column if not exists medical_history text,
+  add column if not exists immunization_history text;
+
+-- EVENTS (clinic drives, vaccination missions, seminars)
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  event_date date not null,
+  start_time time,
+  end_time time,
+  location text,
+  category text default 'General',
+  status text default 'draft' check (status in ('draft', 'published', 'cancelled', 'archived')),
+  is_published boolean default false,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- EVENT EMAIL LOGS (announcement blast tracking)
+create table if not exists public.event_email_logs (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references public.events(id) on delete cascade,
+  sent_by uuid references auth.users(id) on delete set null,
+  recipient_count integer default 0,
+  success_count integer default 0,
+  failed_count integer default 0,
+  status text default 'completed',
+  error_message text,
+  sent_at timestamptz default now()
 );
 
 -- INDEXES
@@ -750,12 +850,12 @@ create index if not exists idx_users_clearance_level on public.users (clearance_
 -- 4b) Optional break-glass logging table + helper function.
 create table if not exists public.break_glass_audit_logs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.users(id) on update cascade on delete set null,
+  user_id uuid references public.admins(id) on update cascade on delete set null,
   patient_id text references public.patients(id) on update cascade on delete set null,
   encounter_id uuid references public.encounters(id) on update cascade on delete set null,
   justification text not null,
   access_scope text not null default 'read',
-  approved_by uuid references public.users(id) on update cascade on delete set null,
+  approved_by uuid references public.admins(id) on update cascade on delete set null,
   expires_at timestamptz,
   created_at timestamptz not null default now(),
   metadata jsonb not null default '{}'::jsonb
@@ -904,9 +1004,6 @@ $$;
 alter table if exists public.users
   add column if not exists password text;
 
--- -----------------------------------------------------------------------------
--- 2) SYNC auth.users -> public.users (admin creates accounts in Supabase Auth)
--- -----------------------------------------------------------------------------
 create or replace function public.sync_public_user_from_auth()
 returns trigger
 language plpgsql
@@ -916,6 +1013,8 @@ as $$
 declare
   v_email text;
   v_name text;
+  v_role text;
+  v_patient_id text;
 begin
   if new.email is null then
     return new;
@@ -923,27 +1022,55 @@ begin
 
   v_email := lower(new.email);
   v_name := coalesce(new.raw_user_meta_data->>'name', split_part(coalesce(new.email, ''), '@', 1), 'Clinic User');
+  v_role := lower(coalesce(new.raw_user_meta_data->>'role', ''));
+  v_patient_id := new.raw_user_meta_data->>'patient_id';
 
-  -- If a public user already exists by email, link it to auth_user_id.
-  update public.users
-  set
-    auth_user_id = new.id,
-    email = coalesce(email, v_email),
-    updated_at = now()
-  where lower(email) = v_email;
+  -- Route based on role
+  if v_role in ('admin', 'physician', 'nurse') then
+    -- Staff Account -> public.admins
+    update public.admins
+    set
+      auth_user_id = new.id,
+      name = coalesce(nullif(trim(name), ''), v_name),
+      email = coalesce(email, v_email),
+      role = v_role,
+      updated_at = now()
+    where lower(email) = v_email;
 
-  -- If no row exists, create one with default nurse role (admin can reassign later).
-  if not exists (
-    select 1 from public.users u where u.auth_user_id = new.id
-  ) then
-    insert into public.users (id, auth_user_id, name, email, role, active, created_at, updated_at)
-    values (gen_random_uuid(), new.id, v_name, v_email, 'nurse', true, now(), now());
+    if not exists (
+      select 1 from public.admins a where a.auth_user_id = new.id or lower(a.email) = v_email
+    ) then
+      insert into public.admins (id, auth_user_id, name, email, role, active, created_at, updated_at)
+      values (gen_random_uuid(), new.id, v_name, v_email, v_role, true, now(), now());
+    end if;
+
+  elsif v_role = 'patient' then
+    -- Patient Account -> public.users
+    update public.users
+    set
+      auth_user_id = new.id,
+      name = coalesce(nullif(trim(name), ''), v_name),
+      email = coalesce(email, v_email),
+      patient_id = coalesce(patient_id, v_patient_id),
+      role = 'patient',
+      updated_at = now()
+    where lower(email) = v_email;
+
+    if not exists (
+      select 1 from public.users u where u.auth_user_id = new.id or lower(u.email) = v_email
+    ) then
+      insert into public.users (id, auth_user_id, name, email, role, active, patient_id, created_at, updated_at)
+      values (gen_random_uuid(), new.id, v_name, v_email, 'patient', true, v_patient_id, now(), now());
+    end if;
+
+  else
+    -- Unknown/missing role: Fail safely, do NOT default to nurse!
+    raise notice 'sync_public_user_from_auth: Skipping sync for % with unknown role: %', v_email, v_role;
   end if;
 
   return new;
 exception
   when others then
-    -- Do not block auth.users creation if profile sync fails.
     raise warning 'sync_public_user_from_auth failed for %: %', coalesce(new.email, '<null>'), sqlerrm;
     return new;
 end;
@@ -959,13 +1086,6 @@ create trigger trg_sync_public_user_from_auth_update
 after update of email, raw_user_meta_data on auth.users
 for each row execute function public.sync_public_user_from_auth();
 
--- Backfill auth_user_id for existing rows where possible.
-update public.users u
-set auth_user_id = au.id
-from auth.users au
-where lower(u.email) = lower(au.email)
-  and (u.auth_user_id is null or u.auth_user_id <> au.id);
-
 -- -----------------------------------------------------------------------------
 -- 3) ROLE + CLINIC-HOURS HELPERS
 -- -----------------------------------------------------------------------------
@@ -978,12 +1098,18 @@ set search_path = public
 as $$
   select coalesce(
     (
+      select a.role
+      from public.admins a
+      where a.auth_user_id = auth.uid()
+      limit 1
+    ),
+    (
       select u.role
       from public.users u
       where u.auth_user_id = auth.uid()
       limit 1
     ),
-    'nurse'
+    null
   )::text;
 $$;
 
@@ -994,7 +1120,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select public.current_app_role() in ('physician', 'admin');
+  select coalesce(public.current_app_role() in ('physician', 'admin'), false);
 $$;
 
 create or replace function public.current_clinician_name()
@@ -1006,9 +1132,9 @@ set search_path = public
 as $$
   select coalesce(
     (
-      select u.name
-      from public.users u
-      where u.auth_user_id = auth.uid()
+      select a.name
+      from public.admins a
+      where a.auth_user_id = auth.uid()
       limit 1
     ),
     ''
@@ -1036,21 +1162,7 @@ declare
   v_manila_now time;
 begin
   -- DEVELOPMENT MODE: Temporarily bypass clinic hours so development and testing can proceed 24/7.
-  -- To re-enable production clinic hours (07:00–19:00 Asia/Manila), remove "return true;" below.
   return true;
-
-  /* PRODUCTION LOGIC:
-  if current_user in ('postgres', 'supabase_admin', 'service_role') then
-    return true;
-  end if;
-
-  if coalesce(current_setting('app.bypass_clinic_hours', true), 'off') = 'on' then
-    return true;
-  end if;
-
-  v_manila_now := (now() at time zone 'Asia/Manila')::time;
-  return v_manila_now >= time '07:00' and v_manila_now < time '19:00';
-  */
 end;
 $$;
 
@@ -1069,11 +1181,19 @@ as $$
 declare
   v_locked_until timestamptz;
 begin
-  select u.locked_until
+  select a.locked_until
     into v_locked_until
-  from public.users u
-  where lower(u.email) = lower(p_email)
+  from public.admins a
+  where lower(a.email) = lower(p_email)
   limit 1;
+
+  if v_locked_until is null and not exists (select 1 from public.admins a where lower(a.email) = lower(p_email)) then
+    select u.locked_until
+      into v_locked_until
+    from public.users u
+    where lower(u.email) = lower(p_email)
+    limit 1;
+  end if;
 
   return query
   select
@@ -1099,43 +1219,76 @@ security definer
 set search_path = public
 as $$
 declare
+  v_admin public.admins%rowtype;
   v_user public.users%rowtype;
   v_attempts integer;
   v_locked_until timestamptz;
 begin
-  select *
-    into v_user
+  select * into v_admin
+  from public.admins a
+  where lower(a.email) = lower(p_email)
+  limit 1
+  for update;
+
+  if found then
+    v_attempts := coalesce(v_admin.failed_login_attempts, 0) + 1;
+    if v_attempts >= greatest(p_lock_after, 1) then
+      v_locked_until := now() + make_interval(mins => greatest(p_lock_minutes, 1));
+    else
+      v_locked_until := null;
+    end if;
+
+    update public.admins
+    set
+      failed_login_attempts = v_attempts,
+      last_failed_login_at = now(),
+      locked_until = v_locked_until,
+      lockout_reason = case when v_locked_until is null then null else coalesce(p_reason, 'too_many_failed_attempts') end,
+      updated_at = now()
+    where id = v_admin.id;
+
+    return query
+    select
+      v_admin.id,
+      v_attempts,
+      v_locked_until,
+      (v_locked_until is not null and v_locked_until > now());
+    return;
+  end if;
+
+  select * into v_user
   from public.users u
   where lower(u.email) = lower(p_email)
   limit 1
   for update;
 
-  if not found then
+  if found then
+    v_attempts := coalesce(v_user.failed_login_attempts, 0) + 1;
+    if v_attempts >= greatest(p_lock_after, 1) then
+      v_locked_until := now() + make_interval(mins => greatest(p_lock_minutes, 1));
+    else
+      v_locked_until := null;
+    end if;
+
+    update public.users
+    set
+      failed_login_attempts = v_attempts,
+      last_failed_login_at = now(),
+      locked_until = v_locked_until,
+      lockout_reason = case when v_locked_until is null then null else coalesce(p_reason, 'too_many_failed_attempts') end,
+      updated_at = now()
+    where id = v_user.id;
+
+    return query
+    select
+      v_user.id,
+      v_attempts,
+      v_locked_until,
+      (v_locked_until is not null and v_locked_until > now());
     return;
   end if;
 
-  v_attempts := coalesce(v_user.failed_login_attempts, 0) + 1;
-  if v_attempts >= greatest(p_lock_after, 1) then
-    v_locked_until := now() + make_interval(mins => greatest(p_lock_minutes, 1));
-  else
-    v_locked_until := null;
-  end if;
-
-  update public.users
-  set
-    failed_login_attempts = v_attempts,
-    last_failed_login_at = now(),
-    locked_until = v_locked_until,
-    lockout_reason = case when v_locked_until is null then null else coalesce(p_reason, 'too_many_failed_attempts') end,
-    updated_at = now()
-  where id = v_user.id;
-
-  return query
-  select
-    v_user.id,
-    v_attempts,
-    v_locked_until,
-    (v_locked_until is not null and v_locked_until > now());
+  return;
 end;
 $$;
 
@@ -1149,6 +1302,16 @@ security definer
 set search_path = public
 as $$
 begin
+  update public.admins
+  set
+    failed_login_attempts = 0,
+    last_failed_login_at = null,
+    locked_until = null,
+    lockout_reason = null,
+    last_login_at = case when p_touch_last_login then now() else last_login_at end,
+    updated_at = now()
+  where lower(email) = lower(p_email);
+
   update public.users
   set
     failed_login_attempts = 0,
@@ -1158,6 +1321,154 @@ begin
     last_login_at = case when p_touch_last_login then now() else last_login_at end,
     updated_at = now()
   where lower(email) = lower(p_email);
+end;
+$$;
+
+create or replace function public.complete_patient_registration(
+  p_student_id text,
+  p_name text,
+  p_year integer,
+  p_contact_number text default null,
+  p_address text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_auth_uid uuid;
+  v_auth_email text;
+  v_normalized_student_id text;
+  v_clean_name text;
+  v_clean_year integer;
+  v_user_id uuid;
+begin
+  -- 1. Verify caller authentication
+  v_auth_uid := auth.uid();
+  if v_auth_uid is null then
+    return jsonb_build_object('success', false, 'error', 'Authentication required. Please log in or verify OTP.');
+  end if;
+
+  -- 2. Retrieve authenticated email
+  select lower(email) into v_auth_email
+  from auth.users
+  where id = v_auth_uid;
+
+  if v_auth_email is null or not v_auth_email like '%@tup.edu.ph' then
+    return jsonb_build_object('success', false, 'error', 'Only official @tup.edu.ph email addresses are authorized.');
+  end if;
+
+  -- 3. Validate & normalize Student ID
+  v_normalized_student_id := upper(trim(p_student_id));
+  if v_normalized_student_id !~ '^TUPM-[0-9]{2}-[0-9]{4}$' then
+    return jsonb_build_object('success', false, 'error', 'Invalid Student ID format. Required format is TUPM-YY-XXXX (e.g. TUPM-23-5030).');
+  end if;
+
+  -- 4. Validate name and year
+  v_clean_name := trim(p_name);
+  if v_clean_name is null or length(v_clean_name) < 2 then
+    return jsonb_build_object('success', false, 'error', 'Full name is required.');
+  end if;
+
+  v_clean_year := coalesce(p_year, 1);
+  if v_clean_year < 1 or v_clean_year > 6 then
+    v_clean_year := 1;
+  end if;
+
+  -- 5. Upsert public.students master record
+  insert into public.students (id, name, year, updated_at)
+  values (v_normalized_student_id, v_clean_name, v_clean_year, now())
+  on conflict (id) do update set
+    name = excluded.name,
+    year = excluded.year,
+    updated_at = now();
+
+  -- 6. Upsert public.patients master record
+  insert into public.patients (id, name, year, sensitivity_level, updated_at)
+  values (v_normalized_student_id, v_clean_name, v_clean_year, 'normal', now())
+  on conflict (id) do update set
+    name = excluded.name,
+    year = excluded.year,
+    updated_at = now();
+
+  -- 7. Upsert public.users application account (strictly role = 'patient')
+  insert into public.users (
+    id,
+    auth_user_id,
+    name,
+    email,
+    role,
+    patient_id,
+    student_id,
+    active,
+    created_at,
+    updated_at
+  )
+  values (
+    gen_random_uuid(),
+    v_auth_uid,
+    v_clean_name,
+    v_auth_email,
+    'patient',
+    v_normalized_student_id,
+    v_normalized_student_id,
+    true,
+    now(),
+    now()
+  )
+  on conflict (email) do update set
+    auth_user_id = excluded.auth_user_id,
+    name = excluded.name,
+    role = 'patient',
+    patient_id = excluded.patient_id,
+    student_id = excluded.student_id,
+    active = true,
+    updated_at = now()
+  returning id into v_user_id;
+
+  -- 8. Upsert public.patient_profiles extended record
+  insert into public.patient_profiles (
+    patient_id,
+    user_id,
+    student_id,
+    full_name,
+    email,
+    year,
+    contact_number,
+    address,
+    updated_at
+  )
+  values (
+    v_normalized_student_id,
+    v_auth_uid,
+    v_normalized_student_id,
+    v_clean_name,
+    v_auth_email,
+    v_clean_year,
+    p_contact_number,
+    p_address,
+    now()
+  )
+  on conflict (patient_id) do update set
+    user_id = excluded.user_id,
+    student_id = excluded.student_id,
+    full_name = excluded.full_name,
+    email = excluded.email,
+    year = excluded.year,
+    contact_number = coalesce(excluded.contact_number, public.patient_profiles.contact_number),
+    address = coalesce(excluded.address, public.patient_profiles.address),
+    updated_at = now();
+
+  return jsonb_build_object(
+    'success', true,
+    'user_id', v_user_id,
+    'auth_user_id', v_auth_uid,
+    'student_id', v_normalized_student_id,
+    'name', v_clean_name,
+    'email', v_auth_email,
+    'role', 'patient'
+  );
 end;
 $$;
 
@@ -1180,6 +1491,7 @@ revoke all on function public.clear_login_lockout(text, boolean) from public;
 grant execute on function public.get_login_lockout_status(text) to anon, authenticated;
 grant execute on function public.register_failed_login(text, integer, integer, text) to anon, authenticated;
 grant execute on function public.clear_login_lockout(text, boolean) to authenticated;
+grant execute on function public.complete_patient_registration(text, text, integer, text, text) to authenticated, anon;
 
 drop trigger if exists trg_set_appointments_clinician_auth_user_id on public.appointments;
 create trigger trg_set_appointments_clinician_auth_user_id
@@ -1459,11 +1771,14 @@ using (
     public.current_app_role() in ('admin', 'physician', 'nurse')
     or (
       public.current_app_role() = 'patient'
-      and patient_id in (
-        select u.patient_id
-        from public.users u
-        where u.auth_user_id = auth.uid()
-          and u.patient_id is not null
+      and (
+        auth_user_id = auth.uid()
+        or patient_id in (
+          select u.patient_id
+          from public.users u
+          where u.auth_user_id = auth.uid()
+            and u.patient_id is not null
+        )
       )
     )
   )
@@ -1478,6 +1793,7 @@ with check (
     or (
       public.current_app_role() = 'patient'
       and sender_role = 'patient'
+      and (auth_user_id is null or auth_user_id = auth.uid())
       and patient_id in (
         select u.patient_id
         from public.users u
@@ -1487,6 +1803,70 @@ with check (
     )
   )
 );
+
+-- PATIENT PROFILES RLS
+create policy patient_profiles_select_policy on public.patient_profiles
+for select to authenticated
+using (
+  public.is_within_clinic_hours()
+  and (
+    public.current_app_role() in ('admin', 'physician', 'nurse')
+    or user_id = auth.uid()
+    or patient_id in (
+      select u.patient_id
+      from public.users u
+      where u.auth_user_id = auth.uid()
+        and u.patient_id is not null
+    )
+  )
+);
+
+create policy patient_profiles_update_policy on public.patient_profiles
+for update to authenticated
+using (
+  public.is_within_clinic_hours()
+  and (
+    public.current_app_role() in ('admin', 'physician', 'nurse')
+    or user_id = auth.uid()
+    or patient_id in (
+      select u.patient_id
+      from public.users u
+      where u.auth_user_id = auth.uid()
+        and u.patient_id is not null
+    )
+  )
+)
+with check (
+  public.is_within_clinic_hours()
+  and (
+    public.current_app_role() in ('admin', 'physician', 'nurse')
+    or user_id = auth.uid()
+    or patient_id in (
+      select u.patient_id
+      from public.users u
+      where u.auth_user_id = auth.uid()
+        and u.patient_id is not null
+    )
+  )
+);
+
+-- EVENTS RLS
+create policy events_select_policy on public.events
+for select to anon, authenticated
+using (
+  (is_published = true and status = 'published')
+  or public.current_app_role() in ('admin', 'physician', 'nurse')
+);
+
+create policy events_write_staff_policy on public.events
+for all to authenticated
+using (public.current_app_role() in ('admin', 'physician', 'nurse'))
+with check (public.current_app_role() in ('admin', 'physician', 'nurse'));
+
+create policy event_email_logs_staff_policy on public.event_email_logs
+for all to authenticated
+using (public.current_app_role() in ('admin', 'physician', 'nurse'))
+with check (public.current_app_role() in ('admin', 'physician', 'nurse'));
 
 create policy encounters_insert_policy on public.encounters
 for insert to authenticated
@@ -1826,8 +2206,8 @@ begin
     end if;
   end if;
 
-  -- Link public.users profile records to auth.users
-  insert into public.users (id, auth_user_id, name, email, role, active, created_at, updated_at)
+  -- Link public.admins profile records to auth.users
+  insert into public.admins (id, auth_user_id, name, email, role, active, created_at, updated_at)
   values
     (gen_random_uuid(), v_physician_id, 'Dr. Rivera', 'physician@tupclinic.local', 'physician', true, now(), now()),
     (gen_random_uuid(), v_nurse_id, 'Nurse Santos', 'nurse@tupclinic.local', 'nurse', true, now(), now())
@@ -1838,28 +2218,24 @@ begin
     active = excluded.active,
     updated_at = now();
 
-  -- Backfill any remaining auth_user_ids by email
-  update public.users u
-  set auth_user_id = au.id
-  from auth.users au
-  where lower(u.email) = lower(au.email)
-    and (u.auth_user_id is null or u.auth_user_id <> au.id);
+  -- Clean up any staff accounts from public.users
+  delete from public.users where role in ('admin', 'physician', 'nurse');
 
 end $$;
 
 update public.appointments a
-set clinician_auth_user_id = u.auth_user_id
-from public.users u
+set clinician_auth_user_id = adm.auth_user_id
+from public.admins adm
 where a.clinician_auth_user_id is null
-  and u.auth_user_id is not null
-  and lower(coalesce(a.clinician_name, '')) = lower(coalesce(u.name, ''));
+  and adm.auth_user_id is not null
+  and lower(coalesce(a.clinician_name, '')) = lower(coalesce(adm.name, ''));
 
 update public.encounters e
-set clinician_auth_user_id = u.auth_user_id
-from public.users u
+set clinician_auth_user_id = adm.auth_user_id
+from public.admins adm
 where e.clinician_auth_user_id is null
-  and u.auth_user_id is not null
-  and lower(coalesce(e.clinician_name, '')) = lower(coalesce(u.name, ''));
+  and adm.auth_user_id is not null
+  and lower(coalesce(e.clinician_name, '')) = lower(coalesce(adm.name, ''));
 
 -- END FILE: schema_auth_rls.sql
 
@@ -1874,24 +2250,24 @@ select set_config('app.bypass_clinic_hours', 'on', true);
 -- 1) Students
 insert into public.students (id, name, year)
 values
-('2021-01234', 'Juan Dela Cruz', 3),
-('2020-04567', 'Maria Santos', 4),
-('2022-05678', 'Ana Reyes', 2),
-('2023-07890', 'Carlos Garcia', 1),
-('2022-09876', 'Elena Lopez', 2),
-('2021-06543', 'Miguel Torres', 3),
-('2023-01278', 'Isabella Rodriguez', 1),
-('2020-03456', 'Diego Fernandez', 4),
-('2022-07891', 'Sofia Martinez', 2),
-('2021-04321', 'Alejandro Ruiz', 3),
-('2023-05678', 'Valentina Gomez', 1),
-('2020-06789', 'Mateo Morales', 4),
-('2022-08901', 'Camila Silva', 2),
-('2021-07892', 'Sebastian Ramirez', 3),
-('2023-04321', 'Luna Castillo', 1),
-('2020-07893', 'Ethan Flores', 4),
-('2022-03210', 'Mia Castro', 2),
-('2021-09876', 'Daniel Mendoza', 3)
+('TUPM-21-1234', 'Juan Dela Cruz', 3),
+('TUPM-20-4567', 'Maria Santos', 4),
+('TUPM-22-5678', 'Ana Reyes', 2),
+('TUPM-23-7890', 'Carlos Garcia', 1),
+('TUPM-22-9876', 'Elena Lopez', 2),
+('TUPM-21-6543', 'Miguel Torres', 3),
+('TUPM-23-1278', 'Isabella Rodriguez', 1),
+('TUPM-20-3456', 'Diego Fernandez', 4),
+('TUPM-22-7891', 'Sofia Martinez', 2),
+('TUPM-21-4321', 'Alejandro Ruiz', 3),
+('TUPM-23-5678', 'Valentina Gomez', 1),
+('TUPM-20-6789', 'Mateo Morales', 4),
+('TUPM-22-8901', 'Camila Silva', 2),
+('TUPM-21-7892', 'Sebastian Ramirez', 3),
+('TUPM-23-4321', 'Luna Castillo', 1),
+('TUPM-20-7893', 'Ethan Flores', 4),
+('TUPM-22-3210', 'Mia Castro', 2),
+('TUPM-21-9876', 'Daniel Mendoza', 3)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -1905,16 +2281,16 @@ select
   s.name,
   s.year,
   case s.id
-    when '2021-01234' then date '2025-11-14'
-    when '2020-04567' then date '2025-10-28'
+    when 'TUPM-21-1234' then date '2025-11-14'
+    when 'TUPM-20-4567' then date '2025-10-28'
     else null
   end as last_visit_date,
   'normal' as sensitivity_level
 from public.students s
 where s.id in (
-  '2021-01234','2020-04567','2022-05678','2023-07890','2022-09876','2021-06543',
-  '2023-01278','2020-03456','2022-07891','2021-04321','2023-05678','2020-06789',
-  '2022-08901','2021-07892','2023-04321','2020-07893'
+  'TUPM-21-1234','TUPM-20-4567','TUPM-22-5678','TUPM-23-7890','TUPM-22-9876','TUPM-21-6543',
+  'TUPM-23-1278','TUPM-20-3456','TUPM-22-7891','TUPM-21-4321','TUPM-23-5678','TUPM-20-6789',
+  'TUPM-22-8901','TUPM-21-7892','TUPM-23-4321','TUPM-20-7893'
 )
 on conflict (id) do update
 set
@@ -1927,32 +2303,32 @@ set
 insert into public.appointments
   (patient_id, clinician_name, appointment_date, appointment_time, type, status)
 values
-('2021-01234', 'Dr. Rivera', '2025-11-21', '09:00', 'Consult', 'Scheduled'),
-('2020-04567', 'Nurse Santos', '2025-11-21', '09:30', 'Follow-up', 'Checked-in');
+('TUPM-21-1234', 'Dr. Rivera', '2025-11-21', '09:00', 'Consult', 'Scheduled'),
+('TUPM-20-4567', 'Nurse Santos', '2025-11-21', '09:30', 'Follow-up', 'Checked-in');
 
 -- 4) Encounters
 insert into public.encounters
   (patient_id, clinician_name, encounter_date, chief_complaint, assessment_plan, vitals)
 values
-('2021-01234', 'Dr. Rivera', '2025-11-15T10:00:00+08:00', 'Fever', 'Antibiotics prescribed, rest advised', '{"temp":"101.5","pulse":"90","bp":"120/80","weight":"60"}'::jsonb),
-('2021-01234', 'Dr. Rivera', '2025-11-10T11:00:00+08:00', 'Cough', 'Cough syrup and rest', '{"temp":"98.6","pulse":"80","bp":"118/78","weight":"61"}'::jsonb),
-('2020-04567', 'Dr. Rivera', '2025-11-14T09:30:00+08:00', 'Headache', 'Pain relievers and hydration', '{"temp":"97.5","pulse":"75","bp":"116/76","weight":"57"}'::jsonb),
-('2022-05678', 'Dr. Rivera', '2025-11-16T13:00:00+08:00', 'Stomach pain', 'Dietary changes, antacids', '{"temp":"99.0","pulse":"78","bp":"119/79","weight":"55"}'::jsonb),
-('2022-05678', 'Dr. Rivera', '2025-11-12T10:30:00+08:00', 'Sore throat', 'Gargle salt water, lozenges', '{"temp":"98.0","pulse":"82","bp":"121/81","weight":"56"}'::jsonb),
-('2021-01234', 'Dr. Rivera', '2025-11-18T15:00:00+08:00', 'Fever', 'Antibiotics', '{"temp":"102.0","pulse":"92","bp":"125/85","weight":"59"}'::jsonb),
-('2023-07890', 'Dr. Rivera', '2025-11-19T14:00:00+08:00', 'Allergic reaction', 'Antihistamines, observation', '{"temp":"98.2","pulse":"85","bp":"118/75","weight":"70"}'::jsonb),
-('2022-09876', 'Dr. Rivera', '2025-11-17T09:00:00+08:00', 'Flu symptoms', 'Antiviral medication, fluids', '{"temp":"100.8","pulse":"88","bp":"122/82","weight":"62"}'::jsonb),
-('2021-06543', 'Nurse Santos', '2025-11-13T11:30:00+08:00', 'Sore throat', 'Salt water gargle, lozenges', '{"temp":"98.5","pulse":"78","bp":"115/70","weight":"58"}'::jsonb),
-('2023-01278', 'Dr. Rivera', '2025-11-20T16:00:00+08:00', 'Back pain', 'Pain medication, light exercise', '{"temp":"98.0","pulse":"75","bp":"120/80","weight":"68"}'::jsonb),
-('2020-03456', 'Nurse Santos', '2025-11-11T08:00:00+08:00', 'Cold symptoms', 'Rest, decongestants', '{"temp":"99.5","pulse":"82","bp":"117/74","weight":"55"}'::jsonb),
-('2022-07891', 'Dr. Rivera', '2025-11-21T10:00:00+08:00', 'Anxiety symptoms', 'Counseling referral, mild sedative', '{"temp":"98.6","pulse":"95","bp":"135/90","weight":"65"}'::jsonb),
-('2021-04321', 'Dr. Rivera', '2025-11-09T12:00:00+08:00', 'Skin rash', 'Topical cream, allergy testing', '{"temp":"97.8","pulse":"72","bp":"112/68","weight":"63"}'::jsonb),
-('2023-05678', 'Dr. Rivera', '2025-11-22T14:30:00+08:00', 'Sleep disturbance', 'Sleep hygiene counseling, melatonin', '{"temp":"98.1","pulse":"80","bp":"118/76","weight":"52"}'::jsonb),
-('2020-06789', 'Nurse Santos', '2025-11-08T15:00:00+08:00', 'Dizziness', 'Monitor blood pressure, hydration', '{"temp":"98.4","pulse":"76","bp":"110/65","weight":"60"}'::jsonb),
-('2022-08901', 'Dr. Rivera', '2025-11-23T11:15:00+08:00', 'Ear infection', 'Ear drops, antibiotics', '{"temp":"98.9","pulse":"85","bp":"119/78","weight":"48"}'::jsonb),
-('2021-07892', 'Dr. Rivera', '2025-11-07T13:00:00+08:00', 'Joint pain', 'NSAIDs, physical therapy referral', '{"temp":"98.7","pulse":"83","bp":"122/84","weight":"72"}'::jsonb),
-('2023-04321', 'Dr. Rivera', '2025-11-24T09:45:00+08:00', 'Migraine', 'Triptans, migraine prevention meds', '{"temp":"98.3","pulse":"88","bp":"124/86","weight":"58"}'::jsonb),
-('2020-07893', 'Nurse Santos', '2025-11-06T10:30:00+08:00', 'Stress related symptoms', 'Counseling, stress management', '{"temp":"97.9","pulse":"82","bp":"115/72","weight":"61"}'::jsonb);
+('TUPM-21-1234', 'Dr. Rivera', '2025-11-15T10:00:00+08:00', 'Fever', 'Antibiotics prescribed, rest advised', '{"temp":"101.5","pulse":"90","bp":"120/80","weight":"60"}'::jsonb),
+('TUPM-21-1234', 'Dr. Rivera', '2025-11-10T11:00:00+08:00', 'Cough', 'Cough syrup and rest', '{"temp":"98.6","pulse":"80","bp":"118/78","weight":"61"}'::jsonb),
+('TUPM-20-4567', 'Dr. Rivera', '2025-11-14T09:30:00+08:00', 'Headache', 'Pain relievers and hydration', '{"temp":"97.5","pulse":"75","bp":"116/76","weight":"57"}'::jsonb),
+('TUPM-22-5678', 'Dr. Rivera', '2025-11-16T13:00:00+08:00', 'Stomach pain', 'Dietary changes, antacids', '{"temp":"99.0","pulse":"78","bp":"119/79","weight":"55"}'::jsonb),
+('TUPM-22-5678', 'Dr. Rivera', '2025-11-12T10:30:00+08:00', 'Sore throat', 'Gargle salt water, lozenges', '{"temp":"98.0","pulse":"82","bp":"121/81","weight":"56"}'::jsonb),
+('TUPM-21-1234', 'Dr. Rivera', '2025-11-18T15:00:00+08:00', 'Fever', 'Antibiotics', '{"temp":"102.0","pulse":"92","bp":"125/85","weight":"59"}'::jsonb),
+('TUPM-23-7890', 'Dr. Rivera', '2025-11-19T14:00:00+08:00', 'Allergic reaction', 'Antihistamines, observation', '{"temp":"98.2","pulse":"85","bp":"118/75","weight":"70"}'::jsonb),
+('TUPM-22-9876', 'Dr. Rivera', '2025-11-17T09:00:00+08:00', 'Flu symptoms', 'Antiviral medication, fluids', '{"temp":"100.8","pulse":"88","bp":"122/82","weight":"62"}'::jsonb),
+('TUPM-21-6543', 'Nurse Santos', '2025-11-13T11:30:00+08:00', 'Sore throat', 'Salt water gargle, lozenges', '{"temp":"98.5","pulse":"78","bp":"115/70","weight":"58"}'::jsonb),
+('TUPM-23-1278', 'Dr. Rivera', '2025-11-20T16:00:00+08:00', 'Back pain', 'Pain medication, light exercise', '{"temp":"98.0","pulse":"75","bp":"120/80","weight":"68"}'::jsonb),
+('TUPM-20-3456', 'Nurse Santos', '2025-11-11T08:00:00+08:00', 'Cold symptoms', 'Rest, decongestants', '{"temp":"99.5","pulse":"82","bp":"117/74","weight":"55"}'::jsonb),
+('TUPM-22-7891', 'Dr. Rivera', '2025-11-21T10:00:00+08:00', 'Anxiety symptoms', 'Counseling referral, mild sedative', '{"temp":"98.6","pulse":"95","bp":"135/90","weight":"65"}'::jsonb),
+('TUPM-21-4321', 'Dr. Rivera', '2025-11-09T12:00:00+08:00', 'Skin rash', 'Topical cream, allergy testing', '{"temp":"97.8","pulse":"72","bp":"112/68","weight":"63"}'::jsonb),
+('TUPM-23-5678', 'Dr. Rivera', '2025-11-22T14:30:00+08:00', 'Sleep disturbance', 'Sleep hygiene counseling, melatonin', '{"temp":"98.1","pulse":"80","bp":"118/76","weight":"52"}'::jsonb),
+('TUPM-20-6789', 'Nurse Santos', '2025-11-08T15:00:00+08:00', 'Dizziness', 'Monitor blood pressure, hydration', '{"temp":"98.4","pulse":"76","bp":"110/65","weight":"60"}'::jsonb),
+('TUPM-22-8901', 'Dr. Rivera', '2025-11-23T11:15:00+08:00', 'Ear infection', 'Ear drops, antibiotics', '{"temp":"98.9","pulse":"85","bp":"119/78","weight":"48"}'::jsonb),
+('TUPM-21-7892', 'Dr. Rivera', '2025-11-07T13:00:00+08:00', 'Joint pain', 'NSAIDs, physical therapy referral', '{"temp":"98.7","pulse":"83","bp":"122/84","weight":"72"}'::jsonb),
+('TUPM-23-4321', 'Dr. Rivera', '2025-11-24T09:45:00+08:00', 'Migraine', 'Triptans, migraine prevention meds', '{"temp":"98.3","pulse":"88","bp":"124/86","weight":"58"}'::jsonb),
+('TUPM-20-7893', 'Nurse Santos', '2025-11-06T10:30:00+08:00', 'Stress related symptoms', 'Counseling, stress management', '{"temp":"97.9","pulse":"82","bp":"115/72","weight":"61"}'::jsonb);
 
 -- 5) Optional inventory rows (so transaction log has corresponding visible items)
 insert into public.inventory (item_name, category, stock_quantity, unit, reorder_level)
@@ -1993,24 +2369,24 @@ select set_config('app.bypass_clinic_hours', 'on', true);
 -- 1) Students
 insert into public.students (id, name, year)
 values
-('2021-01234', 'Juan Dela Cruz', 3),
-('2020-04567', 'Maria Santos', 4),
-('2022-05678', 'Ana Reyes', 2),
-('2023-07890', 'Carlos Garcia', 1),
-('2022-09876', 'Elena Lopez', 2),
-('2021-06543', 'Miguel Torres', 3),
-('2023-01278', 'Isabella Rodriguez', 1),
-('2020-03456', 'Diego Fernandez', 4),
-('2022-07891', 'Sofia Martinez', 2),
-('2021-04321', 'Alejandro Ruiz', 3),
-('2023-05678', 'Valentina Gomez', 1),
-('2020-06789', 'Mateo Morales', 4),
-('2022-08901', 'Camila Silva', 2),
-('2021-07892', 'Sebastian Ramirez', 3),
-('2023-04321', 'Luna Castillo', 1),
-('2020-07893', 'Ethan Flores', 4),
-('2022-03210', 'Mia Castro', 2),
-('2021-09876', 'Daniel Mendoza', 3)
+('TUPM-21-1234', 'Juan Dela Cruz', 3),
+('TUPM-20-4567', 'Maria Santos', 4),
+('TUPM-22-5678', 'Ana Reyes', 2),
+('TUPM-23-7890', 'Carlos Garcia', 1),
+('TUPM-22-9876', 'Elena Lopez', 2),
+('TUPM-21-6543', 'Miguel Torres', 3),
+('TUPM-23-1278', 'Isabella Rodriguez', 1),
+('TUPM-20-3456', 'Diego Fernandez', 4),
+('TUPM-22-7891', 'Sofia Martinez', 2),
+('TUPM-21-4321', 'Alejandro Ruiz', 3),
+('TUPM-23-5678', 'Valentina Gomez', 1),
+('TUPM-20-6789', 'Mateo Morales', 4),
+('TUPM-22-8901', 'Camila Silva', 2),
+('TUPM-21-7892', 'Sebastian Ramirez', 3),
+('TUPM-23-4321', 'Luna Castillo', 1),
+('TUPM-20-7893', 'Ethan Flores', 4),
+('TUPM-22-3210', 'Mia Castro', 2),
+('TUPM-21-9876', 'Daniel Mendoza', 3)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -2026,9 +2402,9 @@ select
   null::date
 from public.students s
 where s.id in (
-  '2021-01234','2020-04567','2022-05678','2023-07890','2022-09876','2021-06543',
-  '2023-01278','2020-03456','2022-07891','2021-04321','2023-05678','2020-06789',
-  '2022-08901','2021-07892','2023-04321','2020-07893','2022-03210','2021-09876'
+  'TUPM-21-1234','TUPM-20-4567','TUPM-22-5678','TUPM-23-7890','TUPM-22-9876','TUPM-21-6543',
+  'TUPM-23-1278','TUPM-20-3456','TUPM-22-7891','TUPM-21-4321','TUPM-23-5678','TUPM-20-6789',
+  'TUPM-22-8901','TUPM-21-7892','TUPM-23-4321','TUPM-20-7893','TUPM-22-3210','TUPM-21-9876'
 )
 on conflict (id) do update
 set
@@ -2040,12 +2416,12 @@ set
 insert into public.appointments
   (id, patient_id, patient_name, clinician_name, appointment_date, appointment_time, type, status)
 values
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56001', '2021-01234', 'Juan Dela Cruz', 'Dr. Rivera', '2026-04-14', '09:00', 'Consult', 'Checked-in'),
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56002', '2020-04567', 'Maria Santos', 'Nurse Santos', '2026-04-14', '09:30', 'Follow-up', 'Checked-in'),
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56003', '2022-05678', 'Ana Reyes', 'Dr. Rivera', '2026-04-15', '10:00', 'Consult', 'Scheduled'),
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56004', '2023-07890', 'Carlos Garcia', 'Nurse Santos', '2026-04-15', '10:30', 'Follow-up', 'Scheduled'),
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56005', '2022-09876', 'Elena Lopez', 'Dr. Rivera', '2026-04-16', '13:00', 'Consult', 'Scheduled'),
-('b7d0aa65-644a-4dc5-87a8-5fa6e4b56006', '2021-06543', 'Miguel Torres', 'Nurse Santos', '2026-04-16', '13:30', 'Follow-up', 'Scheduled')
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56001', 'TUPM-21-1234', 'Juan Dela Cruz', 'Dr. Rivera', '2026-04-14', '09:00', 'Consult', 'Checked-in'),
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56002', 'TUPM-20-4567', 'Maria Santos', 'Nurse Santos', '2026-04-14', '09:30', 'Follow-up', 'Checked-in'),
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56003', 'TUPM-22-5678', 'Ana Reyes', 'Dr. Rivera', '2026-04-15', '10:00', 'Consult', 'Scheduled'),
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56004', 'TUPM-23-7890', 'Carlos Garcia', 'Nurse Santos', '2026-04-15', '10:30', 'Follow-up', 'Scheduled'),
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56005', 'TUPM-22-9876', 'Elena Lopez', 'Dr. Rivera', '2026-04-16', '13:00', 'Consult', 'Scheduled'),
+('b7d0aa65-644a-4dc5-87a8-5fa6e4b56006', 'TUPM-21-6543', 'Miguel Torres', 'Nurse Santos', '2026-04-16', '13:30', 'Follow-up', 'Scheduled')
 on conflict (id) do update
 set
   patient_id = excluded.patient_id,
@@ -2061,22 +2437,22 @@ set
 insert into public.encounters
   (id, patient_id, patient_name, clinician_name, encounter_date, chief_complaint, assessment_plan, vitals)
 values
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77001', '2021-01234', 'Juan Dela Cruz', 'Dr. Rivera', '2026-03-20T09:15:00+08:00', 'Fever', 'Paracetamol and hydration', '{"temp":"38.2","pulse":"90","bp":"120/80","weight":"60"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77002', '2020-04567', 'Maria Santos', 'Dr. Rivera', '2026-03-22T10:40:00+08:00', 'Headache', 'Rest, hydration, monitor symptoms', '{"temp":"36.9","pulse":"76","bp":"118/76","weight":"57"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77003', '2022-05678', 'Ana Reyes', 'Dr. Rivera', '2026-03-25T11:20:00+08:00', 'Cough', 'Cough syrup and steam inhalation', '{"temp":"37.1","pulse":"82","bp":"119/79","weight":"55"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77004', '2023-07890', 'Carlos Garcia', 'Nurse Santos', '2026-03-27T08:35:00+08:00', 'Sore throat', 'Warm saline gargle and lozenges', '{"temp":"37.0","pulse":"80","bp":"117/75","weight":"70"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77005', '2022-09876', 'Elena Lopez', 'Dr. Rivera', '2026-03-29T14:10:00+08:00', 'Flu symptoms', 'Oseltamivir, rest, fluids', '{"temp":"38.4","pulse":"92","bp":"122/82","weight":"62"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77006', '2021-06543', 'Miguel Torres', 'Nurse Santos', '2026-04-01T09:50:00+08:00', 'Cold symptoms', 'Decongestant and rest', '{"temp":"37.4","pulse":"84","bp":"116/74","weight":"58"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77007', '2023-01278', 'Isabella Rodriguez', 'Dr. Rivera', '2026-04-03T15:25:00+08:00', 'Back pain', 'NSAID and posture advice', '{"temp":"36.8","pulse":"74","bp":"120/80","weight":"68"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77008', '2020-03456', 'Diego Fernandez', 'Nurse Santos', '2026-04-05T10:05:00+08:00', 'Dizziness', 'Blood pressure monitoring', '{"temp":"36.7","pulse":"78","bp":"110/68","weight":"55"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77009', '2022-07891', 'Sofia Martinez', 'Dr. Rivera', '2026-04-07T13:45:00+08:00', 'Anxiety symptoms', 'Counseling referral and follow-up', '{"temp":"36.9","pulse":"96","bp":"132/88","weight":"65"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77010', '2021-04321', 'Alejandro Ruiz', 'Dr. Rivera', '2026-04-08T11:30:00+08:00', 'Skin rash', 'Topical corticosteroid for 5 days', '{"temp":"36.6","pulse":"72","bp":"114/70","weight":"63"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77011', '2023-05678', 'Valentina Gomez', 'Dr. Rivera', '2026-04-09T14:20:00+08:00', 'Migraine', 'Triptan and trigger tracking', '{"temp":"36.8","pulse":"86","bp":"124/84","weight":"52"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77012', '2020-06789', 'Mateo Morales', 'Nurse Santos', '2026-04-10T09:00:00+08:00', 'Stress related symptoms', 'Stress management guidance', '{"temp":"36.7","pulse":"82","bp":"115/72","weight":"60"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77013', '2022-08901', 'Camila Silva', 'Dr. Rivera', '2026-04-11T10:10:00+08:00', 'Ear infection', 'Ear drops and antibiotic', '{"temp":"37.2","pulse":"84","bp":"118/78","weight":"48"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77014', '2021-07892', 'Sebastian Ramirez', 'Dr. Rivera', '2026-04-12T16:00:00+08:00', 'Joint pain', 'NSAID and stretching exercises', '{"temp":"36.9","pulse":"83","bp":"122/84","weight":"72"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77015', '2023-04321', 'Luna Castillo', 'Dr. Rivera', '2026-04-13T08:20:00+08:00', 'Fever', 'Hydration and antipyretic', '{"temp":"38.0","pulse":"89","bp":"121/79","weight":"58"}'::jsonb),
-('d5e34175-dac7-4ae7-a88d-2aa8a0f77016', '2020-07893', 'Ethan Flores', 'Nurse Santos', '2026-04-14T10:00:00+08:00', 'Cough', 'Symptomatic treatment and rest', '{"temp":"37.3","pulse":"81","bp":"116/73","weight":"61"}'::jsonb)
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77001', 'TUPM-21-1234', 'Juan Dela Cruz', 'Dr. Rivera', '2026-03-20T09:15:00+08:00', 'Fever', 'Paracetamol and hydration', '{"temp":"38.2","pulse":"90","bp":"120/80","weight":"60"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77002', 'TUPM-20-4567', 'Maria Santos', 'Dr. Rivera', '2026-03-22T10:40:00+08:00', 'Headache', 'Rest, hydration, monitor symptoms', '{"temp":"36.9","pulse":"76","bp":"118/76","weight":"57"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77003', 'TUPM-22-5678', 'Ana Reyes', 'Dr. Rivera', '2026-03-25T11:20:00+08:00', 'Cough', 'Cough syrup and steam inhalation', '{"temp":"37.1","pulse":"82","bp":"119/79","weight":"55"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77004', 'TUPM-23-7890', 'Carlos Garcia', 'Nurse Santos', '2026-03-27T08:35:00+08:00', 'Sore throat', 'Warm saline gargle and lozenges', '{"temp":"37.0","pulse":"80","bp":"117/75","weight":"70"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77005', 'TUPM-22-9876', 'Elena Lopez', 'Dr. Rivera', '2026-03-29T14:10:00+08:00', 'Flu symptoms', 'Oseltamivir, rest, fluids', '{"temp":"38.4","pulse":"92","bp":"122/82","weight":"62"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77006', 'TUPM-21-6543', 'Miguel Torres', 'Nurse Santos', '2026-04-01T09:50:00+08:00', 'Cold symptoms', 'Decongestant and rest', '{"temp":"37.4","pulse":"84","bp":"116/74","weight":"58"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77007', 'TUPM-23-1278', 'Isabella Rodriguez', 'Dr. Rivera', '2026-04-03T15:25:00+08:00', 'Back pain', 'NSAID and posture advice', '{"temp":"36.8","pulse":"74","bp":"120/80","weight":"68"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77008', 'TUPM-20-3456', 'Diego Fernandez', 'Nurse Santos', '2026-04-05T10:05:00+08:00', 'Dizziness', 'Blood pressure monitoring', '{"temp":"36.7","pulse":"78","bp":"110/68","weight":"55"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77009', 'TUPM-22-7891', 'Sofia Martinez', 'Dr. Rivera', '2026-04-07T13:45:00+08:00', 'Anxiety symptoms', 'Counseling referral and follow-up', '{"temp":"36.9","pulse":"96","bp":"132/88","weight":"65"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77010', 'TUPM-21-4321', 'Alejandro Ruiz', 'Dr. Rivera', '2026-04-08T11:30:00+08:00', 'Skin rash', 'Topical corticosteroid for 5 days', '{"temp":"36.6","pulse":"72","bp":"114/70","weight":"63"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77011', 'TUPM-23-5678', 'Valentina Gomez', 'Dr. Rivera', '2026-04-09T14:20:00+08:00', 'Migraine', 'Triptan and trigger tracking', '{"temp":"36.8","pulse":"86","bp":"124/84","weight":"52"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77012', 'TUPM-20-6789', 'Nurse Santos', '2026-04-10T09:00:00+08:00', 'Stress related symptoms', 'Stress management guidance', '{"temp":"36.7","pulse":"82","bp":"115/72","weight":"60"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77013', 'TUPM-22-8901', 'Camila Silva', 'Dr. Rivera', '2026-04-11T10:10:00+08:00', 'Ear infection', 'Ear drops and antibiotic', '{"temp":"37.2","pulse":"84","bp":"118/78","weight":"48"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77014', 'TUPM-21-7892', 'Sebastian Ramirez', 'Dr. Rivera', '2026-04-12T16:00:00+08:00', 'Joint pain', 'NSAID and stretching exercises', '{"temp":"36.9","pulse":"83","bp":"122/84","weight":"72"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77015', 'TUPM-23-4321', 'Luna Castillo', 'Dr. Rivera', '2026-04-13T08:20:00+08:00', 'Fever', 'Hydration and antipyretic', '{"temp":"38.0","pulse":"89","bp":"121/79","weight":"58"}'::jsonb),
+('d5e34175-dac7-4ae7-a88d-2aa8a0f77016', 'TUPM-20-7893', 'Ethan Flores', 'Nurse Santos', '2026-04-14T10:00:00+08:00', 'Cough', 'Symptomatic treatment and rest', '{"temp":"37.3","pulse":"81","bp":"116/73","weight":"61"}'::jsonb)
 on conflict (id) do update
 set
   patient_id = excluded.patient_id,

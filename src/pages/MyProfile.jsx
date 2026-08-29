@@ -265,8 +265,9 @@ const MyProfile = () => {
     }
 
     try {
+      const targetTable = (authUser?.role || '').toLowerCase() === 'patient' ? 'users' : 'admins';
       const { error } = await supabase
-        .from('users')
+        .from(targetTable)
         .update({
           name: editableUser.name,
           avatar: editableUser.avatar || null

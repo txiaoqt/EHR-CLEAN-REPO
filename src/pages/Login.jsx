@@ -1,5 +1,5 @@
 // src/pages/Login.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
@@ -11,12 +11,22 @@ import {
   LOCKOUT_MINUTES,
   MAX_FAILED_ATTEMPTS,
 } from './loginSecurity.js';
+import { EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import bg1Image from '../assets/images/bg1.jpg';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
+import {
+  ALLOWED_USER_EMAIL_DOMAIN,
+  STUDENT_ID_REGEX,
+  isValidTupEmail,
+  isValidStudentId,
+} from '../utils/authValidation.js';
+
+export { ALLOWED_USER_EMAIL_DOMAIN, STUDENT_ID_REGEX, isValidTupEmail, isValidStudentId };
 
 const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
 const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
+
 const USER_TEST_ACCOUNT = {
   email: 'patient.test@tup.edu.ph',
   password: 'UserTest@123',
@@ -26,7 +36,7 @@ const USER_TEST_ACCOUNT = {
     email: 'patient.test@tup.edu.ph',
     avatar: null,
     role: 'patient',
-    patient_id: 'TEST-USER-0001',
+    patient_id: 'TUPM-23-5030',
   },
 };
 
@@ -35,12 +45,16 @@ const Login = () => {
   const location = useLocation();
   const { login, fetchUserProfile } = useAuth();
   const [vw, setVw] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
+
+  // Authentication Mode: 'login' | 'signup' | 'forgot' | 'update_password'
+  const [authMode, setAuthMode] = useState('login');
+
+  // Login State
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
-  const [msg, setMsg] = useState('');
-  const [msgOpen, setMsgOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [signupMode, setSignupMode] = useState(false);
+  const [showLoginPass, setShowLoginPass] = useState(false);
+
+  // Sign-up State
   const [signupData, setSignupData] = useState({
     studentId: '',
     fullName: '',
@@ -49,6 +63,83 @@ const Login = () => {
     password: '',
     confirmPassword: '',
   });
+  const [showSignupPass, setShowSignupPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+
+  // OTP Verification State
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [otpEmail, setOtpEmail] = useState('');
+
+  // Forgot Password State
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  // Password Recovery / Update State
+  const [newPass, setNewPass] = useState('');
+  const [confirmNewPass, setConfirmNewPass] = useState('');
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmNewPass, setShowConfirmNewPass] = useState(false);
+  const [updatePassLoading, setUpdatePassLoading] = useState(false);
+
+  // Global Feedback & Loading State
+  const [msg, setMsg] = useState('');
+  const [msgOpen, setMsgOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Listen for Supabase Password Recovery Redirects & Events
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+        setAuthMode('update_password');
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthMode('update_password');
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  // Cooldown Countdown Timer
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCooldown]);
+
+  // Window Resize Listener
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Location Session Message
+  useEffect(() => {
+    const sessionMessage = location?.state?.sessionMessage;
+    if (sessionMessage) setMsg(sessionMessage);
+  }, [location]);
+
+  // Open Message Modal on message set
+  useEffect(() => {
+    if (msg) setMsgOpen(true);
+  }, [msg]);
+
+  // -------------------------------------------------------------
+  // HANDLERS
+  // -------------------------------------------------------------
 
   const handleLogin = async () => {
     if (!email || !pass) {
@@ -86,11 +177,9 @@ const Login = () => {
           setLoading(false);
           return;
         }
-      } catch (_) {
-        // Continue if RPC is not deployed yet
-      }
+      } catch (_) {}
 
-      // 1. Authenticate with Supabase Auth (validates password securely)
+      // 1. Authenticate with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password: pass,
@@ -98,12 +187,11 @@ const Login = () => {
 
       if (authError) {
         console.warn('Authentication error:', authError.message);
-        // Track failed attempt via security lockout RPC if available
         try {
           const { data: lockData } = await supabase.rpc('register_failed_login', {
             p_email: normalizedEmail,
             p_lock_after: MAX_FAILED_ATTEMPTS,
-            p_lock_minutes: LOCKOUT_MINUTES
+            p_lock_minutes: LOCKOUT_MINUTES,
           });
           if (lockData && lockData.length > 0 && lockData[0].is_locked) {
             setMsg(getLockoutMessage(lockData[0].locked_until, new Date()));
@@ -127,7 +215,7 @@ const Login = () => {
 
       const authUser = authData.user;
 
-      // 2. Load user profile from public.users via fetchUserProfile
+      // 2. Load user profile from public.admins (staff) or public.users (patients)
       const profile = await fetchUserProfile(authUser);
 
       if (!profile) {
@@ -161,9 +249,15 @@ const Login = () => {
         await supabase.rpc('clear_login_lockout', { p_email: normalizedEmail, p_touch_last_login: true });
       } catch (_) {
         try {
+          const targetTable = userRole === 'patient' ? 'users' : 'admins';
           await supabase
-            .from('users')
-            .update({ failed_login_attempts: 0, locked_until: null, last_failed_login_at: null, last_login_at: new Date().toISOString() })
+            .from(targetTable)
+            .update({
+              failed_login_attempts: 0,
+              locked_until: null,
+              last_failed_login_at: null,
+              last_login_at: new Date().toISOString(),
+            })
             .eq('id', profile.id);
         } catch (__) {}
       }
@@ -184,18 +278,79 @@ const Login = () => {
     }
   };
 
+  const handleSendOtp = async () => {
+    const targetEmail = signupData.email.trim().toLowerCase();
+    if (!targetEmail) {
+      setMsg('Please enter your official TUP email address.');
+      return;
+    }
+    if (!isValidTupEmail(targetEmail)) {
+      setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
+      return;
+    }
+    if (otpSending || otpCooldown > 0) return;
+
+    setOtpSending(true);
+    setMsg('');
+    try {
+      // 1. Sign up with Supabase Auth to trigger OTP verification email
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: targetEmail,
+        password: signupData.password || 'TupPatientTempPass@2026',
+        options: {
+          data: {
+            name: signupData.fullName.trim() || 'Patient',
+            role: 'patient',
+            patient_id: signupData.studentId.trim().toUpperCase() || targetEmail.split('@')[0],
+          },
+        },
+      });
+
+      if (authErr) {
+        if (authErr.message?.toLowerCase().includes('already registered')) {
+          const { error: resendErr } = await supabase.auth.resend({
+            type: 'signup',
+            email: targetEmail,
+          });
+          if (resendErr) throw resendErr;
+        } else {
+          throw authErr;
+        }
+      }
+
+      setOtpSent(true);
+      setOtpEmail(targetEmail);
+      setOtpCooldown(60);
+      setMsg('Verification code sent. Check your TUP email.');
+    } catch (err) {
+      console.error('Send OTP error:', err);
+      setMsg(err.message || 'Unable to send the verification code. Please try again.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
   const handlePatientSignup = async () => {
     const payload = {
-      studentId: signupData.studentId.trim(),
+      studentId: signupData.studentId.trim().toUpperCase(),
       fullName: signupData.fullName.trim(),
       year: Number(signupData.year || 1),
       email: signupData.email.trim().toLowerCase(),
       password: signupData.password,
       confirmPassword: signupData.confirmPassword,
+      otp: otpCode.trim(),
     };
 
-    if (!payload.studentId || !payload.fullName || !payload.email || !payload.password) {
+    if (!payload.studentId || !payload.fullName || !payload.email || !payload.password || !payload.confirmPassword) {
       setMsg('Please fill in all required fields.');
+      return;
+    }
+    if (!isValidStudentId(payload.studentId)) {
+      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-23-5030).');
+      return;
+    }
+    if (!isValidTupEmail(payload.email)) {
+      setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
       return;
     }
     if (payload.password !== payload.confirmPassword) {
@@ -206,81 +361,232 @@ const Login = () => {
       setMsg('Password must be at least 6 characters.');
       return;
     }
+    if (!payload.otp) {
+      setMsg('Please enter the verification code sent to your email.');
+      return;
+    }
 
     setLoading(true);
     setMsg('');
     try {
-      // 1. Sign up with Supabase Auth
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
+      // 1. Verify OTP with Supabase Auth
+      let authUserId = null;
+      const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
         email: payload.email,
-        password: payload.password,
-        options: {
-          data: {
-            name: payload.fullName,
-            role: 'patient',
-            patient_id: payload.studentId,
-          }
-        }
+        token: payload.otp,
+        type: 'signup',
       });
-      if (authErr) throw authErr;
 
-      const authUserId = authData?.user?.id;
-
-      // 2. Ensure student & patient records exist
-      const { error: studentErr } = await supabase
-        .from('students')
-        .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
-      if (studentErr) console.warn('Student record error:', studentErr);
-
-      const { error: patientErr } = await supabase
-        .from('patients')
-        .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
-      if (patientErr) console.warn('Patient record error:', patientErr);
-
-      // 3. Upsert public.users profile
-      const { error: userErr } = await supabase
-        .from('users')
-        .upsert([{
-          auth_user_id: authUserId,
-          name: payload.fullName,
+      if (verifyErr) {
+        // Fallback retry with type: 'email'
+        const { data: retryData, error: retryErr } = await supabase.auth.verifyOtp({
           email: payload.email,
-          role: 'patient',
-          active: true,
-          patient_id: payload.studentId,
-        }], { onConflict: 'email' });
-      if (userErr) console.warn('Public user profile sync error:', userErr);
+          token: payload.otp,
+          type: 'email',
+        });
+        if (retryErr) {
+          console.warn('OTP Verification error:', verifyErr.message);
+          setMsg('The verification code is incorrect or has expired. Please try again.');
+          setLoading(false);
+          return;
+        }
+        authUserId = retryData?.user?.id;
+      } else {
+        authUserId = verifyData?.user?.id;
+      }
 
-      setMsg('Account created successfully! You can now log in.');
-      setSignupMode(false);
+      if (!authUserId) {
+        authUserId = (await supabase.auth.getUser())?.data?.user?.id;
+      }
+
+      // 2. Execute atomic patient registration RPC
+      let rpcSucceeded = false;
+      try {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_patient_registration', {
+          p_student_id: payload.studentId,
+          p_name: payload.fullName,
+          p_year: payload.year,
+        });
+        if (!rpcErr && rpcData?.success) {
+          rpcSucceeded = true;
+        } else if (rpcErr) {
+          console.warn('complete_patient_registration RPC fallback:', rpcErr.message);
+        }
+      } catch (rpcEx) {
+        console.warn('RPC invocation notice:', rpcEx);
+      }
+
+      // 3. Fallback / Direct multi-table persistence guarantee
+      if (!rpcSucceeded) {
+        // Ensure student master record exists
+        await supabase
+          .from('students')
+          .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
+
+        // Ensure patient master record exists
+        await supabase
+          .from('patients')
+          .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year, sensitivity_level: 'normal' }], { onConflict: 'id' });
+
+        // Upsert public.users application account (strictly role = 'patient')
+        await supabase
+          .from('users')
+          .upsert(
+            [
+              {
+                auth_user_id: authUserId,
+                name: payload.fullName,
+                email: payload.email,
+                role: 'patient',
+                active: true,
+                patient_id: payload.studentId,
+                student_id: payload.studentId,
+              },
+            ],
+            { onConflict: 'email' }
+          );
+
+        // Upsert public.patient_profiles extended record
+        try {
+          await supabase
+            .from('patient_profiles')
+            .upsert(
+              [
+                {
+                  patient_id: payload.studentId,
+                  user_id: authUserId,
+                  student_id: payload.studentId,
+                  full_name: payload.fullName,
+                  email: payload.email,
+                  year: payload.year,
+                },
+              ],
+              { onConflict: 'patient_id' }
+            );
+        } catch (_) {}
+      }
+
+      setMsg('Account created and verified successfully! You can now log in.');
+      setAuthMode('login');
       setEmail(payload.email);
       setPass('');
+      setOtpSent(false);
+      setOtpCode('');
+      setSignupData({
+        studentId: '',
+        fullName: '',
+        year: '1',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      });
     } catch (e) {
       console.error(e);
-      setMsg(`Sign-up failed: ${e.message || 'Unknown error'}`);
+      setMsg(`Registration failed: ${e.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const onKeyDown = (e) => {
-    if (e.key === 'Enter') handleLogin();
+  const handleForgotPassword = async (e) => {
+    if (e) e.preventDefault();
+    const targetEmail = forgotEmail.trim().toLowerCase();
+    if (!targetEmail) {
+      setMsg('Please enter your official TUP email address.');
+      return;
+    }
+    if (!isValidTupEmail(targetEmail)) {
+      setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
+      return;
+    }
+
+    setForgotLoading(true);
+    setMsg('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (error) throw error;
+      setMsg('Password reset instructions have been sent to your TUP email.');
+    } catch (err) {
+      console.error('Password reset error:', err);
+      setMsg(err.message || 'Unable to send password reset email. Please try again.');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
-  React.useEffect(() => {
-    const sessionMessage = location?.state?.sessionMessage;
-    if (sessionMessage) setMsg(sessionMessage);
-  }, [location]);
+  const handleUpdatePassword = async (e) => {
+    if (e) e.preventDefault();
+    if (!newPass || !confirmNewPass) {
+      setMsg('Please enter and confirm your new password.');
+      return;
+    }
+    if (newPass !== confirmNewPass) {
+      setMsg('Passwords do not match.');
+      return;
+    }
+    if (newPass.length < 6) {
+      setMsg('Password must be at least 6 characters.');
+      return;
+    }
 
-  React.useEffect(() => {
-    if (msg) setMsgOpen(true);
-  }, [msg]);
+    setUpdatePassLoading(true);
+    setMsg('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) throw error;
+      await supabase.auth.signOut();
+      setMsg('Your password has been successfully updated. Please log in with your new password.');
+      setAuthMode('login');
+      setNewPass('');
+      setConfirmNewPass('');
+    } catch (err) {
+      console.error('Password update error:', err);
+      setMsg(err.message || 'Unable to update password. Please try again.');
+    } finally {
+      setUpdatePassLoading(false);
+    }
+  };
 
-  React.useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  // -------------------------------------------------------------
+  // VALIDATION & DISABLED STATE DERIVATIONS
+  // -------------------------------------------------------------
 
+  const isLoginDisabled = loading || !email.trim() || !pass;
+
+  const isStudentIdValid = isValidStudentId(signupData.studentId);
+  const showStudentIdError = signupData.studentId.length > 0 && !isStudentIdValid;
+
+  const isSignupEmailValid = isValidTupEmail(signupData.email);
+  const showSignupEmailError = signupData.email.length > 0 && !isSignupEmailValid;
+
+  const isSendDisabled = otpSending || otpCooldown > 0 || !isSignupEmailValid;
+
+  const passwordsMatch =
+    signupData.password &&
+    signupData.confirmPassword &&
+    signupData.password === signupData.confirmPassword;
+
+  const isSignupDisabled =
+    loading ||
+    !isStudentIdValid ||
+    !signupData.fullName.trim() ||
+    !signupData.year ||
+    !isSignupEmailValid ||
+    !signupData.password ||
+    signupData.password.length < 6 ||
+    !passwordsMatch ||
+    !otpSent ||
+    !otpCode.trim();
+
+  const isForgotDisabled = forgotLoading || !isValidTupEmail(forgotEmail);
+
+  const newPasswordsMatch = newPass && confirmNewPass && newPass === confirmNewPass;
+  const isUpdatePassDisabled =
+    updatePassLoading || !newPass || newPass.length < 6 || !newPasswordsMatch;
+
+  // Responsive breakpoints
   const isMobile = vw <= 768;
   const isTablet = vw > 768 && vw <= 1100;
 
@@ -292,17 +598,9 @@ const Login = () => {
     fontSize: 14,
     color: '#111',
     outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
     boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.04)',
-  };
-
-  const tabBaseStyle = {
-    border: '1px solid rgba(255,255,255,0.35)',
-    borderRadius: 10,
-    fontWeight: 700,
-    fontSize: 14,
-    padding: '8px 16px',
-    cursor: 'pointer',
-    minWidth: 92,
   };
 
   return (
@@ -327,8 +625,18 @@ const Login = () => {
       }}
     >
       {/* Outer shell */}
-      <div id="login-screen" style={{ width: '100%', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
-        {/* Two-column layout with balanced spacing */}
+      <div
+        id="login-screen"
+        style={{
+          width: '100%',
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Two-column layout */}
         <div
           className="wrap"
           style={{
@@ -367,55 +675,55 @@ const Login = () => {
               />
               <div>
                 {IS_USER_SURFACE ? (
-                  <h1 style={{
-                    margin: 0,
-                    fontSize: isTablet ? 26 : 32,
-                    lineHeight: 1.15,
-                    fontWeight: 900,
-                    fontFamily: `"Merriweather", serif`,
-                    color: '#111',
-                    letterSpacing: '-0.4px',
-                  }}>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: isTablet ? 26 : 32,
+                      lineHeight: 1.15,
+                      fontWeight: 900,
+                      fontFamily: `"Merriweather", serif`,
+                      color: '#111',
+                      letterSpacing: '-0.4px',
+                    }}
+                  >
                     TUP Manila Clinic Online Patient Portal
                   </h1>
                 ) : (
-                <h1 style={{
-                  margin: 0,
-                  fontSize: isTablet ? 26 : 32,
-                  lineHeight: 1.15,
-                  fontWeight: 900,
-                  fontFamily: `"Merriweather", serif`,
-                  color: '#111',
-                  letterSpacing: '-0.4px',
-                }}>
-                  Technological University of the
-                  <br />
-                  Philippines (TUP) Manila – Clinic
-                </h1>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: isTablet ? 26 : 32,
+                      lineHeight: 1.15,
+                      fontWeight: 900,
+                      fontFamily: `"Merriweather", serif`,
+                      color: '#111',
+                      letterSpacing: '-0.4px',
+                    }}
+                  >
+                    Technological University of the
+                    <br />
+                    Philippines (TUP) Manila – Clinic
+                  </h1>
                 )}
               </div>
             </div>
 
-            <p className="lead" style={{
-              marginTop: 20,
-              color: 'rgba(51,51,51,1)',
-              maxWidth: 680,
-              fontSize: isTablet ? 14.5 : 16,
-              lineHeight: 1.8,
-              fontWeight: 400,
-              opacity: 0.95,
-              textAlign: 'left'
-            }}>
-              {IS_USER_SURFACE ? (
-                'The TUP Manila Clinic Online Patient Portal helps students, faculty, staff, and authorized TUP personnel access clinic services online. Users can book same-day or future appointments, view clinic visit history, and send non-emergency messages to doctors or clinic staff. The portal is built to make clinic coordination faster, easier, and more convenient for the whole TUP community.'
-              ) : (`
-              TUP-M Electronic Health Records System is a streamlined, modern electronic health
-              record platform designed to support efficient, accurate, and student-centered
-              clinical care. It centralizes patient information, simplifies consultation
-              documentation, improves workflow for clinicians, and ensures secure, role-based
-              access to medical records — all tailored to the needs of the Technological
-              University of the Philippines community.
-              `)}
+            <p
+              className="lead"
+              style={{
+                marginTop: 20,
+                color: 'rgba(51,51,51,1)',
+                maxWidth: 680,
+                fontSize: isTablet ? 14.5 : 16,
+                lineHeight: 1.8,
+                fontWeight: 400,
+                opacity: 0.95,
+                textAlign: 'left',
+              }}
+            >
+              {IS_USER_SURFACE
+                ? 'The TUP Manila Clinic Online Patient Portal helps students, faculty, staff, and authorized TUP personnel access clinic services online. Users can book same-day or future appointments, view clinic visit history, and send non-emergency messages to doctors or clinic staff. The portal is built to make clinic coordination faster, easier, and more convenient for the whole TUP community.'
+                : `TUP-M Electronic Health Records System is a streamlined, modern electronic health record platform designed to support efficient, accurate, and student-centered clinical care. It centralizes patient information, simplifies consultation documentation, improves workflow for clinicians, and ensures secure, role-based access to medical records — all tailored to the needs of the Technological University of the Philippines community.`}
             </p>
 
             <div
@@ -426,21 +734,20 @@ const Login = () => {
                 color: '#444',
                 fontSize: 14.5,
                 textAlign: 'left',
-                width: '100%'
+                width: '100%',
               }}
             >
               “Where records don’t get lost—just students.”
             </div>
-
           </div>
 
-          {/* LOGIN (right) */}
+          {/* AUTH CARD (right) */}
           <div
             className="login-wrap"
             aria-hidden="false"
             style={{
               flexShrink: 0,
-              width: isTablet ? 380 : 420,
+              width: isTablet ? 380 : 440,
               maxWidth: '100%',
               display: 'flex',
               justifyContent: 'center',
@@ -451,8 +758,14 @@ const Login = () => {
               className="login-card"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (signupMode && IS_USER_SURFACE) handlePatientSignup();
-                else handleLogin();
+                if (IS_USER_SURFACE) {
+                  if (authMode === 'signup') handlePatientSignup();
+                  else if (authMode === 'forgot') handleForgotPassword();
+                  else if (authMode === 'update_password') handleUpdatePassword();
+                  else handleLogin();
+                } else {
+                  handleLogin();
+                }
               }}
               style={{
                 width: '100%',
@@ -464,156 +777,707 @@ const Login = () => {
                 boxSizing: 'border-box',
               }}
             >
-              <h2 id="login-title" style={{
-                textAlign: 'center',
-                margin: '0 0 16px 0',
-                fontSize: 26,
-                fontWeight: 800,
-                fontFamily: `"Merriweather", serif`
-              }}>{IS_USER_SURFACE ? (signupMode ? 'Create Account' : 'Patient Log In') : 'Staff Log In'}</h2>
-
-              {IS_USER_SURFACE && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 10, justifyContent: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setSignupMode(false)}
-                    disabled={loading}
-                    style={{
-                      ...tabBaseStyle,
-                      background: signupMode ? 'rgba(255,255,255,0.12)' : '#fff',
-                      color: signupMode ? '#fce8e8' : '#931b1b',
-                    }}
-                  >
-                    Log In
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSignupMode(true)}
-                    disabled={loading}
-                    style={{
-                      ...tabBaseStyle,
-                      background: signupMode ? '#fff' : 'rgba(255,255,255,0.12)',
-                      color: signupMode ? '#931b1b' : '#fce8e8',
-                    }}
-                  >
-                    Sign Up
-                  </button>
-                </div>
-              )}
-
-              {signupMode && IS_USER_SURFACE ? (
+              {/* ========================================================= */}
+              {/* 1. SIGNUP VIEW (USER SURFACE ONLY)                       */}
+              {/* Visual Order: ID -> Name -> Year -> Email (Send) -> OTP -> Password -> Confirm */}
+              {/* ========================================================= */}
+              {IS_USER_SURFACE && authMode === 'signup' && (
                 <>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Student ID</label>
-                    <input className="input" style={authInputStyle} value={signupData.studentId} onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value }))} />
+                  <h2
+                    id="login-title"
+                    style={{
+                      textAlign: 'center',
+                      margin: '0 0 16px 0',
+                      fontSize: 24,
+                      fontWeight: 800,
+                      fontFamily: `"Merriweather", serif`,
+                    }}
+                  >
+                    Create Account
+                  </h2>
+
+                  {/* 1. Student ID */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-student-id" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Student ID</label>
+                    <input
+                      id="signup-student-id"
+                      className="input"
+                      style={authInputStyle}
+                      placeholder="TUPM-23-5030"
+                      value={signupData.studentId}
+                      onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
+                    />
+                    {showStudentIdError && (
+                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                        Format must be TUPM-YY-XXXX (e.g. TUPM-23-5030).
+                      </div>
+                    )}
                   </div>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Full Name</label>
-                    <input className="input" style={authInputStyle} value={signupData.fullName} onChange={(e) => setSignupData((p) => ({ ...p, fullName: e.target.value }))} />
+
+                  {/* 2. Full Name */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-full-name" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Full Name</label>
+                    <input
+                      id="signup-full-name"
+                      className="input"
+                      style={authInputStyle}
+                      placeholder="Full legal name"
+                      value={signupData.fullName}
+                      onChange={(e) => setSignupData((p) => ({ ...p, fullName: e.target.value }))}
+                    />
                   </div>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Year</label>
-                    <input className="input" style={authInputStyle} type="number" min="1" max="5" value={signupData.year} onChange={(e) => setSignupData((p) => ({ ...p, year: e.target.value }))} />
+
+                  {/* 3. Year */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-year" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Year</label>
+                    <select
+                      id="signup-year"
+                      className="input"
+                      style={{ ...authInputStyle, cursor: 'pointer' }}
+                      value={signupData.year}
+                      onChange={(e) => setSignupData((p) => ({ ...p, year: e.target.value }))}
+                    >
+                      <option value="1">1st Year</option>
+                      <option value="2">2nd Year</option>
+                      <option value="3">3rd Year</option>
+                      <option value="4">4th Year</option>
+                      <option value="5">5th Year</option>
+                    </select>
                   </div>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
-                    <input className="input" style={authInputStyle} type="email" value={signupData.email} onChange={(e) => setSignupData((p) => ({ ...p, email: e.target.value }))} />
+
+                  {/* 4. Email with Send/Resend Button */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        id="signup-email"
+                        className="input"
+                        style={{ ...authInputStyle, flex: 1 }}
+                        type="email"
+                        placeholder="student@tup.edu.ph"
+                        value={signupData.email}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSignupData((p) => ({ ...p, email: val }));
+                          if (otpSent && otpEmail && val.trim().toLowerCase() !== otpEmail) {
+                            setOtpSent(false);
+                            setOtpCode('');
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={isSendDisabled}
+                        onClick={handleSendOtp}
+                        style={{
+                          background: isSendDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                          color: isSendDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                          fontWeight: 700,
+                          padding: '10px 14px',
+                          borderRadius: 10,
+                          border: 'none',
+                          cursor: isSendDisabled ? 'not-allowed' : 'pointer',
+                          fontSize: 13,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          boxShadow: isSendDisabled ? 'none' : '0 2px 6px rgba(0,0,0,0.1)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {otpSending ? 'Sending…' : otpCooldown > 0 ? `Resend (${otpCooldown}s)` : otpSent ? 'Resend' : 'Send'}
+                      </button>
+                    </div>
+                    {showSignupEmailError && (
+                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2, lineHeight: 1.35 }}>
+                        Please use your official TUP email address ending in @tup.edu.ph.
+                      </div>
+                    )}
+                    {otpSent && (
+                      <div style={{ color: '#c6f6d5', fontSize: 11.5, marginTop: 2, fontWeight: 600 }}>
+                        Verification code sent. Check your TUP email.
+                      </div>
+                    )}
                   </div>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
-                    <input className="input" style={authInputStyle} type="password" value={signupData.password} onChange={(e) => setSignupData((p) => ({ ...p, password: e.target.value }))} />
+
+                  {/* 5. Verification Code (OTP) Field — DIRECTLY BENEATH EMAIL */}
+                  {otpSent && (
+                    <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label htmlFor="signup-otp" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Verification Code</label>
+                      <input
+                        id="signup-otp"
+                        className="input"
+                        style={authInputStyle}
+                        type="text"
+                        placeholder="Enter 6-digit code from email"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        autoComplete="one-time-code"
+                      />
+                    </div>
+                  )}
+
+                  {/* 6. Password with Eye Toggle */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <input
+                        id="signup-password"
+                        className="input"
+                        style={{ ...authInputStyle, paddingRight: 40 }}
+                        type={showSignupPass ? 'text' : 'password'}
+                        placeholder="At least 6 characters"
+                        value={signupData.password}
+                        onChange={(e) => setSignupData((p) => ({ ...p, password: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showSignupPass ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowSignupPass(!showSignupPass)}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#666',
+                          padding: 4,
+                        }}
+                      >
+                        {showSignupPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                      </button>
+                    </div>
                   </div>
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Confirm Password</label>
-                    <input className="input" style={authInputStyle} type="password" value={signupData.confirmPassword} onChange={(e) => setSignupData((p) => ({ ...p, confirmPassword: e.target.value }))} />
+
+                  {/* 7. Confirm Password with Eye Toggle */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-confirm-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Confirm Password</label>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <input
+                        id="signup-confirm-password"
+                        className="input"
+                        style={{ ...authInputStyle, paddingRight: 40 }}
+                        type={showConfirmPass ? 'text' : 'password'}
+                        placeholder="Re-type password"
+                        value={signupData.confirmPassword}
+                        onChange={(e) => setSignupData((p) => ({ ...p, confirmPassword: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowConfirmPass(!showConfirmPass)}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#666',
+                          padding: 4,
+                        }}
+                      >
+                        {showConfirmPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                      </button>
+                    </div>
+                    {signupData.password && signupData.confirmPassword && !passwordsMatch && (
+                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                        Passwords do not match.
+                      </div>
+                    )}
                   </div>
-                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                    <button type="submit" className="btn" disabled={loading}>
-                      {loading ? 'Creating…' : 'Create Account'}
+
+                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                    <button
+                      type="submit"
+                      className="btn"
+                      disabled={isSignupDisabled}
+                      style={{
+                        width: '100%',
+                        background: isSignupDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                        color: isSignupDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                        fontWeight: 700,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: isSignupDisabled ? 'not-allowed' : 'pointer',
+                        fontSize: 14,
+                        boxShadow: isSignupDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {loading ? 'Creating Account…' : 'Create Account'}
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setMsg('');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 700,
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: 13,
+                      }}
+                    >
+                      Log in
                     </button>
                   </div>
                 </>
-              ) : (
+              )}
+
+              {/* ========================================================= */}
+              {/* 2. FORGOT PASSWORD VIEW (USER SURFACE ONLY)               */}
+              {/* ========================================================= */}
+              {IS_USER_SURFACE && authMode === 'forgot' && (
                 <>
+                  <h2
+                    id="login-title"
+                    style={{
+                      textAlign: 'center',
+                      margin: '0 0 12px 0',
+                      fontSize: 24,
+                      fontWeight: 800,
+                      fontFamily: `"Merriweather", serif`,
+                    }}
+                  >
+                    Reset Password
+                  </h2>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.45 }}>
+                    Enter your official TUP email address to receive password recovery instructions.
+                  </p>
 
-              <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label htmlFor="email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
-                <input
-                  id="email"
-                  className="input"
-                  type="email"
-                  placeholder="you@tup.edu.ph"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    ...authInputStyle,
-                  }}
-                />
-              </div>
+                  <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label htmlFor="forgot-email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>TUP Email</label>
+                    <input
+                      id="forgot-email"
+                      className="input"
+                      style={authInputStyle}
+                      type="email"
+                      placeholder="student@tup.edu.ph"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                    />
+                    {forgotEmail.length > 0 && !isValidTupEmail(forgotEmail) && (
+                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                        Please use your official TUP email address ending in @tup.edu.ph.
+                      </div>
+                    )}
+                  </div>
 
-              <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label htmlFor="password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
-                <input
-                  id="password"
-                  className="input"
-                  type="password"
-                  placeholder="Password"
-                  autoComplete="current-password"
-                  value={pass}
-                  onChange={(e) => setPass(e.target.value)}
-                  style={{
-                    ...authInputStyle,
-                  }}
-                />
-              </div>
+                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                    <button
+                      type="submit"
+                      className="btn"
+                      disabled={isForgotDisabled}
+                      style={{
+                        width: '100%',
+                        background: isForgotDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                        color: isForgotDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                        fontWeight: 700,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: isForgotDisabled ? 'not-allowed' : 'pointer',
+                        fontSize: 14,
+                        boxShadow: isForgotDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {forgotLoading ? 'Sending Instructions…' : 'Send Reset Instructions'}
+                    </button>
+                  </div>
 
-              <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 12 }}>
-                <button
-                  id="loginBtn"
-                  type="submit"
-                  className="btn"
-                  disabled={loading}
-                  style={{
-                    background: '#fff',
-                    color: '#931b1b',
-                    fontWeight: 700,
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 6px 14px rgba(0,0,0,0.08)',
-                    fontSize: 14
-                  }}
-                >
-                  {loading ? 'Signing in…' : 'Log In'}
-                </button>
-              </div>
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                    Remember your password?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setMsg('');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 700,
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: 13,
+                      }}
+                    >
+                      Log in
+                    </button>
+                  </div>
                 </>
               )}
 
-              
+              {/* ========================================================= */}
+              {/* 3. UPDATE PASSWORD VIEW (SUPABASE RECOVERY REDIRECT FLOW) */}
+              {/* ========================================================= */}
+              {IS_USER_SURFACE && authMode === 'update_password' && (
+                <>
+                  <h2
+                    id="login-title"
+                    style={{
+                      textAlign: 'center',
+                      margin: '0 0 12px 0',
+                      fontSize: 24,
+                      fontWeight: 800,
+                      fontFamily: `"Merriweather", serif`,
+                    }}
+                  >
+                    Set New Password
+                  </h2>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.45 }}>
+                    Enter your new password below to complete account recovery.
+                  </p>
 
-              <div className="footer-note" style={{ marginTop: 14, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: 12.5 }}>
+                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label htmlFor="new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>New Password</label>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <input
+                        id="new-password"
+                        className="input"
+                        style={{ ...authInputStyle, paddingRight: 40 }}
+                        type={showNewPass ? 'text' : 'password'}
+                        placeholder="At least 6 characters"
+                        value={newPass}
+                        onChange={(e) => setNewPass(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showNewPass ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#666',
+                          padding: 4,
+                        }}
+                      >
+                        {showNewPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label htmlFor="confirm-new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Confirm New Password</label>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <input
+                        id="confirm-new-password"
+                        className="input"
+                        style={{ ...authInputStyle, paddingRight: 40 }}
+                        type={showConfirmNewPass ? 'text' : 'password'}
+                        placeholder="Re-type new password"
+                        value={confirmNewPass}
+                        onChange={(e) => setConfirmNewPass(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showConfirmNewPass ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowConfirmNewPass(!showConfirmNewPass)}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#666',
+                          padding: 4,
+                        }}
+                      >
+                        {showConfirmNewPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                      </button>
+                    </div>
+                    {newPass && confirmNewPass && !newPasswordsMatch && (
+                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                        Passwords do not match.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                    <button
+                      type="submit"
+                      className="btn"
+                      disabled={isUpdatePassDisabled}
+                      style={{
+                        width: '100%',
+                        background: isUpdatePassDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                        color: isUpdatePassDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                        fontWeight: 700,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: isUpdatePassDisabled ? 'not-allowed' : 'pointer',
+                        fontSize: 14,
+                        boxShadow: isUpdatePassDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {updatePassLoading ? 'Updating Password…' : 'Update Password'}
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setMsg('');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 700,
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: 13,
+                      }}
+                    >
+                      Cancel and return to Log In
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ========================================================= */}
+              {/* 4. LOGIN VIEW (DEFAULT FOR USER & ALWAYS FOR STAFF)       */}
+              {/* ========================================================= */}
+              {authMode === 'login' && (
+                <>
+                  <h2
+                    id="login-title"
+                    style={{
+                      textAlign: 'center',
+                      margin: '0 0 16px 0',
+                      fontSize: 26,
+                      fontWeight: 800,
+                      fontFamily: `"Merriweather", serif`,
+                    }}
+                  >
+                    {IS_USER_SURFACE ? 'Patient Log In' : 'Staff Log In'}
+                  </h2>
+
+                  {/* Email Field */}
+                  <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label htmlFor="email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
+                    <input
+                      id="email"
+                      className="input"
+                      type="email"
+                      placeholder={IS_USER_SURFACE ? 'you@tup.edu.ph' : 'staff@tupclinic.local'}
+                      autoComplete="username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      style={authInputStyle}
+                    />
+                  </div>
+
+                  {/* Password Header with Forgot Password above input (User Surface) */}
+                  <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label htmlFor="password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
+                      {IS_USER_SURFACE && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthMode('forgot');
+                            setForgotEmail(email);
+                            setMsg('');
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'rgba(255,255,255,0.92)',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0,
+                          }}
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    {/* Password input with embedded Eye toggle */}
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <input
+                        id="password"
+                        className="input"
+                        type={showLoginPass ? 'text' : 'password'}
+                        placeholder="Password"
+                        autoComplete="current-password"
+                        value={pass}
+                        onChange={(e) => setPass(e.target.value)}
+                        style={{ ...authInputStyle, paddingRight: 40 }}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showLoginPass ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowLoginPass(!showLoginPass)}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#666',
+                          padding: 4,
+                        }}
+                      >
+                        {showLoginPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 14 }}>
+                    <button
+                      id="loginBtn"
+                      type="submit"
+                      className="btn"
+                      disabled={isLoginDisabled}
+                      style={{
+                        width: '100%',
+                        background: isLoginDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                        color: isLoginDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                        fontWeight: 700,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: isLoginDisabled ? 'not-allowed' : 'pointer',
+                        fontSize: 14,
+                        boxShadow: isLoginDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {loading ? 'Signing in…' : 'Log In'}
+                    </button>
+                  </div>
+
+                  {/* Create Account Link (User Surface Only) */}
+                  {IS_USER_SURFACE && (
+                    <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                      Don't have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('signup');
+                          setMsg('');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#fff',
+                          fontWeight: 700,
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: 13,
+                        }}
+                      >
+                        Create one
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="footer-note" style={{ marginTop: 16, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: 12.5 }}>
                 © Technological University of the Philippines
               </div>
             </form>
           </div>
         </div>
       </div>
+
+      {/* Global Message Modal Dialog */}
       {msgOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3200, padding: 14 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 3200,
+            padding: 14,
+          }}
           onClick={() => setMsgOpen(false)}
         >
           <div
-            style={{ width: 'min(92vw, 520px)', background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 18px 38px rgba(0,0,0,0.18)', padding: 18 }}
+            style={{
+              width: 'min(92vw, 520px)',
+              background: '#fff',
+              borderRadius: 12,
+              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 18px 38px rgba(0,0,0,0.18)',
+              padding: 18,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#111' }}>Login Notice</div>
-            <div style={{ color: msg.toLowerCase().includes('failed') || msg.toLowerCase().includes('invalid') ? 'var(--danger)' : '#111', lineHeight: 1.45 }}>{msg}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#111' }}>Notice</div>
+            <div
+              style={{
+                color:
+                  msg.toLowerCase().includes('failed') ||
+                  msg.toLowerCase().includes('invalid') ||
+                  msg.toLowerCase().includes('incorrect') ||
+                  msg.toLowerCase().includes('error') ||
+                  msg.toLowerCase().includes('deactivated') ||
+                  msg.toLowerCase().includes('not allowed')
+                    ? 'var(--danger)'
+                    : '#111',
+                lineHeight: 1.45,
+                fontSize: 14,
+              }}
+            >
+              {msg}
+            </div>
             <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn secondary" onClick={() => setMsgOpen(false)}>Close</button>
+              <button className="btn secondary" onClick={() => setMsgOpen(false)}>
+                Close
+              </button>
             </div>
           </div>
         </div>

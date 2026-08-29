@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>TUP Clinic Verification Code</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    table { border-collapse: collapse !important; }
+    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f4f6f8; font-family: Arial, Helvetica, sans-serif; }
+    @media screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; }
+      .email-content { padding: 24px 20px !important; }
+      .otp-code { font-size: 28px !important; letter-spacing: 4px !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f6f8;">
+    <tr>
+      <td align="center" style="padding: 40px 15px 40px 15px;">
+        <!-- Email Container -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" class="email-container" style="max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td align="center" style="background-color: #931b1b; padding: 28px 24px; color: #ffffff;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; text-transform: uppercase; font-family: Arial, Helvetica, sans-serif;">
+                      TUP Manila Clinic
+                    </h1>
+                    <p style="margin: 6px 0 0 0; font-size: 13px; color: #fed7d7; font-weight: 500; letter-spacing: 0.2px;">
+                      Online Patient Portal
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td class="email-content" style="padding: 36px 32px; background-color: #ffffff; text-align: center;">
+              <h2 style="margin: 0 0 14px 0; font-size: 20px; font-weight: 700; color: #1a202c;">
+                Verify Your Email Address
+              </h2>
+              
+              <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #4a5568;">
+                Thank you for registering with the TUP Manila Clinic Online Patient Portal. Please enter the verification code below to complete your account setup:
+              </p>
+
+              <!-- OTP Display Box -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0 28px 0;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="background-color: #fff5f5; border: 2px dashed #e53e3e; border-radius: 8px;">
+                      <tr>
+                        <td align="center" style="padding: 16px 36px;">
+                          <span class="otp-code" style="font-family: 'Courier New', Courier, monospace, Arial; font-size: 32px; font-weight: 800; color: #931b1b; letter-spacing: 6px; display: inline-block;">
+                            {{ .Token }}
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Instructions -->
+              <div style="background-color: #f7fafc; border-radius: 8px; padding: 14px 16px; margin-top: 10px; border-left: 4px solid #931b1b; text-align: left;">
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #718096;">
+                  <strong style="color: #2d3748;">Security Note:</strong> Never share this verification code with anyone. Clinic staff will never ask for your verification code.
+                </p>
+              </div>
+
+              <p style="margin: 24px 0 0 0; font-size: 13px; line-height: 1.5; color: #a0aec0; text-align: center;">
+                If you did not attempt to register on the TUP Clinic Patient Portal, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 32px; background-color: #edf2f7; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; color: #718096; font-weight: 600;">
+                Technological University of the Philippines – Manila Clinic
+              </p>
+              <p style="margin: 4px 0 0 0; font-size: 11.5px; color: #a0aec0;">
+                Ayala Blvd, Ermita, Manila, 1000 Metro Manila, Philippines
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

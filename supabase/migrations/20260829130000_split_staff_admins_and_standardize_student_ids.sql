@@ -1,6 +1,6 @@
 -- ============================================================================
--- Migration: Staff Supabase Auth & RLS Policy Hardening (Updated for Goal 41 Account Separation)
--- Filename: supabase/migrations/20260825184500_staff_supabase_auth_rls.sql
+-- Migration: Split Staff & Patient Accounts, Standardize Student IDs to TUPM-YY-XXXX
+-- Filename: supabase/migrations/20260829130000_split_staff_admins_and_standardize_student_ids.sql
 -- ============================================================================
 
 -- 1. Ensure required extensions
@@ -13,7 +13,7 @@ begin
   end;
 end $$;
 
--- 2. Create public.admins table for Staff Portal accounts
+-- 2. Create public.admins table for Staff Portal accounts (admin, physician, nurse)
 create table if not exists public.admins (
   id uuid primary key default gen_random_uuid(),
   auth_user_id uuid unique references auth.users(id) on delete set null,
@@ -38,33 +38,146 @@ create index if not exists idx_admins_auth_user_id on public.admins (auth_user_i
 create index if not exists idx_admins_email on public.admins (email);
 create index if not exists idx_admins_role on public.admins (role);
 
--- Ensure public.users table has auth_user_id and patient constraints
-alter table if exists public.users
-  add column if not exists auth_user_id uuid unique references auth.users(id) on delete set null,
-  add column if not exists failed_login_attempts integer not null default 0,
-  add column if not exists last_failed_login_at timestamptz,
-  add column if not exists locked_until timestamptz,
-  add column if not exists lockout_reason text,
-  add column if not exists last_login_at timestamptz,
-  add column if not exists patient_id text references public.patients(id) on update cascade on delete set null;
+-- 3. Migrate existing staff rows from public.users to public.admins preserving original UUIDs
+insert into public.admins (
+  id,
+  auth_user_id,
+  name,
+  email,
+  role,
+  avatar,
+  active,
+  failed_login_attempts,
+  last_failed_login_at,
+  locked_until,
+  lockout_reason,
+  last_login_at,
+  created_at,
+  updated_at
+)
+select
+  u.id,
+  u.auth_user_id,
+  u.name,
+  u.email,
+  u.role,
+  u.avatar,
+  coalesce(u.active, true),
+  coalesce(u.failed_login_attempts, 0),
+  u.last_failed_login_at,
+  u.locked_until,
+  u.lockout_reason,
+  u.last_login_at,
+  coalesce(u.created_at, now()),
+  coalesce(u.updated_at, now())
+from public.users u
+where u.role in ('admin', 'physician', 'nurse')
+on conflict (email) do update set
+  auth_user_id = coalesce(excluded.auth_user_id, public.admins.auth_user_id),
+  name = excluded.name,
+  role = excluded.role,
+  active = excluded.active,
+  updated_at = now();
 
-create index if not exists idx_users_auth_user_id on public.users (auth_user_id);
-create index if not exists idx_users_email on public.users (email);
+-- Ensure standard staff accounts in public.admins
+do $$
+declare
+  v_phys_auth_id uuid;
+  v_nurse_auth_id uuid;
+begin
+  select id into v_phys_auth_id from auth.users where lower(email) = 'physician@tupclinic.local';
+  select id into v_nurse_auth_id from auth.users where lower(email) = 'nurse@tupclinic.local';
 
+  insert into public.admins (id, auth_user_id, name, email, role, active, created_at, updated_at)
+  values
+    (gen_random_uuid(), v_phys_auth_id, 'Dr. Rivera', 'physician@tupclinic.local', 'physician', true, now(), now()),
+    (gen_random_uuid(), v_nurse_auth_id, 'Nurse Santos', 'nurse@tupclinic.local', 'nurse', true, now(), now())
+  on conflict (email) do update set
+    auth_user_id = coalesce(excluded.auth_user_id, public.admins.auth_user_id),
+    name = excluded.name,
+    role = excluded.role,
+    active = excluded.active,
+    updated_at = now();
+end $$;
+
+-- 4. Migrate Foreign Keys in break_glass_audit_logs to reference public.admins(id)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'break_glass_audit_logs') then
+    -- Drop old foreign keys referencing users
+    alter table public.break_glass_audit_logs
+      drop constraint if exists break_glass_audit_logs_user_id_fkey,
+      drop constraint if exists break_glass_audit_logs_approved_by_fkey;
+
+    -- Add new foreign keys referencing admins
+    alter table public.break_glass_audit_logs
+      add constraint break_glass_audit_logs_user_id_fkey foreign key (user_id) references public.admins(id) on update cascade on delete set null,
+      add constraint break_glass_audit_logs_approved_by_fkey foreign key (approved_by) references public.admins(id) on update cascade on delete set null;
+  end if;
+end $$;
+
+-- 5. Standardize Student IDs to TUPM-YY-XXXX format
+create temp table if not exists _student_id_migration_map (
+  old_id text primary key,
+  new_id text not null unique
+);
+truncate table _student_id_migration_map;
+
+insert into _student_id_migration_map (old_id, new_id)
+select
+  id as old_id,
+  case
+    when id ~ '^TUPM-[0-9]{2}-[0-9]{4}$' then id
+    when id ~ '^[0-9]{4}-[0-9]{5}$' then 'TUPM-' || substr(id, 3, 2) || '-' || substr(id, 7, 4)
+    when id ~ '^[0-9]{2}-[0-9]{4}$' then 'TUPM-' || id
+    else 'TUPM-23-' || right('0000' || replace(replace(id, 'TEST-USER-', ''), 'student-', ''), 4)
+  end as new_id
+from public.students;
+
+-- Apply updates to students table (cascades to patients, appointments, encounters, patient_messages, users)
+update public.students s
+set id = m.new_id
+from _student_id_migration_map m
+where s.id = m.old_id and s.id <> m.new_id;
+
+-- Add or update format check constraint on public.students
+alter table public.students drop constraint if exists chk_students_id_format;
+alter table public.students add constraint chk_students_id_format check (id ~ '^TUPM-[0-9]{2}-[0-9]{4}$');
+
+-- 6. Clean up migrated staff rows from public.users and enforce role = 'patient'
+delete from public.users where role in ('admin', 'physician', 'nurse');
+
+-- Drop old role constraint and apply patient-only constraint
+alter table public.users drop constraint if exists users_role_check;
+alter table public.users add constraint users_role_check check (role = 'patient');
+alter table public.users alter column role set default 'patient';
+
+-- Ensure password column in public.users is nullable or dropped
 do $$
 begin
   if exists (
-    select 1
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'users'
-      and column_name = 'password'
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'password'
   ) then
     alter table public.users alter column password drop not null;
   end if;
 end $$;
 
--- 3. Automatic Profile Sync Trigger: auth.users -> (public.admins | public.users)
+-- 7. Create safe public.staff_directory projection view for patient-side staff pickers
+create or replace view public.staff_directory as
+select
+  id,
+  name,
+  role,
+  avatar,
+  department,
+  active
+from public.admins
+where active = true;
+
+grant select on public.staff_directory to authenticated, anon;
+
+-- 8. Update Automatic Profile Sync Trigger: auth.users -> (public.admins | public.users)
 create or replace function public.sync_public_user_from_auth()
 returns trigger
 language plpgsql
@@ -125,7 +238,7 @@ begin
     end if;
 
   else
-    -- Unknown/missing role: Fail safely, do NOT default to nurse!
+    -- Unknown/invalid/missing role: Fail safely, NEVER default to nurse!
     raise notice 'sync_public_user_from_auth: Skipping sync for % with unknown role: %', v_email, v_role;
   end if;
 
@@ -147,7 +260,7 @@ create trigger trg_sync_public_user_from_auth_update
 after update of email, raw_user_meta_data on auth.users
 for each row execute function public.sync_public_user_from_auth();
 
--- 4. Role & Access Control Helpers
+-- 9. Role & Access Control Helper Functions
 create or replace function public.current_app_role()
 returns text
 language sql
@@ -200,32 +313,7 @@ as $$
   )::text;
 $$;
 
-create or replace function public.can_access_sensitivity(p_sensitivity text)
-returns boolean
-language sql
-stable
-as $$
-  select
-    case
-      when coalesce(lower(p_sensitivity), 'normal') = 'restricted' then public.is_physician_or_admin()
-      else true
-    end;
-$$;
-
-create or replace function public.is_within_clinic_hours()
-returns boolean
-language plpgsql
-stable
-as $$
-declare
-  v_manila_now time;
-begin
-  -- Temporary bypass for development/testing — return true 24/7
-  return true;
-end;
-$$;
-
--- 5. Security definer lockout helpers
+-- 10. Login Lockout Routing Functions
 create or replace function public.get_login_lockout_status(p_email text)
 returns table (
   locked_until timestamptz,
@@ -238,12 +326,14 @@ as $$
 declare
   v_locked_until timestamptz;
 begin
+  -- Check admins first
   select a.locked_until
     into v_locked_until
   from public.admins a
   where lower(a.email) = lower(p_email)
   limit 1;
 
+  -- If not in admins, check users
   if v_locked_until is null and not exists (select 1 from public.admins a where lower(a.email) = lower(p_email)) then
     select u.locked_until
       into v_locked_until
@@ -281,6 +371,7 @@ declare
   v_attempts integer;
   v_locked_until timestamptz;
 begin
+  -- 1. Try staff (admins)
   select * into v_admin
   from public.admins a
   where lower(a.email) = lower(p_email)
@@ -313,6 +404,7 @@ begin
     return;
   end if;
 
+  -- 2. Try patients (users)
   select * into v_user
   from public.users u
   where lower(u.email) = lower(p_email)
@@ -389,40 +481,14 @@ grant execute on function public.get_login_lockout_status(text) to anon, authent
 grant execute on function public.register_failed_login(text, integer, integer, text) to anon, authenticated;
 grant execute on function public.clear_login_lockout(text, boolean) to authenticated;
 
--- 6. Enable RLS and Configure Policies
+-- 11. Enable Row Level Security & Configure Policies
 alter table public.admins enable row level security;
 alter table public.users enable row level security;
-alter table public.role_permissions enable row level security;
-alter table public.students enable row level security;
-alter table public.patients enable row level security;
-alter table public.appointments enable row level security;
-alter table public.encounters enable row level security;
-alter table public.inventory enable row level security;
-alter table public.inventory_transactions enable row level security;
-alter table public.settings enable row level security;
-alter table public.audit_logs enable row level security;
-alter table public.patient_messages enable row level security;
 
--- Safe Staff Directory View
-create or replace view public.staff_directory as
-select
-  id,
-  name,
-  role,
-  avatar,
-  department,
-  active
-from public.admins
-where active = true;
-
-grant select on public.staff_directory to authenticated, anon;
-
--- ADMINS policies
+-- Admins Table Policies
 drop policy if exists admins_select_policy on public.admins;
-create policy admins_select_policy
-on public.admins
-for select
-to authenticated
+create policy admins_select_policy on public.admins
+for select to authenticated
 using (
   public.is_within_clinic_hours()
   and (
@@ -432,10 +498,8 @@ using (
 );
 
 drop policy if exists admins_update_policy on public.admins;
-create policy admins_update_policy
-on public.admins
-for update
-to authenticated
+create policy admins_update_policy on public.admins
+for update to authenticated
 using (
   public.is_within_clinic_hours()
   and (
@@ -451,12 +515,10 @@ with check (
   )
 );
 
--- USERS policies (Patient accounts only)
+-- Users (Patient) Table Policies
 drop policy if exists users_select_policy on public.users;
-create policy users_select_policy
-on public.users
-for select
-to authenticated
+create policy users_select_policy on public.users
+for select to authenticated
 using (
   public.is_within_clinic_hours()
   and (
@@ -466,10 +528,8 @@ using (
 );
 
 drop policy if exists users_update_policy on public.users;
-create policy users_update_policy
-on public.users
-for update
-to authenticated
+create policy users_update_policy on public.users
+for update to authenticated
 using (
   public.is_within_clinic_hours()
   and (
@@ -484,220 +544,3 @@ with check (
     or public.is_physician_or_admin()
   )
 );
-
--- 7. Provision Predefined Staff Accounts in Supabase Auth & Link to public.admins
-do $$
-declare
-  v_physician_id uuid;
-  v_nurse_id uuid;
-  v_encrypted_pass_physician text;
-  v_encrypted_pass_nurse text;
-begin
-  -- Bcrypt hashed passwords
-  v_encrypted_pass_physician := crypt('Physician@123', gen_salt('bf'));
-  v_encrypted_pass_nurse := crypt('Nurse@123', gen_salt('bf'));
-
-  -- Provision Physician: physician@tupclinic.local / Physician@123
-  select id into v_physician_id from auth.users where lower(email) = 'physician@tupclinic.local';
-  if v_physician_id is null then
-    v_physician_id := gen_random_uuid();
-    insert into auth.users (
-      id,
-      instance_id,
-      aud,
-      role,
-      email,
-      encrypted_password,
-      email_confirmed_at,
-      raw_app_meta_data,
-      raw_user_meta_data,
-      created_at,
-      updated_at,
-      confirmation_token,
-      recovery_token,
-      email_change_token_new,
-      email_change
-    ) values (
-      v_physician_id,
-      '00000000-0000-0000-0000-000000000000',
-      'authenticated',
-      'authenticated',
-      'physician@tupclinic.local',
-      v_encrypted_pass_physician,
-      now(),
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      '{"name":"Dr. Rivera","role":"physician"}'::jsonb,
-      now(),
-      now(),
-      '', '', '', ''
-    );
-  else
-    update auth.users
-    set
-      encrypted_password = v_encrypted_pass_physician,
-      email_confirmed_at = coalesce(email_confirmed_at, now()),
-      raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{name}', '"Dr. Rivera"'),
-      updated_at = now()
-    where id = v_physician_id;
-  end if;
-
-  -- Ensure identity for physician
-  if not exists (select 1 from auth.identities where user_id = v_physician_id) then
-    if exists (
-      select 1 from information_schema.columns
-      where table_schema = 'auth' and table_name = 'identities' and column_name = 'provider_id'
-    ) then
-      execute $dyn$
-        insert into auth.identities (
-          id,
-          user_id,
-          identity_data,
-          provider,
-          provider_id,
-          last_sign_in_at,
-          created_at,
-          updated_at
-        ) values (
-          $1,
-          $1,
-          json_build_object('sub', $1::text, 'email', 'physician@tupclinic.local'),
-          'email',
-          $1::text,
-          now(),
-          now(),
-          now()
-        )
-      $dyn$ using v_physician_id;
-    else
-      execute $dyn$
-        insert into auth.identities (
-          id,
-          user_id,
-          identity_data,
-          provider,
-          last_sign_in_at,
-          created_at,
-          updated_at
-        ) values (
-          $1,
-          $1,
-          json_build_object('sub', $1::text, 'email', 'physician@tupclinic.local'),
-          'email',
-          now(),
-          now(),
-          now()
-        )
-      $dyn$ using v_physician_id;
-    end if;
-  end if;
-
-  -- Provision Nurse: nurse@tupclinic.local / Nurse@123
-  select id into v_nurse_id from auth.users where lower(email) = 'nurse@tupclinic.local';
-  if v_nurse_id is null then
-    v_nurse_id := gen_random_uuid();
-    insert into auth.users (
-      id,
-      instance_id,
-      aud,
-      role,
-      email,
-      encrypted_password,
-      email_confirmed_at,
-      raw_app_meta_data,
-      raw_user_meta_data,
-      created_at,
-      updated_at,
-      confirmation_token,
-      recovery_token,
-      email_change_token_new,
-      email_change
-    ) values (
-      v_nurse_id,
-      '00000000-0000-0000-0000-000000000000',
-      'authenticated',
-      'authenticated',
-      'nurse@tupclinic.local',
-      v_encrypted_pass_nurse,
-      now(),
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      '{"name":"Nurse Santos","role":"nurse"}'::jsonb,
-      now(),
-      now(),
-      '', '', '', ''
-    );
-  else
-    update auth.users
-    set
-      encrypted_password = v_encrypted_pass_nurse,
-      email_confirmed_at = coalesce(email_confirmed_at, now()),
-      raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{name}', '"Nurse Santos"'),
-      updated_at = now()
-    where id = v_nurse_id;
-  end if;
-
-  -- Ensure identity for nurse
-  if not exists (select 1 from auth.identities where user_id = v_nurse_id) then
-    if exists (
-      select 1 from information_schema.columns
-      where table_schema = 'auth' and table_name = 'identities' and column_name = 'provider_id'
-    ) then
-      execute $dyn$
-        insert into auth.identities (
-          id,
-          user_id,
-          identity_data,
-          provider,
-          provider_id,
-          last_sign_in_at,
-          created_at,
-          updated_at
-        ) values (
-          $1,
-          $1,
-          json_build_object('sub', $1::text, 'email', 'nurse@tupclinic.local'),
-          'email',
-          $1::text,
-          now(),
-          now(),
-          now()
-        )
-      $dyn$ using v_nurse_id;
-    else
-      execute $dyn$
-        insert into auth.identities (
-          id,
-          user_id,
-          identity_data,
-          provider,
-          last_sign_in_at,
-          created_at,
-          updated_at
-        ) values (
-          $1,
-          $1,
-          json_build_object('sub', $1::text, 'email', 'nurse@tupclinic.local'),
-          'email',
-          now(),
-          now(),
-          now()
-        )
-      $dyn$ using v_nurse_id;
-    end if;
-  end if;
-
-  -- Link public.admins profile records to auth.users (STAFF ONLY)
-  insert into public.admins (id, auth_user_id, name, email, role, active, created_at, updated_at)
-  values
-    (gen_random_uuid(), v_physician_id, 'Dr. Rivera', 'physician@tupclinic.local', 'physician', true, now(), now()),
-    (gen_random_uuid(), v_nurse_id, 'Nurse Santos', 'nurse@tupclinic.local', 'nurse', true, now(), now())
-  on conflict (email) do update set
-    auth_user_id = excluded.auth_user_id,
-    name = excluded.name,
-    role = excluded.role,
-    active = excluded.active,
-    updated_at = now();
-
-  -- Clean up any staff accounts from public.users
-  delete from public.users where role in ('admin', 'physician', 'nurse');
-
-end $$;
