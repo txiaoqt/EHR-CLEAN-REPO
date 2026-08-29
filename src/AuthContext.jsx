@@ -98,12 +98,24 @@ export const AuthProvider = ({ children }) => {
               .catch(() => {});
           }
 
+          let resolvedAvatar = userData.avatar || null;
+          if (!resolvedAvatar && userData.patient_id) {
+            try {
+              const { data: ppData } = await supabase
+                .from('patient_profiles')
+                .select('avatar_url')
+                .eq('patient_id', userData.patient_id)
+                .maybeSingle();
+              if (ppData?.avatar_url) resolvedAvatar = ppData.avatar_url;
+            } catch (_) {}
+          }
+
           return {
             id: userData.id,
             auth_user_id: userData.auth_user_id || authUser.id,
             name: userData.name || authUser.user_metadata?.name || authUser.email,
             email: userData.email || authUser.email,
-            avatar: userData.avatar || null,
+            avatar: resolvedAvatar,
             role: 'patient',
             patient_id: userData.patient_id || null,
             active: userData.active !== false,

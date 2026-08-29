@@ -1,5 +1,9 @@
 {
     "liveServer.settings.multiRootWorkspaceName": "EHR-PROJECT1",
-    "liveServer.settings.port": 0
-
+    "liveServer.settings.port": 0,
+    "deno.enable": true,
+    "deno.config": "supabase/functions/deno.json",
+    "deno.enablePaths": [
+        "supabase/functions"
+    ]
 }

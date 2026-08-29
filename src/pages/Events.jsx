@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
-import { CalendarIcon, UsersIcon } from '../components/icons/Icons.jsx';
+import { ChevronDownIcon } from '../components/icons/Icons.jsx';
 
 const CATEGORIES = ['All', 'Blood Drive', 'Vaccination', 'Health Seminar', 'Medical Mission', 'General'];
 const STATUSES = ['All', 'published', 'draft', 'cancelled', 'archived'];
@@ -38,6 +38,12 @@ const Events = () => {
   const [studentCount, setStudentCount] = useState(0);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
+  const [recipients, setRecipients] = useState([]);
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState(new Set());
+  const [recipientYearFilter, setRecipientYearFilter] = useState('all');
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [showFullRecipientModal, setShowFullRecipientModal] = useState(false);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
 
   // Delete / Archive confirmation modal
   const [deleteEvent, setDeleteEvent] = useState(null);
@@ -165,24 +171,6 @@ const Events = () => {
     }
   };
 
-  const handleTogglePublish = async (ev) => {
-    const nextStatus = ev.status === 'published' ? 'draft' : 'published';
-    const nextIsPublished = nextStatus === 'published';
-
-    try {
-      const { error } = await supabase
-        .from('events')
-        .update({ status: nextStatus, is_published: nextIsPublished, updated_at: new Date().toISOString() })
-        .eq('id', ev.id);
-
-      if (error) throw error;
-      await loadEvents();
-    } catch (err) {
-      console.error('Toggle publish error:', err);
-      alert(`Error updating event status: ${err.message}`);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleteEvent) return;
     try {
@@ -196,67 +184,132 @@ const Events = () => {
     }
   };
 
+  const filteredRecipients = useMemo(() => {
+    return recipients.filter((r) => {
+      const matchesYear = recipientYearFilter === 'all' || String(r.year) === String(recipientYearFilter);
+      const q = recipientSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.student_id.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q);
+      return matchesYear && matchesSearch;
+    });
+  }, [recipients, recipientYearFilter, recipientSearch]);
+
+  const visibleSelectedCount = useMemo(() => {
+    return filteredRecipients.filter((r) => selectedRecipientIds.has(r.id)).length;
+  }, [filteredRecipients, selectedRecipientIds]);
+
+  const isAllVisibleSelected =
+    filteredRecipients.length > 0 && visibleSelectedCount === filteredRecipients.length;
+
+  const toggleSelectAllVisible = () => {
+    const next = new Set(selectedRecipientIds);
+    if (isAllVisibleSelected) {
+      filteredRecipients.forEach((r) => next.delete(r.id));
+    } else {
+      filteredRecipients.forEach((r) => next.add(r.id));
+    }
+    setSelectedRecipientIds(next);
+  };
+
+  const toggleRecipient = (id) => {
+    const next = new Set(selectedRecipientIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedRecipientIds(next);
+  };
+
   const openEmailBlastModal = async (ev) => {
     setEmailEvent(ev);
     setEmailResult(null);
     setSendingEmail(false);
+    setRecipientYearFilter('all');
+    setRecipientSearch('');
+    setShowFullRecipientModal(false);
     setShowEmailModal(true);
+    setLoadingRecipients(true);
 
     try {
-      const { count } = await supabase
+      const { data: usersData, error: usersErr } = await supabase
         .from('users')
-        .select('*', { count: 'exact', head: true })
+        .select('id, name, student_id, email')
         .eq('role', 'patient')
-        .eq('active', true);
-      setStudentCount(count || 0);
-    } catch (_) {
+        .eq('active', true)
+        .not('email', 'is', null);
+
+      if (usersErr) throw usersErr;
+
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('id, year');
+
+      const yearMap = new Map((studentsData || []).map((s) => [s.id, s.year]));
+
+      const eligible = (usersData || [])
+        .filter((u) => u.email && u.email.trim().toLowerCase().endsWith('@tup.edu.ph'))
+        .map((u) => ({
+          id: u.id,
+          name: u.name || 'Student',
+          student_id: u.student_id || 'N/A',
+          email: u.email.trim().toLowerCase(),
+          year: yearMap.get(u.student_id) || 1,
+        }));
+
+      setRecipients(eligible);
+      setSelectedRecipientIds(new Set(eligible.map((r) => r.id)));
+      setStudentCount(eligible.length);
+    } catch (err) {
+      console.error('Failed to load eligible recipients:', err);
+      setRecipients([]);
+      setSelectedRecipientIds(new Set());
       setStudentCount(0);
+    } finally {
+      setLoadingRecipients(false);
     }
   };
 
   const executeEmailBlast = async () => {
-    if (!emailEvent) return;
+    if (!emailEvent || selectedRecipientIds.size === 0) return;
     setSendingEmail(true);
     setEmailResult(null);
 
     try {
-      // 1. Try invoking Edge Function if supported
-      let edgeSuccess = false;
-      let summary = null;
+      const selectedIdsArray = Array.from(selectedRecipientIds);
+      const { data, error } = await supabase.functions.invoke('send-event-announcement', {
+        body: {
+          event_id: emailEvent.id,
+          selected_user_ids: selectedIdsArray,
+        },
+      });
 
-      try {
-        const { data, error } = await supabase.functions.invoke('send-event-announcement', {
-          body: { event_id: emailEvent.id },
-        });
-
-        if (!error && data?.success) {
-          edgeSuccess = true;
-          summary = data;
-        }
-      } catch (_) {}
-
-      // 2. Fallback execution simulation with audit log write
-      if (!edgeSuccess) {
-        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
-        await supabase.from('event_email_logs').insert([
-          {
-            event_id: emailEvent.id,
-            sent_by: authUid,
-            recipient_count: studentCount,
-            success_count: studentCount,
-            failed_count: 0,
-            status: 'completed',
-          },
-        ]);
-        summary = {
-          success: true,
-          recipient_count: studentCount,
-          success_count: studentCount,
-          failed_count: 0,
-        };
+      if (error) {
+        let msg = error.message || 'Failed to dispatch email announcement.';
+        try {
+          if (error.context && typeof error.context.json === 'function') {
+            const errBody = await error.context.json();
+            if (errBody?.error) msg = errBody.error;
+          }
+        } catch (_) {}
+        setEmailResult({ error: msg });
+        return;
       }
 
-      setEmailResult(summary);
+      if (!data) {
+        setEmailResult({ error: 'No response received from email announcement service.' });
+        return;
+      }
+
+      if (data.error && !data.success && !data.partial) {
+        setEmailResult({ error: data.error });
+        return;
+      }
+
+      setEmailResult(data);
     } catch (err) {
       console.error('Email blast error:', err);
       setEmailResult({ error: err.message || 'Dispatch failed' });
@@ -343,19 +396,35 @@ const Events = () => {
             />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Category:</span>
-              <select className="input" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  className="input"
+                  style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: 34, cursor: 'pointer' }}
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <ChevronDownIcon size={13} style={{ position: 'absolute', right: 12, pointerEvents: 'none', color: 'var(--muted)' }} />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Status:</span>
-              <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  className="input"
+                  style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: 34, cursor: 'pointer' }}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                  ))}
+                </select>
+                <ChevronDownIcon size={13} style={{ position: 'absolute', right: 12, pointerEvents: 'none', color: 'var(--muted)' }} />
+              </div>
             </div>
           </div>
         </div>
@@ -424,25 +493,20 @@ const Events = () => {
                         <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                           {ev.status === 'published' && (
                             <button
+                              type="button"
                               className="btn small secondary"
                               style={{ color: '#991b1b', borderColor: '#fee2e2' }}
                               title="Email Registered Students"
                               onClick={() => openEmailBlastModal(ev)}
                             >
-                              📧 Email Blast
+                              Email Blast
                             </button>
                           )}
-                          <button
-                            className="btn small secondary"
-                            onClick={() => handleTogglePublish(ev)}
-                            title={ev.status === 'published' ? 'Unpublish to draft' : 'Publish event'}
-                          >
-                            {ev.status === 'published' ? 'Unpublish' : 'Publish'}
-                          </button>
-                          <button className="btn small" onClick={() => openEditModal(ev)}>
+                          <button type="button" className="btn small" onClick={() => openEditModal(ev)}>
                             Edit
                           </button>
                           <button
+                            type="button"
                             className="btn small secondary"
                             style={{ color: 'var(--danger)' }}
                             onClick={() => setDeleteEvent(ev)}
@@ -509,16 +573,19 @@ const Events = () => {
                     <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
                       Category
                     </label>
-                    <select
-                      className="input"
-                      style={{ width: '100%' }}
-                      value={form.category}
-                      onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                    >
-                      {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <select
+                        className="input"
+                        style={{ width: '100%', appearance: 'none', WebkitAppearance: 'none', paddingRight: 34, cursor: 'pointer' }}
+                        value={form.category}
+                        onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                      >
+                        {CATEGORIES.filter((c) => c !== 'All').map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <ChevronDownIcon size={13} style={{ position: 'absolute', right: 14, pointerEvents: 'none', color: 'var(--muted)' }} />
+                    </div>
                   </div>
                   <div>
                     <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
@@ -592,17 +659,20 @@ const Events = () => {
                   <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
                     Publication Status
                   </label>
-                  <select
-                    className="input"
-                    style={{ width: '100%' }}
-                    value={form.status}
-                    onChange={(e) => setForm((p) => ({ ...p, status: e.target.value, is_published: e.target.value === 'published' }))}
-                  >
-                    <option value="published">Published (Visible on Patient Portal)</option>
-                    <option value="draft">Draft (Staff View Only)</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="archived">Archived</option>
-                  </select>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <select
+                      className="input"
+                      style={{ width: '100%', appearance: 'none', WebkitAppearance: 'none', paddingRight: 34, cursor: 'pointer' }}
+                      value={form.status}
+                      onChange={(e) => setForm((p) => ({ ...p, status: e.target.value, is_published: e.target.value === 'published' }))}
+                    >
+                      <option value="published">Published (Visible on Patient Portal)</option>
+                      <option value="draft">Draft (Staff View Only)</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                    <ChevronDownIcon size={13} style={{ position: 'absolute', right: 14, pointerEvents: 'none', color: 'var(--muted)' }} />
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
@@ -636,19 +706,21 @@ const Events = () => {
             <div
               style={{
                 background: 'var(--panel, #ffffff)',
-                borderRadius: 12,
-                width: 'min(92vw, 540px)',
-                padding: 24,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                borderRadius: 14,
+                width: 'min(740px, calc(100vw - 32px))',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '28px 28px 24px',
+                boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 20, fontWeight: 700, color: '#991b1b' }}>
-                📧 Email Registered Students
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 21, fontWeight: 700, color: '#991b1b' }}>
+                Email Registered Students
               </h3>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 16, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 18, lineHeight: 1.5 }}>
                 You are about to dispatch an email announcement for:
-                <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6, color: 'var(--text)' }}>
+                <div style={{ fontWeight: 700, fontSize: 16, marginTop: 4, color: 'var(--text)' }}>
                   {emailEvent.title}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
@@ -656,44 +728,257 @@ const Events = () => {
                 </div>
               </div>
 
-              <div style={{ background: 'var(--bg, #f8fafc)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Recipient Audience:</div>
-                <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>
-                  {studentCount} Active Registered Student(s)
+              {/* Recipient Audience Section */}
+              <div style={{ background: 'var(--bg, #f8fafc)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Recipient Audience</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                      Eligible: {recipients.length} &bull; Selected: {selectedRecipientIds.size}
+                    </div>
+                  </div>
+                  {recipients.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ fontSize: 12, padding: '5px 12px', height: 'auto', borderRadius: 6 }}
+                      onClick={() => setShowFullRecipientModal(true)}
+                    >
+                      View All ({recipients.length})
+                    </button>
+                  )}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  Emails ending with official domain @tup.edu.ph
+
+                {/* Filter Controls: Searchbar FIRST, Year Filter SECOND following Admin filter design system */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name, ID, or email..."
+                    value={recipientSearch}
+                    onChange={(e) => setRecipientSearch(e.target.value)}
+                    style={{
+                      flex: '1 1 280px',
+                      minWidth: '200px',
+                      height: '40px',
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel, #ffffff)',
+                      fontSize: 13,
+                      color: 'var(--text)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  <div style={{ position: 'relative', width: '160px', flex: '0 0 160px', minWidth: '140px', height: '40px' }}>
+                    <select
+                      value={recipientYearFilter}
+                      onChange={(e) => setRecipientYearFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px 36px 8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'var(--panel, #ffffff)',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--text)',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                      }}
+                    >
+                      <option value="all">All Years</option>
+                      <option value="1">Year 1</option>
+                      <option value="2">Year 2</option>
+                      <option value="3">Year 3</option>
+                      <option value="4">Year 4</option>
+                      <option value="5">Year 5</option>
+                      <option value="6">Year 6</option>
+                    </select>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--muted, #64748b)',
+                        lineHeight: 0,
+                      }}
+                    >
+                      <ChevronDownIcon size={14} />
+                    </span>
+                  </div>
                 </div>
+
+                {/* Select All Toggle */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'rgba(0,0,0,0.02)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    marginBottom: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      disabled={filteredRecipients.length === 0}
+                    />
+                    <span>Select All Visible</span>
+                  </label>
+                  <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
+                    {visibleSelectedCount} of {filteredRecipients.length} visible selected
+                  </span>
+                </div>
+
+                {/* Recipient Preview List */}
+                {loadingRecipients ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--muted)' }}>
+                    Loading eligible recipients...
+                  </div>
+                ) : filteredRecipients.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--muted)' }}>
+                    No students match the selected filter.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                    {filteredRecipients.slice(0, 5).map((r) => {
+                      const isSelected = selectedRecipientIds.has(r.id);
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => toggleRecipient(r.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '10px 14px',
+                            borderRadius: 8,
+                            background: isSelected ? 'rgba(139, 0, 0, 0.04)' : 'var(--panel, #ffffff)',
+                            border: `1px solid ${isSelected ? 'rgba(139, 0, 0, 0.3)' : 'var(--border)'}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                {r.name}
+                              </span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6, flexShrink: 0 }}>
+                                Year {r.year}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <span>{r.student_id}</span>
+                              <span>&bull;</span>
+                              <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.email}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {filteredRecipients.length > 5 && (
+                      <div style={{ textAlign: 'center', paddingTop: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowFullRecipientModal(true)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#991b1b',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          Showing 5 of {filteredRecipients.length} matching students. Click to View All &rarr;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* Email Result Feedback */}
               {emailResult && (
                 <div
                   style={{
-                    background: emailResult.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                    border: `1px solid ${emailResult.error ? 'var(--danger)' : 'var(--success, #16a34a)'}`,
-                    borderRadius: 8,
-                    padding: 14,
-                    marginBottom: 16,
+                    background: emailResult.error
+                      ? 'rgba(239, 68, 68, 0.1)'
+                      : emailResult.partial
+                      ? 'rgba(234, 179, 8, 0.1)'
+                      : 'rgba(34, 197, 94, 0.1)',
+                    border: `1px solid ${
+                      emailResult.error
+                        ? 'var(--danger, #dc2626)'
+                        : emailResult.partial
+                        ? '#eab308'
+                        : 'var(--success, #16a34a)'
+                    }`,
+                    borderRadius: 10,
+                    padding: 16,
+                    marginBottom: 18,
                   }}
                 >
                   {emailResult.error ? (
-                    <div style={{ color: 'var(--danger)', fontSize: 14 }}>
-                      <strong>Dispatch Error:</strong> {emailResult.error}
+                    <div style={{ color: 'var(--danger, #dc2626)', fontSize: 14 }}>
+                      <strong>Email Announcement Failed:</strong> {emailResult.error}
+                    </div>
+                  ) : emailResult.partial ? (
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#b45309', fontSize: 15 }}>
+                        ⚠️ Announcement Partially Sent
+                      </div>
+                      <div style={{ fontSize: 13, marginTop: 4, color: 'var(--text)' }}>
+                        <strong>{emailResult.success_count}</strong> of <strong>{emailResult.recipient_count}</strong> emails were sent successfully. (<strong>{emailResult.failed_count}</strong> failed)
+                      </div>
                     </div>
                   ) : (
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--success, #16a34a)', fontSize: 15 }}>
-                        ✓ Announcement Dispatched Successfully!
+                      <div style={{ fontWeight: 700, color: 'var(--success, #16a34a)', fontSize: 16 }}>
+                        ✓ Email sent successfully
                       </div>
                       <div style={{ fontSize: 13, marginTop: 4, color: 'var(--text)' }}>
-                        Recipients: <strong>{emailResult.recipient_count}</strong> | Success: <strong>{emailResult.success_count}</strong> | Failed: <strong>{emailResult.failed_count || 0}</strong>
+                        {emailResult.success_count === 1
+                          ? 'Email sent successfully to 1 selected recipient.'
+                          : `Email sent successfully to all ${emailResult.success_count} selected recipients.`}
                       </div>
+                    </div>
+                  )}
+                  {emailResult.warning && (
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.15)', color: '#b45309', fontSize: 12, lineHeight: 1.4 }}>
+                      <strong>Notice:</strong> {emailResult.warning}
                     </div>
                   )}
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                 <button
                   type="button"
                   className="btn secondary"
@@ -706,12 +991,229 @@ const Events = () => {
                   <button
                     type="button"
                     className="btn primary"
-                    disabled={sendingEmail || studentCount === 0}
+                    disabled={sendingEmail || selectedRecipientIds.size === 0}
                     onClick={executeEmailBlast}
                   >
-                    {sendingEmail ? 'Dispatching...' : `Send to ${studentCount} Students`}
+                    {sendingEmail
+                      ? 'Email sending...'
+                      : `Send to ${selectedRecipientIds.size} Selected Student${selectedRecipientIds.size === 1 ? '' : 's'}`}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View All Recipients Selection Modal */}
+        {showFullRecipientModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3300,
+              padding: 16,
+            }}
+            onClick={() => setShowFullRecipientModal(false)}
+          >
+            <div
+              style={{
+                background: 'var(--panel, #ffffff)',
+                borderRadius: 14,
+                width: 'min(760px, calc(100vw - 32px))',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                    Select Recipients ({selectedRecipientIds.size} of {recipients.length} Selected)
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    style={{ fontSize: 12, padding: '4px 8px' }}
+                    onClick={() => setShowFullRecipientModal(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
+                  Filter and select students eligible to receive this clinic announcement.
+                </div>
+
+                {/* Filter and Search Bar: Searchbar FIRST, Year Filter SECOND */}
+                <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name, student ID, or email..."
+                    value={recipientSearch}
+                    onChange={(e) => setRecipientSearch(e.target.value)}
+                    style={{
+                      flex: '1 1 280px',
+                      minWidth: '200px',
+                      height: '40px',
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel, #ffffff)',
+                      fontSize: 13,
+                      color: 'var(--text)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  <div style={{ position: 'relative', width: '160px', flex: '0 0 160px', minWidth: '140px', height: '40px' }}>
+                    <select
+                      value={recipientYearFilter}
+                      onChange={(e) => setRecipientYearFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px 36px 8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'var(--panel, #ffffff)',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--text)',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                      }}
+                    >
+                      <option value="all">All Years</option>
+                      <option value="1">Year 1</option>
+                      <option value="2">Year 2</option>
+                      <option value="3">Year 3</option>
+                      <option value="4">Year 4</option>
+                      <option value="5">Year 5</option>
+                      <option value="6">Year 6</option>
+                    </select>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--muted, #64748b)',
+                        lineHeight: 0,
+                      }}
+                    >
+                      <ChevronDownIcon size={14} />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Select All Row */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'var(--bg, #f8fafc)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    marginTop: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      disabled={filteredRecipients.length === 0}
+                    />
+                    <span>Select All Visible Students</span>
+                  </label>
+                  <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
+                    {visibleSelectedCount} of {filteredRecipients.length} visible selected
+                  </span>
+                </div>
+              </div>
+
+              {/* Scrollable Recipient Grid */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {filteredRecipients.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 14 }}>
+                    No students found matching the selected filter criteria.
+                  </div>
+                ) : (
+                  filteredRecipients.map((r) => {
+                    const isSelected = selectedRecipientIds.has(r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => toggleRecipient(r.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                          borderRadius: 8,
+                          background: isSelected ? 'rgba(139, 0, 0, 0.04)' : 'var(--panel, #ffffff)',
+                          border: `1px solid ${isSelected ? 'rgba(139, 0, 0, 0.3)' : 'var(--border)'}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                              {r.name}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6, flexShrink: 0 }}>
+                              Year {r.year}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <span><strong>ID:</strong> {r.student_id}</span>
+                            <span>&bull;</span>
+                            <span>{r.email}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg, #f8fafc)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                  Selected: <strong>{selectedRecipientIds.size}</strong> of {recipients.length} students
+                </div>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => setShowFullRecipientModal(false)}
+                >
+                  Done
+                </button>
               </div>
             </div>
           </div>

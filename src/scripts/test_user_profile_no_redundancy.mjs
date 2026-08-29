@@ -54,7 +54,7 @@ console.log('\n[TEST GROUP 3] Clean Information Hierarchy Audit');
 
 assert(profileCode.includes('Contact Information'), 'Contains "Contact Information" section');
 assert(profileCode.includes('Contact Phone Number'), 'Contact section contains "Contact Phone Number"');
-assert(profileCode.includes('Residential / Campus Address'), 'Contact section contains "Residential / Campus Address"');
+assert(profileCode.includes('Current Address'), 'Contact section contains "Current Address"');
 
 assert(profileCode.includes('Emergency Contact'), 'Contains "Emergency Contact" section');
 assert(profileCode.includes('Emergency Contact Person'), 'Emergency section contains "Emergency Contact Person"');

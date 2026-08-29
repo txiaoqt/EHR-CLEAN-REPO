@@ -111,20 +111,20 @@ export const DesktopIcon = ({ size = 24, className = '' }) => (
   </svg>
 );
 
-export const ChevronDownIcon = ({ size = 14, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+export const ChevronDownIcon = ({ size = 14, className = '', style = {}, ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style} aria-hidden="true" {...props}>
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
-export const ChevronLeftIcon = ({ size = 16, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+export const ChevronLeftIcon = ({ size = 16, className = '', style = {}, ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style} aria-hidden="true" {...props}>
     <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 
-export const ChevronRightIcon = ({ size = 16, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+export const ChevronRightIcon = ({ size = 16, className = '', style = {}, ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style} aria-hidden="true" {...props}>
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );

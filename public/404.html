@@ -2,19 +2,18 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>404 — Not Found</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    body { background:#071022; color:#e6eef6; font-family:system-ui; margin:0; display:flex; align-items:center; justify-content:center; height:100vh; }
-    a { color:#8C1515; text-decoration:none; }
-    .wrap { text-align:center; }
-  </style>
+  <title>TUP Clinic EHR</title>
+  <script>
+    // Single Page App Fallback: Redirect deep links and recovery hashes to index.html
+    const path = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    window.location.replace('/' + (path.startsWith('/') ? path.slice(1) : path) + search + hash);
+  </script>
 </head>
 <body>
-  <div class="wrap">
-    <h1>404 — Not Found</h1>
-    <p>The page you're looking for doesn't exist.</p>
-    <p><a href="index.html">Return to Dashboard</a></p>
+  <div style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #64748b;">
+    Redirecting to TUP Clinic EHR...
   </div>
 </body>
 </html>

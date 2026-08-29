@@ -10,6 +10,7 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const PatientProfilePortal = () => {
   const { user, updateUser } = useAuth();
   const fileInputRef = useRef(null);
+  const originalProfileRef = useRef(null);
 
   const [profile, setProfile] = useState({
     id: '',
@@ -44,15 +45,17 @@ const PatientProfilePortal = () => {
         .eq('id', user.patient_id)
         .maybeSingle();
 
-      // 2. Query users record for avatar
+      // 2. Query users record for avatar & name fallback
       let uAvatar = user?.avatar || '';
+      let uName = user?.name || '';
       try {
         const { data: uData } = await supabase
           .from('users')
-          .select('avatar')
+          .select('avatar, name')
           .eq('patient_id', user.patient_id)
           .maybeSingle();
         if (uData?.avatar) uAvatar = uData.avatar;
+        if (uData?.name) uName = uData.name;
       } catch (_) {}
 
       // 3. Query extended patient_profiles record
@@ -70,20 +73,23 @@ const PatientProfilePortal = () => {
 
       const resolvedAvatar = extData?.avatar_url || uAvatar || user?.avatar || '';
 
-      setProfile({
+      const loadedProfile = {
         id: user.patient_id,
-        name: pData?.name || extData?.full_name || user.name || '',
-        year: pData?.year || extData?.year || '',
-        contact_number: extData?.contact_number || '',
+        name: extData?.full_name || pData?.name || uName || '',
+        year: extData?.year || pData?.year || '',
+        contact_number: extData?.contact_number || pData?.contact || '',
         address: extData?.address || '',
         emergency_contact: extData?.emergency_contact || '',
         emergency_contact_number: extData?.emergency_contact_number || '',
         blood_type: extData?.blood_type || '',
-        medications: pData?.medications || extData?.medications || '',
-        allergies: pData?.allergies || extData?.allergies || '',
-        notes: pData?.notes || extData?.notes || '',
+        medications: extData?.medications || pData?.medications || '',
+        allergies: extData?.allergies || pData?.allergies || '',
+        notes: extData?.notes || extData?.medical_history || pData?.notes || '',
         avatar_url: resolvedAvatar,
-      });
+      };
+
+      setProfile(loadedProfile);
+      originalProfileRef.current = { ...loadedProfile };
 
       if (resolvedAvatar && resolvedAvatar !== user?.avatar) {
         updateUser?.({ avatar: resolvedAvatar });
@@ -98,7 +104,7 @@ const PatientProfilePortal = () => {
     if (msg) setMsgOpen(true);
   }, [msg]);
 
-  // Handle Photo Selection & Upload
+  // Handle Photo Selection & Upload to Supabase Storage
   const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,58 +114,80 @@ const PatientProfilePortal = () => {
 
     // Validation 1: MIME type
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      setMsg('Invalid image format. Please upload a JPEG, PNG, or WEBP photo.');
+      setMsg('Please choose a JPG, PNG, or WebP image up to 5 MB.');
       return;
     }
 
-    // Validation 2: File size
+    // Validation 2: File size (5MB maximum)
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      setMsg('Image size exceeds 5MB limit. Please choose a smaller photo.');
+      setMsg('Please choose a JPG, PNG, or WebP image up to 5 MB.');
       return;
     }
 
     setUploadingPhoto(true);
     setMsg('');
 
+    let uploadedBucket = 'profile-images';
+    let uploadedPath = '';
+
     try {
-      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id || 'anonymous';
+      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id;
+      if (!authUid) {
+        setMsg('Unable to update your profile photo. Please log in again.');
+        return;
+      }
+
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = `${authUid}/${fileName}`;
+      uploadedPath = filePath;
 
-      let photoUrl = '';
-
-      // Try uploading to Supabase Storage bucket 'avatars'
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
+      // 1. Upload directly to Supabase Storage bucket 'profile-images' (with avatars fallback)
+      let { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true,
         });
 
-      if (!uploadError && uploadData) {
-        const { data: urlData } = supabase.storage
+      if (uploadError) {
+        // Fallback check for avatars bucket
+        const fallbackRes = await supabase.storage
           .from('avatars')
-          .getPublicUrl(filePath);
-        photoUrl = urlData?.publicUrl || '';
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (!fallbackRes.error && fallbackRes.data) {
+          uploadedBucket = 'avatars';
+          uploadData = fallbackRes.data;
+          uploadError = null;
+        }
       }
 
-      // Fallback: If Supabase storage is not configured or in local test environment, convert to Base64
-      if (!photoUrl) {
-        photoUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+      if (uploadError || !uploadData) {
+        console.error('Storage upload failed:', uploadError);
+        setMsg('Unable to update your profile photo. Please try again.');
+        return;
       }
 
-      // 1. Update state
-      setProfile((prev) => ({ ...prev, avatar_url: photoUrl }));
+      // 2. Obtain persistent public Storage URL with cache-busting timestamp
+      const { data: urlData } = supabase.storage
+        .from(uploadedBucket)
+        .getPublicUrl(filePath);
 
-      // 2. Persist to public.patient_profiles
+      const rawUrl = urlData?.publicUrl || '';
+      if (!rawUrl) {
+        setMsg('Unable to update your profile photo. Please try again.');
+        return;
+      }
+
+      const photoUrl = `${rawUrl}?v=${Date.now()}`;
+
+      // 3. Persist to authoritative database tables (patient_profiles and users)
       if (user?.patient_id) {
-        await supabase
+        const { error: ppErr } = await supabase
           .from('patient_profiles')
           .upsert([
             {
@@ -172,30 +200,40 @@ const PatientProfilePortal = () => {
             },
           ], { onConflict: 'patient_id' });
 
-        // 3. Persist to public.users
-        await supabase
+        const { error: uErr } = await supabase
           .from('users')
           .update({ avatar: photoUrl })
           .eq('patient_id', user.patient_id);
+
+        if (ppErr && uErr) {
+          console.error('Database avatar persistence failed:', { ppErr, uErr });
+          // Rollback: cleanup uploaded storage object to avoid orphaned files
+          await supabase.storage.from(uploadedBucket).remove([filePath]).catch(() => {});
+          setMsg('Unable to update your profile photo. Please try again.');
+          return;
+        }
       }
 
-      // 4. Update live AuthContext & localStorage
+      // 4. Update live state and propagate across entire app (Header, Sidebar, Profile)
+      setProfile((prev) => ({ ...prev, avatar_url: photoUrl }));
       updateUser?.({ avatar: photoUrl });
-      setMsg('Profile photo updated successfully.');
+      setMsg('Photo updated successfully.');
     } catch (err) {
       console.warn('Profile photo upload error:', err);
-      setMsg(`Failed to update profile photo: ${err.message || 'Unknown error'}`);
+      if (uploadedPath) {
+        await supabase.storage.from(uploadedBucket).remove([uploadedPath]).catch(() => {});
+      }
+      setMsg('Unable to update your profile photo. Please try again.');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  // Remove Photo & revert to default
+  // Remove Photo & revert to default placeholder
   const handleRemovePhoto = async () => {
     setUploadingPhoto(true);
     try {
-      setProfile((prev) => ({ ...prev, avatar_url: '' }));
-
+      // 1. Remove database references
       if (user?.patient_id) {
         await supabase
           .from('patient_profiles')
@@ -208,72 +246,136 @@ const PatientProfilePortal = () => {
           .eq('patient_id', user.patient_id);
       }
 
+      // 2. Clean up storage object if present
+      const currentUrl = profile.avatar_url;
+      if (currentUrl && currentUrl.includes('/storage/v1/object/public/')) {
+        const parts = currentUrl.split('/storage/v1/object/public/');
+        if (parts[1]) {
+          const [bucket, ...pathParts] = parts[1].split('?')[0].split('/');
+          const oldPath = pathParts.join('/');
+          if (bucket && oldPath) {
+            await supabase.storage.from(bucket).remove([oldPath]).catch(() => {});
+          }
+        }
+      }
+
+      // 3. Update state and broadcast to AuthContext
+      setProfile((prev) => ({ ...prev, avatar_url: '' }));
       updateUser?.({ avatar: null });
       setMsg('Profile photo removed.');
     } catch (err) {
       console.warn('Remove photo error:', err);
-      setMsg('Failed to remove profile photo.');
+      setMsg('Unable to remove profile photo. Please try again.');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
+  // Discard unsaved changes and revert to loaded profile
+  const handleCancel = () => {
+    if (originalProfileRef.current) {
+      setProfile({ ...originalProfileRef.current });
+    }
+    setEditing(false);
+    setMsg('');
+  };
+
   // Save profile fields
   const save = async () => {
-    if (!user?.patient_id || !profile.name.trim()) return;
+    if (!user?.patient_id) return;
     setSaving(true);
     setMsg('');
 
-    const payload = {
-      name: profile.name.trim(),
-      year: Number(profile.year || 1),
-      allergies: profile.allergies || null,
-      medications: profile.medications || null,
-      notes: profile.notes || null,
-    };
+    const authoritativeName = originalProfileRef.current?.name || user?.name || profile.name;
+    const parsedYear = Number(profile.year) || 1;
+    const trimmedContact = profile.contact_number?.trim() || null;
+    const trimmedAddress = profile.address?.trim() || null;
+    const trimmedEmergencyContact = profile.emergency_contact?.trim() || null;
+    const trimmedEmergencyPhone = profile.emergency_contact_number?.trim() || null;
+    const trimmedBloodType = profile.blood_type?.trim() || null;
+    const trimmedAllergies = profile.allergies?.trim() || null;
+    const trimmedMedications = profile.medications?.trim() || null;
+    const trimmedNotes = profile.notes?.trim() || null;
 
-    // 1. Update patients master
-    const { error: pErr } = await supabase
-      .from('patients')
-      .update(payload)
-      .eq('id', user.patient_id);
-
-    if (pErr) {
-      setMsg(`Unable to save profile: ${pErr.message}`);
-      setSaving(false);
-      return;
-    }
-
-    // 2. Update patient_profiles extended record
     try {
-      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
-      await supabase
+      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id || null;
+
+      // 1. Update patients master table (preserving immutable registered name)
+      const { error: pErr } = await supabase
+        .from('patients')
+        .update({
+          year: parsedYear,
+          contact: trimmedContact,
+          allergies: trimmedAllergies,
+          medications: trimmedMedications,
+          notes: trimmedNotes,
+        })
+        .eq('id', user.patient_id);
+
+      if (pErr) {
+        console.error('Patients update error:', pErr);
+        setMsg('Unable to save your profile changes. Please try again.');
+        setSaving(false);
+        return;
+      }
+
+      // 2. Upsert patient_profiles extended record
+      const { error: ppErr } = await supabase
         .from('patient_profiles')
         .upsert([
           {
             patient_id: user.patient_id,
             user_id: authUid,
             student_id: user.patient_id,
-            full_name: payload.name,
-            year: payload.year,
-            contact_number: profile.contact_number || null,
-            address: profile.address || null,
-            emergency_contact: profile.emergency_contact || null,
-            emergency_contact_number: profile.emergency_contact_number || null,
-            blood_type: profile.blood_type || null,
-            allergies: payload.allergies,
-            medications: payload.medications,
-            notes: payload.notes,
+            full_name: authoritativeName,
+            year: parsedYear,
+            contact_number: trimmedContact,
+            address: trimmedAddress,
+            emergency_contact: trimmedEmergencyContact,
+            emergency_contact_number: trimmedEmergencyPhone,
+            blood_type: trimmedBloodType,
+            allergies: trimmedAllergies,
+            medications: trimmedMedications,
+            medical_history: trimmedNotes,
+            notes: trimmedNotes,
             avatar_url: profile.avatar_url || null,
             updated_at: new Date().toISOString(),
-          }
+          },
         ], { onConflict: 'patient_id' });
-    } catch (_) {}
 
-    updateUser?.({ name: payload.name });
-    setMsg('Profile details saved successfully.');
-    setEditing(false);
-    setSaving(false);
+      if (ppErr) {
+        console.error('Patient profiles update error:', ppErr);
+        setMsg('Unable to save your profile changes. Please try again.');
+        setSaving(false);
+        return;
+      }
+
+      // 3. Update local state & live session
+      const updatedProfile = {
+        ...profile,
+        name: authoritativeName,
+        year: parsedYear,
+        contact_number: trimmedContact || '',
+        address: trimmedAddress || '',
+        emergency_contact: trimmedEmergencyContact || '',
+        emergency_contact_number: trimmedEmergencyPhone || '',
+        blood_type: trimmedBloodType || '',
+        allergies: trimmedAllergies || '',
+        medications: trimmedMedications || '',
+        notes: trimmedNotes || '',
+      };
+
+      setProfile(updatedProfile);
+      originalProfileRef.current = { ...updatedProfile };
+
+      setMsg('Profile details saved successfully.');
+      setEditing(false);
+    } catch (err) {
+      console.error('Save profile exception:', err);
+      setMsg('Unable to save your profile changes. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderField = (label, value, placeholder = 'None provided') => (
@@ -375,18 +477,15 @@ const PatientProfilePortal = () => {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                    {/* Read-Only Full Name in Edit Mode */}
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 3, color: 'var(--text)' }}>
-                        Full Name *
-                      </label>
-                      <input
-                        className="input"
-                        style={{ width: '100%', height: 36, fontSize: 13 }}
-                        value={profile.name}
-                        onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
-                        required
-                      />
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
+                        Full Name
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word', paddingTop: 2 }}>
+                        {profile.name || user?.name || 'Student Patient'}
+                      </div>
                     </div>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 3, color: 'var(--text)' }}>
@@ -424,7 +523,7 @@ const PatientProfilePortal = () => {
                     type="button"
                     className="btn secondary"
                     style={{ padding: '8px 14px', fontSize: 13 }}
-                    onClick={() => setEditing(false)}
+                    onClick={handleCancel}
                     disabled={saving}
                   >
                     Cancel
@@ -455,7 +554,7 @@ const PatientProfilePortal = () => {
             {!editing ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
                 {renderField('Contact Phone Number', profile.contact_number, 'None provided')}
-                {renderField('Residential / Campus Address', profile.address, 'None provided')}
+                {renderField('Current Address', profile.address, 'None provided')}
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
@@ -473,7 +572,7 @@ const PatientProfilePortal = () => {
                 </div>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Residential / Campus Address
+                    Current Address
                   </label>
                   <input
                     className="input"

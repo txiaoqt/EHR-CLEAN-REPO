@@ -89,13 +89,13 @@ const Login = () => {
   const [msgOpen, setMsgOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Listen for Supabase Password Recovery Redirects & Events
+  // Listen for Supabase Password Recovery Redirects & Route to /reset-password
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
       if (hash.includes('type=recovery') || search.includes('type=recovery')) {
-        setAuthMode('update_password');
+        navigate(`/reset-password${search}${hash}`, { replace: true });
       }
     }
 
@@ -103,12 +103,12 @@ const Login = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        setAuthMode('update_password');
+        navigate('/reset-password', { replace: true });
       }
     });
 
     return () => subscription?.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   // Cooldown Countdown Timer
   useEffect(() => {
@@ -503,8 +503,9 @@ const Login = () => {
     setForgotLoading(true);
     setMsg('');
     try {
+      const resetUrl = `${window.location.origin}/reset-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: resetUrl,
       });
       if (error) throw error;
       setMsg('Password reset instructions have been sent to your TUP email.');

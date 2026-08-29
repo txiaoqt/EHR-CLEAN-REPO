@@ -23,6 +23,7 @@ import PatientMessages from './pages/patient/PatientMessages.jsx';
 import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import { useStaffDeviceCheck } from './hooks/useStaffDeviceCheck.js';
 import { useSidebar } from './useSidebar.js';
@@ -239,6 +240,7 @@ function AppShell() {
       <Routes>
         <Route path="/" element={canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Navigate to="/login" replace />} />
         <Route path="/login" element={canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {IS_ADMIN_SURFACE && (
           <>
