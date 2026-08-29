@@ -33,7 +33,7 @@ const loginContent = fs.readFileSync(loginPath, 'utf8');
 assert(loginContent.includes('className="login-page-main"'), 'Login.jsx uses login-page-main class');
 assert(loginContent.includes('backgroundSize: \'cover\''), 'Background cover specified');
 assert(loginContent.includes('bg1Image'), 'bg1 image linked');
-assert(loginContent.includes('maxWidth: 1360'), 'Responsive wrap container with balanced maxWidth');
+assert(loginContent.includes('1360'), 'Responsive wrap container with balanced maxWidth');
 assert(loginContent.includes('flex: 1'), 'Hero column expands flexibly');
 assert(loginContent.includes('Staff Log In'), 'Staff Log In title present');
 

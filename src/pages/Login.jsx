@@ -539,14 +539,17 @@ const Login = () => {
   const isForgotDisabled = forgotLoading || !isValidTupEmail(forgotEmail);
 
   // Responsive breakpoints
-  const isMobile = vw <= 768;
-  const isTablet = vw > 768 && vw <= 1100;
+  const isMobile = vw < 600;
+  const isTabletPortrait = vw >= 600 && vw < 900;
+  const isTabletLandscape = vw >= 900 && vw < 1024;
+  const isTablet = isTabletPortrait || isTabletLandscape;
+  const isSingleColumn = vw < 900;
 
   const authInputStyle = {
     background: 'rgba(255,255,255,0.94)',
     border: 'none',
-    padding: '11px 12px',
-    borderRadius: 10,
+    padding: isMobile ? '10px 12px' : '11px 12px',
+    borderRadius: isMobile ? 8 : 10,
     fontSize: 14,
     color: '#111',
     outline: 'none',
@@ -565,7 +568,7 @@ const Login = () => {
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center center',
         backgroundSize: 'cover',
-        backgroundAttachment: 'fixed',
+        backgroundAttachment: isMobile ? 'scroll' : 'fixed',
         backgroundColor: '#f6f7f8',
         filter: 'brightness(0.98)',
         fontFamily: `"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial`,
@@ -574,6 +577,7 @@ const Login = () => {
         justifyContent: 'center',
         boxSizing: 'border-box',
         position: 'relative',
+        padding: isSingleColumn ? '20px 0' : 0,
       }}
     >
       {/* Outer shell */}
@@ -581,41 +585,47 @@ const Login = () => {
         id="login-screen"
         style={{
           width: '100%',
-          minHeight: '100vh',
+          minHeight: isSingleColumn ? 'auto' : '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxSizing: 'border-box',
         }}
       >
-        {/* Two-column layout */}
+        {/* Two-column layout on desktop/tablet-landscape; single-column on mobile/tablet-portrait */}
         <div
           className="wrap"
           style={{
             width: '100%',
-            maxWidth: 1360,
+            maxWidth: isTabletLandscape ? 1040 : 1360,
             margin: '0 auto',
             display: 'flex',
-            gap: isTablet ? 36 : 64,
-            padding: isTablet ? '32px 40px' : '48px 64px',
+            gap: isTabletLandscape ? 36 : 64,
+            padding: isMobile
+              ? '20px 16px'
+              : isTabletPortrait
+              ? '36px 24px'
+              : isTabletLandscape
+              ? '32px 36px'
+              : '48px 64px',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            minHeight: '100vh',
+            justifyContent: isSingleColumn ? 'center' : 'space-between',
+            minHeight: isSingleColumn ? 'auto' : '100vh',
             boxSizing: 'border-box',
-            flexDirection: isMobile ? 'column' : 'row',
+            flexDirection: isSingleColumn ? 'column' : 'row',
           }}
         >
-          {/* HERO (left) */}
+          {/* HERO (left - hidden in single-column mobile/tablet-portrait) */}
           <div
             className="hero"
             aria-hidden="false"
             style={{
               flex: 1,
-              maxWidth: 720,
+              maxWidth: isTabletLandscape ? 520 : 720,
               minWidth: 0,
               padding: '16px 0',
               boxSizing: 'border-box',
-              display: isMobile ? 'none' : 'block',
+              display: isSingleColumn ? 'none' : 'block',
             }}
           >
             <div className="brand-row" style={{ display: 'flex', gap: 18, alignItems: 'center', marginBottom: 12 }}>
@@ -630,7 +640,7 @@ const Login = () => {
                   <h1
                     style={{
                       margin: 0,
-                      fontSize: isTablet ? 26 : 32,
+                      fontSize: isTabletLandscape ? 26 : 32,
                       lineHeight: 1.15,
                       fontWeight: 900,
                       fontFamily: `"Merriweather", serif`,
@@ -644,7 +654,7 @@ const Login = () => {
                   <h1
                     style={{
                       margin: 0,
-                      fontSize: isTablet ? 26 : 32,
+                      fontSize: isTabletLandscape ? 26 : 32,
                       lineHeight: 1.15,
                       fontWeight: 900,
                       fontFamily: `"Merriweather", serif`,
@@ -666,7 +676,7 @@ const Login = () => {
                 marginTop: 20,
                 color: 'rgba(51,51,51,1)',
                 maxWidth: 680,
-                fontSize: isTablet ? 14.5 : 16,
+                fontSize: isTabletLandscape ? 14.5 : 16,
                 lineHeight: 1.8,
                 fontWeight: 400,
                 opacity: 0.95,
@@ -699,11 +709,18 @@ const Login = () => {
             aria-hidden="false"
             style={{
               flexShrink: 0,
-              width: isTablet ? 380 : 440,
+              width: isMobile
+                ? 'min(100%, 420px)'
+                : isTabletPortrait
+                ? 'min(100%, 520px)'
+                : isTabletLandscape
+                ? 420
+                : 440,
               maxWidth: '100%',
               display: 'flex',
               justifyContent: 'center',
               boxSizing: 'border-box',
+              margin: isSingleColumn ? 'auto 0' : 0,
             }}
           >
             <form
@@ -723,12 +740,52 @@ const Login = () => {
                 width: '100%',
                 background: 'linear-gradient(180deg, #931b1b, #b92a2a)',
                 color: '#fff',
-                padding: '32px 28px',
-                borderRadius: 24,
-                boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+                padding: isMobile
+                  ? '24px 18px'
+                  : isTabletPortrait
+                  ? '32px 28px'
+                  : isTabletLandscape
+                  ? '28px 24px'
+                  : '32px 28px',
+                borderRadius: isMobile ? 18 : isTabletLandscape ? 20 : 24,
+                boxShadow: isMobile ? '0 12px 36px rgba(0,0,0,0.18)' : '0 20px 50px rgba(0,0,0,0.18)',
                 boxSizing: 'border-box',
               }}
             >
+              {/* Mobile / Tablet Portrait Brand Header */}
+              {isSingleColumn && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 18 }}>
+                  <img
+                    src={tupehrlogo}
+                    alt="TUP Clinic Logo"
+                    style={{
+                      width: isMobile ? 54 : 64,
+                      height: isMobile ? 54 : 64,
+                      borderRadius: '50%',
+                      objectFit: 'contain',
+                      background: '#fff',
+                      border: '2px solid rgba(255, 255, 255, 0.85)',
+                      boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
+                      marginBottom: 8,
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: isMobile ? 15 : 17,
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      textAlign: 'center',
+                      color: '#ffffff',
+                    }}
+                  >
+                    TUP Manila Clinic
+                  </div>
+                  <div style={{ fontSize: isMobile ? 11.5 : 12.5, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 500 }}>
+                    {IS_USER_SURFACE ? 'Online Patient Portal' : 'Clinic Staff Portal'}
+                  </div>
+                </div>
+              )}
               {/* ========================================================= */}
               {/* 1. SIGNUP VIEW (USER SURFACE ONLY)                       */}
               {/* Visual Order: ID -> Name -> Year -> Email (Send) -> OTP -> Password -> Confirm */}
@@ -740,7 +797,7 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 16px 0',
-                      fontSize: 24,
+                      fontSize: isMobile ? 21 : 24,
                       fontWeight: 800,
                       fontFamily: `"Merriweather", serif`,
                     }}
@@ -957,8 +1014,9 @@ const Login = () => {
                         background: isSignupDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isSignupDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
                         fontWeight: 700,
-                        padding: '10px 14px',
-                        borderRadius: 10,
+                        padding: '11px 14px',
+                        minHeight: 44,
+                        borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isSignupDisabled ? 'not-allowed' : 'pointer',
                         fontSize: 14,
@@ -1005,7 +1063,7 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 12px 0',
-                      fontSize: 24,
+                      fontSize: isMobile ? 21 : 24,
                       fontWeight: 800,
                       fontFamily: `"Merriweather", serif`,
                     }}
@@ -1044,8 +1102,9 @@ const Login = () => {
                         background: isForgotDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isForgotDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
                         fontWeight: 700,
-                        padding: '10px 14px',
-                        borderRadius: 10,
+                        padding: '11px 14px',
+                        minHeight: 44,
+                        borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isForgotDisabled ? 'not-allowed' : 'pointer',
                         fontSize: 14,
@@ -1092,7 +1151,7 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 16px 0',
-                      fontSize: 26,
+                      fontSize: isMobile ? 22 : isTabletLandscape ? 24 : 26,
                       fontWeight: 800,
                       fontFamily: `"Merriweather", serif`,
                     }}
@@ -1188,8 +1247,9 @@ const Login = () => {
                         background: isLoginDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isLoginDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
                         fontWeight: 700,
-                        padding: '10px 14px',
-                        borderRadius: 10,
+                        padding: '11px 14px',
+                        minHeight: 44,
+                        borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isLoginDisabled ? 'not-allowed' : 'pointer',
                         fontSize: 14,
@@ -1229,7 +1289,7 @@ const Login = () => {
                 </>
               )}
 
-              <div className="footer-note" style={{ marginTop: 16, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: 12.5 }}>
+              <div className="footer-note" style={{ marginTop: 16, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: isMobile ? 11.5 : 12.5, lineHeight: 1.4 }}>
                 © Technological University of the Philippines
               </div>
             </form>
@@ -1282,7 +1342,22 @@ const Login = () => {
               {msg}
             </div>
             <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn secondary" onClick={() => setMsgOpen(false)}>
+              <button
+                type="button"
+                className="btn secondary"
+                style={{
+                  background: '#ffffff',
+                  color: '#172033',
+                  border: '1px solid var(--border, #cbd5e1)',
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  padding: '8px 18px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+                }}
+                onClick={() => setMsgOpen(false)}
+              >
                 Close
               </button>
             </div>
