@@ -13,6 +13,7 @@ const ResetPassword = () => {
 
   // Explicit Recovery State Model: 'checking' | 'valid' | 'invalid' | 'success'
   const [recoveryState, setRecoveryState] = useState(() => (isPasswordRecoverySession ? 'valid' : 'checking'));
+  const recoveryCompletedRef = React.useRef(false);
 
   const [newPass, setNewPass] = useState('');
   const [confirmNewPass, setConfirmNewPass] = useState('');
@@ -27,17 +28,36 @@ const ResetPassword = () => {
   useEffect(() => {
     let mounted = true;
 
-    const establishRecoverySession = async () => {
-      // 1. If AuthContext already verified recovery session
-      if (isPasswordRecoverySession) {
-        if (mounted) setRecoveryState('valid');
-        return;
-      }
+    // Terminal state protection: If password update has already succeeded, do not re-evaluate or mark invalid
+    if (recoveryCompletedRef.current || recoveryState === 'success') {
+      return;
+    }
 
-      // 2. Parse URL parameters from both search and hash
+    const establishRecoverySession = async () => {
+      if (recoveryCompletedRef.current || !mounted) return;
+
+      // 1. Parse URL parameters from both search and hash
       const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search || '' : '');
       const rawHash = typeof window !== 'undefined' ? window.location.hash || '' : '';
       const hashParams = new URLSearchParams(rawHash.startsWith('#') ? rawHash.slice(1) : rawHash);
+
+      const urlError = searchParams.get('error') || hashParams.get('error');
+      const urlErrorCode = searchParams.get('error_code') || hashParams.get('error_code');
+
+      // If an explicit error is present (e.g. otp_expired or error=expired)
+      if (urlError || urlErrorCode === 'otp_expired') {
+        if (mounted && !recoveryCompletedRef.current) setRecoveryState('invalid');
+        return;
+      }
+
+      // 2. If AuthContext already verified recovery session with valid Supabase session
+      if (isPasswordRecoverySession) {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession) {
+          if (mounted && !recoveryCompletedRef.current) setRecoveryState('valid');
+          return;
+        }
+      }
 
       const code = searchParams.get('code') || hashParams.get('code');
       const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
@@ -51,21 +71,21 @@ const ResetPassword = () => {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error && data?.session) {
             if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-            if (mounted) setRecoveryState('valid');
+            if (mounted && !recoveryCompletedRef.current) setRecoveryState('valid');
             return;
           }
         } else if (tokenHash && type === 'recovery') {
           const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
           if (!error && data?.session) {
             if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-            if (mounted) setRecoveryState('valid');
+            if (mounted && !recoveryCompletedRef.current) setRecoveryState('valid');
             return;
           }
         } else if (accessToken && refreshToken && type === 'recovery') {
           const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
           if (!error && data?.session) {
             if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-            if (mounted) setRecoveryState('valid');
+            if (mounted && !recoveryCompletedRef.current) setRecoveryState('valid');
             return;
           }
         }
@@ -77,20 +97,20 @@ const ResetPassword = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session && isPasswordRecoverySession) {
-          if (mounted) setRecoveryState('valid');
+          if (mounted && !recoveryCompletedRef.current) setRecoveryState('valid');
           return;
         }
       } catch (_) {}
 
-      // 5. If no recovery credentials succeeded, mark as invalid
-      if (mounted) {
-        setRecoveryState('invalid');
+      // 5. If no recovery credentials succeeded, mark as invalid unless already completed
+      if (mounted && !recoveryCompletedRef.current) {
+        setRecoveryState((prev) => (prev === 'success' ? 'success' : 'invalid'));
       }
     };
 
     // Listen for authoritative PASSWORD_RECOVERY event
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
+      if (!mounted || recoveryCompletedRef.current) return;
       if (event === 'PASSWORD_RECOVERY') {
         if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
         setRecoveryState('valid');
@@ -103,7 +123,7 @@ const ResetPassword = () => {
       mounted = false;
       data?.subscription?.unsubscribe();
     };
-  }, [isPasswordRecoverySession, setIsPasswordRecoverySession]);
+  }, [isPasswordRecoverySession, setIsPasswordRecoverySession, recoveryState]);
 
   useEffect(() => {
     if (msg) setMsgOpen(true);
@@ -144,16 +164,16 @@ const ResetPassword = () => {
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) throw error;
 
-      // 2. Sign out the temporary recovery session BEFORE clearing recovery state
-      // This prevents any brief flash of authenticated UI during state transitions
-      await supabase.auth.signOut().catch(() => {});
-
-      // 3. Clear recovery state across all tabs
-      clearPasswordRecoveryState();
-
-      // 4. Mark success state
+      // 2. Mark recovery as permanently completed in this session
+      recoveryCompletedRef.current = true;
       setRecoveryState('success');
       setMsg('Password updated successfully.');
+
+      // 3. Sign out the temporary recovery session
+      await supabase.auth.signOut().catch(() => {});
+
+      // 4. Clear recovery state across all tabs
+      clearPasswordRecoveryState();
     } catch (err) {
       console.error('Password reset error:', err);
       setMsg(err.message || 'Unable to update password. Please try again.');
@@ -315,10 +335,10 @@ const ResetPassword = () => {
         {recoveryState === 'invalid' && (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <h2 style={{ margin: '0 0 10px 0', fontSize: 20, fontWeight: 800, fontFamily: '"Merriweather", serif' }}>
-              Invalid or Expired Link
+              Password Reset Link Expired
             </h2>
             <p style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 22px 0' }}>
-              This password reset link is invalid or has expired. Please request a new password reset email.
+              This password reset link has expired or is no longer valid. Please request a new password reset email to continue.
             </p>
             <button
               type="button"

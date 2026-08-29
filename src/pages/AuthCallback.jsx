@@ -16,16 +16,23 @@ const AuthCallback = () => {
     let mounted = true;
 
     const processAuthHandoff = async () => {
-      // 1. If AuthContext has already recognized a password recovery session, route immediately to /reset-password
+      // 1. If AuthContext has already recognized an active password recovery session with valid Supabase session
       if (isPasswordRecoverySession) {
-        navigate('/reset-password', { replace: true });
-        return;
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession) {
+          if (mounted) navigate('/reset-password', { replace: true });
+          return;
+        }
       }
 
       // 2. Parse URL parameters from search query and hash
       const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search || '' : '');
       const rawHash = typeof window !== 'undefined' ? window.location.hash || '' : '';
       const hashParams = new URLSearchParams(rawHash.startsWith('#') ? rawHash.slice(1) : rawHash);
+
+      const error = searchParams.get('error') || hashParams.get('error');
+      const errorCode = searchParams.get('error_code') || hashParams.get('error_code');
+      const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
 
       const code = searchParams.get('code') || hashParams.get('code');
       const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
@@ -37,48 +44,72 @@ const AuthCallback = () => {
         type === 'recovery' ||
         rawHash.includes('type=recovery') ||
         searchParams.toString().includes('type=recovery') ||
-        (code && type === 'recovery') ||
-        (tokenHash && type === 'recovery');
+        errorCode === 'otp_expired' ||
+        (errorDescription && /expired|invalid|recovery|otp/i.test(errorDescription));
 
-      // 3. If recovery flow is detected, establish session and mark recovery state
-      if (isRecoveryRequest) {
-        try {
-          if (code) {
-            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-            if (!error && data?.session) {
-              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-              if (mounted) navigate('/reset-password', { replace: true });
-              return;
-            }
-          } else if (tokenHash) {
-            const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
-            if (!error && data?.session) {
-              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-              if (mounted) navigate('/reset-password', { replace: true });
-              return;
-            }
-          } else if (accessToken && refreshToken) {
-            const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-            if (!error && data?.session) {
-              if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-              if (mounted) navigate('/reset-password', { replace: true });
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('[AuthCallback] Recovery establishment error:', err);
-        }
-
-        // Forward candidate tokens to /reset-password if active establishment is still ongoing
-        if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
-        if (mounted) navigate('/reset-password', { replace: true });
+      // 3. If an explicit recovery error is present in URL (e.g. otp_expired from Supabase)
+      if (error || errorCode === 'otp_expired' || (isRecoveryRequest && (error || errorCode))) {
+        console.warn('[AuthCallback] Password recovery link expired or invalid.');
+        if (mounted) navigate('/reset-password?error=expired', { replace: true });
         return;
       }
 
-      // 4. Wait until auth initialization has finished for standard logins
+      // 4. If candidate recovery credentials are provided, attempt active session establishment
+      if (code) {
+        try {
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (!exchangeError && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+            if (mounted) navigate('/reset-password', { replace: true });
+            return;
+          }
+        } catch (_) {
+          console.warn('[AuthCallback] Recovery code exchange failed.');
+        }
+        // Code failed to exchange (expired / already consumed / invalid)
+        if (mounted) navigate('/reset-password?error=expired', { replace: true });
+        return;
+      }
+
+      if (tokenHash && isRecoveryRequest) {
+        try {
+          const { data, error: otpError } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+          if (!otpError && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+            if (mounted) navigate('/reset-password', { replace: true });
+            return;
+          }
+        } catch (_) {
+          console.warn('[AuthCallback] Recovery OTP verification failed.');
+        }
+        if (mounted) navigate('/reset-password?error=expired', { replace: true });
+        return;
+      }
+
+      if (accessToken && refreshToken && isRecoveryRequest) {
+        try {
+          const { data, error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (!sessionError && data?.session) {
+            if (setIsPasswordRecoverySession) setIsPasswordRecoverySession(true);
+            if (mounted) navigate('/reset-password', { replace: true });
+            return;
+          }
+        } catch (_) {
+          console.warn('[AuthCallback] Recovery token setSession failed.');
+        }
+        if (mounted) navigate('/reset-password?error=expired', { replace: true });
+        return;
+      }
+
+      if (isRecoveryRequest) {
+        if (mounted) navigate('/reset-password?error=expired', { replace: true });
+        return;
+      }
+
+      // 5. Wait until auth initialization has finished for standard logins
       if (initializing) return;
 
-      // 5. If normal authenticated user, route to surface home
+      // 6. If normal authenticated user, route to surface home
       if (isAuthenticated) {
         const role = (user?.role || '').toLowerCase();
         const surfaceHome = IS_USER_SURFACE
@@ -88,7 +119,7 @@ const AuthCallback = () => {
         return;
       }
 
-      // 6. Unauthenticated fallback -> Login
+      // 7. Unauthenticated fallback -> Login
       navigate('/login', { replace: true });
     };
 

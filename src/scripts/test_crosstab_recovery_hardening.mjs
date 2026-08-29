@@ -106,12 +106,12 @@ assert(clearRecoveryIndex !== -1, 'Calls clearPasswordRecoveryState()');
 assert(successStateIndex !== -1, 'Transitions to success state');
 
 assert(
-  signOutIndex < clearRecoveryIndex,
-  'Signs out recovery session BEFORE clearing recovery state (prevents portal flash)'
+  successStateIndex < signOutIndex,
+  'Sets success state immediately upon password update and before signOut'
 );
 assert(
-  clearRecoveryIndex < successStateIndex,
-  'Clears recovery state before setting success state'
+  signOutIndex < clearRecoveryIndex,
+  'Signs out recovery session BEFORE clearing recovery state (prevents portal flash)'
 );
 
 // -----------------------------------------------------------------------------
