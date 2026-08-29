@@ -1,6 +1,7 @@
 // src/pages/ResetPassword.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
 import { EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import bg1Image from '../assets/images/bg1.jpg';
@@ -8,6 +9,7 @@ import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
+  const { isPasswordRecoverySession, clearPasswordRecoveryState } = useAuth();
 
   // Explicit Recovery State Model: 'checking' | 'valid' | 'invalid' | 'success'
   const [recoveryState, setRecoveryState] = useState('checking');
@@ -21,58 +23,83 @@ const ResetPassword = () => {
   const [msg, setMsg] = useState('');
   const [msgOpen, setMsgOpen] = useState(false);
 
-  // Authoritative Supabase Auth Recovery Verification
+  // Authoritative Supabase Auth Recovery Verification (following Y-TRACE architecture)
   useEffect(() => {
     let mounted = true;
-    let authSubscription = null;
 
-    // 1. Authoritative event listener: ONLY 'PASSWORD_RECOVERY' establishes valid recovery context
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-
-      if (event === 'PASSWORD_RECOVERY') {
-        // Valid Supabase recovery event received
-        setRecoveryState('valid');
-      }
-      // Note: INITIAL_SESSION, SIGNED_IN, USER_UPDATED, TOKEN_REFRESHED do NOT grant recovery authorization
-    });
-    authSubscription = data?.subscription;
-
-    // 2. Inspect environment context for potential recovery callback
-    const inspectRecoveryContext = () => {
-      const hash = typeof window !== 'undefined' ? window.location.hash || '' : '';
-      const search = typeof window !== 'undefined' ? window.location.search || '' : '';
-      const hasRecoveryTokens =
-        hash.includes('type=recovery') ||
-        search.includes('type=recovery') ||
-        hash.includes('access_token=') ||
-        search.includes('code=');
-
-      // If the URL has NO recovery tokens (e.g. manually navigated or normal session), reject after quick check
-      if (!hasRecoveryTokens) {
-        setTimeout(() => {
-          if (mounted) {
-            setRecoveryState((prev) => (prev === 'valid' ? 'valid' : 'invalid'));
-          }
-        }, 400);
+    const establishRecoverySession = async () => {
+      // 1. If AuthContext already verified recovery session
+      if (isPasswordRecoverySession) {
+        if (mounted) setRecoveryState('valid');
         return;
       }
 
-      // If URL has candidate recovery tokens, allow Supabase Auth time to asynchronously parse and emit PASSWORD_RECOVERY
-      setTimeout(() => {
-        if (mounted) {
-          setRecoveryState((prev) => (prev === 'valid' ? 'valid' : 'invalid'));
+      // 2. Parse URL parameters from both search and hash
+      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search || '' : '');
+      const rawHash = typeof window !== 'undefined' ? window.location.hash || '' : '';
+      const hashParams = new URLSearchParams(rawHash.startsWith('#') ? rawHash.slice(1) : rawHash);
+
+      const code = searchParams.get('code') || hashParams.get('code');
+      const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
+      const type = searchParams.get('type') || hashParams.get('type');
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+
+      // 3. Actively establish session based on provided credential format (Y-TRACE pattern)
+      try {
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data?.session) {
+            if (mounted) setRecoveryState('valid');
+            return;
+          }
+        } else if (tokenHash && type === 'recovery') {
+          const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+          if (!error && data?.session) {
+            if (mounted) setRecoveryState('valid');
+            return;
+          }
+        } else if (accessToken && refreshToken && type === 'recovery') {
+          const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (!error && data?.session) {
+            if (mounted) setRecoveryState('valid');
+            return;
+          }
         }
-      }, 2500);
+      } catch (err) {
+        console.warn('Recovery session establishment error:', err);
+      }
+
+      // 4. Check active Supabase session
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && isPasswordRecoverySession) {
+          if (mounted) setRecoveryState('valid');
+          return;
+        }
+      } catch (_) {}
+
+      // 5. If no recovery credentials succeeded, mark as invalid
+      if (mounted) {
+        setRecoveryState('invalid');
+      }
     };
 
-    inspectRecoveryContext();
+    // Listen for authoritative PASSWORD_RECOVERY event
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryState('valid');
+      }
+    });
+
+    establishRecoverySession();
 
     return () => {
       mounted = false;
-      authSubscription?.unsubscribe();
+      data?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [isPasswordRecoverySession]);
 
   useEffect(() => {
     if (msg) setMsgOpen(true);
@@ -112,7 +139,8 @@ const ResetPassword = () => {
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) throw error;
 
-      // Cleanly sign out recovery session
+      // Clear recovery state & cleanly sign out recovery session
+      clearPasswordRecoveryState();
       await supabase.auth.signOut().catch(() => {});
 
       setRecoveryState('success');

@@ -43,10 +43,10 @@ const USER_TEST_ACCOUNT = {
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, fetchUserProfile } = useAuth();
+  const { login, fetchUserProfile, isPasswordRecoverySession } = useAuth();
   const [vw, setVw] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
 
-  // Authentication Mode: 'login' | 'signup' | 'forgot' | 'update_password'
+  // Authentication Mode: 'login' | 'signup' | 'forgot'
   const [authMode, setAuthMode] = useState('login');
 
   // Login State
@@ -77,20 +77,18 @@ const Login = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  // Password Recovery / Update State
-  const [newPass, setNewPass] = useState('');
-  const [confirmNewPass, setConfirmNewPass] = useState('');
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmNewPass, setShowConfirmNewPass] = useState(false);
-  const [updatePassLoading, setUpdatePassLoading] = useState(false);
-
   // Global Feedback & Loading State
   const [msg, setMsg] = useState('');
   const [msgOpen, setMsgOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Listen for Supabase Password Recovery Redirects & Route to /reset-password
+  // Handle Password Recovery Session (following Y-TRACE SignIn architecture)
   useEffect(() => {
+    if (isPasswordRecoverySession) {
+      navigate('/reset-password', { replace: true });
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
@@ -98,17 +96,7 @@ const Login = () => {
         navigate(`/reset-password${search}${hash}`, { replace: true });
       }
     }
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        navigate('/reset-password', { replace: true });
-      }
-    });
-
-    return () => subscription?.unsubscribe();
-  }, [navigate]);
+  }, [isPasswordRecoverySession, navigate]);
 
   // Cooldown Countdown Timer
   useEffect(() => {
@@ -517,39 +505,6 @@ const Login = () => {
     }
   };
 
-  const handleUpdatePassword = async (e) => {
-    if (e) e.preventDefault();
-    if (!newPass || !confirmNewPass) {
-      setMsg('Please enter and confirm your new password.');
-      return;
-    }
-    if (newPass !== confirmNewPass) {
-      setMsg('Passwords do not match.');
-      return;
-    }
-    if (newPass.length < 6) {
-      setMsg('Password must be at least 6 characters.');
-      return;
-    }
-
-    setUpdatePassLoading(true);
-    setMsg('');
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPass });
-      if (error) throw error;
-      await supabase.auth.signOut();
-      setMsg('Your password has been successfully updated. Please log in with your new password.');
-      setAuthMode('login');
-      setNewPass('');
-      setConfirmNewPass('');
-    } catch (err) {
-      console.error('Password update error:', err);
-      setMsg(err.message || 'Unable to update password. Please try again.');
-    } finally {
-      setUpdatePassLoading(false);
-    }
-  };
-
   // -------------------------------------------------------------
   // VALIDATION & DISABLED STATE DERIVATIONS
   // -------------------------------------------------------------
@@ -582,10 +537,6 @@ const Login = () => {
     !otpCode.trim();
 
   const isForgotDisabled = forgotLoading || !isValidTupEmail(forgotEmail);
-
-  const newPasswordsMatch = newPass && confirmNewPass && newPass === confirmNewPass;
-  const isUpdatePassDisabled =
-    updatePassLoading || !newPass || newPass.length < 6 || !newPasswordsMatch;
 
   // Responsive breakpoints
   const isMobile = vw <= 768;
@@ -1132,152 +1083,7 @@ const Login = () => {
               )}
 
               {/* ========================================================= */}
-              {/* 3. UPDATE PASSWORD VIEW (SUPABASE RECOVERY REDIRECT FLOW) */}
-              {/* ========================================================= */}
-              {IS_USER_SURFACE && authMode === 'update_password' && (
-                <>
-                  <h2
-                    id="login-title"
-                    style={{
-                      textAlign: 'center',
-                      margin: '0 0 12px 0',
-                      fontSize: 24,
-                      fontWeight: 800,
-                      fontFamily: `"Merriweather", serif`,
-                    }}
-                  >
-                    Set New Password
-                  </h2>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.45 }}>
-                    Enter your new password below to complete account recovery.
-                  </p>
-
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label htmlFor="new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>New Password</label>
-                    <div style={{ position: 'relative', width: '100%' }}>
-                      <input
-                        id="new-password"
-                        className="input"
-                        style={{ ...authInputStyle, paddingRight: 40 }}
-                        type={showNewPass ? 'text' : 'password'}
-                        placeholder="At least 6 characters"
-                        value={newPass}
-                        onChange={(e) => setNewPass(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        aria-label={showNewPass ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowNewPass(!showNewPass)}
-                        style={{
-                          position: 'absolute',
-                          right: 10,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#666',
-                          padding: 4,
-                        }}
-                      >
-                        {showNewPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="field" style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label htmlFor="confirm-new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Confirm New Password</label>
-                    <div style={{ position: 'relative', width: '100%' }}>
-                      <input
-                        id="confirm-new-password"
-                        className="input"
-                        style={{ ...authInputStyle, paddingRight: 40 }}
-                        type={showConfirmNewPass ? 'text' : 'password'}
-                        placeholder="Re-type new password"
-                        value={confirmNewPass}
-                        onChange={(e) => setConfirmNewPass(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        aria-label={showConfirmNewPass ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowConfirmNewPass(!showConfirmNewPass)}
-                        style={{
-                          position: 'absolute',
-                          right: 10,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#666',
-                          padding: 4,
-                        }}
-                      >
-                        {showConfirmNewPass ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-                      </button>
-                    </div>
-                    {newPass && confirmNewPass && !newPasswordsMatch && (
-                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
-                        Passwords do not match.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-                    <button
-                      type="submit"
-                      className="btn"
-                      disabled={isUpdatePassDisabled}
-                      style={{
-                        width: '100%',
-                        background: isUpdatePassDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
-                        color: isUpdatePassDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                        fontWeight: 700,
-                        padding: '10px 14px',
-                        borderRadius: 10,
-                        border: 'none',
-                        cursor: isUpdatePassDisabled ? 'not-allowed' : 'pointer',
-                        fontSize: 14,
-                        boxShadow: isUpdatePassDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {updatePassLoading ? 'Updating Password…' : 'Update Password'}
-                    </button>
-                  </div>
-
-                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode('login');
-                        setMsg('');
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#fff',
-                        fontWeight: 700,
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: 13,
-                      }}
-                    >
-                      Cancel and return to Log In
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* ========================================================= */}
-              {/* 4. LOGIN VIEW (DEFAULT FOR USER & ALWAYS FOR STAFF)       */}
+              {/* 3. LOGIN VIEW (DEFAULT FOR USER & ALWAYS FOR STAFF)       */}
               {/* ========================================================= */}
               {authMode === 'login' && (
                 <>

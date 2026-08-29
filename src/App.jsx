@@ -24,6 +24,7 @@ import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import AuthCallback from './pages/AuthCallback.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import { useStaffDeviceCheck } from './hooks/useStaffDeviceCheck.js';
 import { useSidebar } from './useSidebar.js';
@@ -77,7 +78,7 @@ const ProtectedRoute = ({
 };
 
 function AppShell() {
-  const { isAuthenticated, user, loading, initializing, logout } = useAuth();
+  const { isAuthenticated, user, loading, initializing, logout, isPasswordRecoverySession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const resolveInitialTheme = () => {
@@ -147,7 +148,7 @@ function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || isPasswordRecoverySession) {
       autoLogoutInProgressRef.current = false;
       return;
     }
@@ -170,7 +171,7 @@ function AppShell() {
     enforceClinicHours();
     const intervalId = setInterval(enforceClinicHours, 30000);
     return () => { mounted = false; clearInterval(intervalId); };
-  }, [isAuthenticated, logout, navigate]);
+  }, [isAuthenticated, isPasswordRecoverySession, logout, navigate]);
 
   // Gating order: Evaluate PC/Laptop Access Safeguard BEFORE session initialization and Login
   if (IS_ADMIN_SURFACE && !isStaffDeviceSupported) {
@@ -213,7 +214,7 @@ function AppShell() {
     </ProtectedRoute>
   );
 
-  const canAccessAuthenticatedHome = isAuthenticated && isWithinClinicHours();
+  const canAccessAuthenticatedHome = isAuthenticated && !isPasswordRecoverySession && isWithinClinicHours();
   const roleHome = getRoleHome(user?.role);
   const surfaceHome = IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard';
   const userRole = (user?.role || '').toLowerCase();
@@ -238,8 +239,9 @@ function AppShell() {
       )}
 
       <Routes>
-        <Route path="/" element={canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Navigate to="/login" replace />} />
-        <Route path="/login" element={canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Login />} />
+        <Route path="/" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Navigate to="/login" replace />)} />
+        <Route path="/login" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Login />)} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
         {IS_ADMIN_SURFACE && (
@@ -271,7 +273,7 @@ function AppShell() {
           </>
         )}
 
-        <Route path="*" element={<Navigate to={canAccessAuthenticatedHome ? surfaceHome : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={isPasswordRecoverySession ? '/reset-password' : (canAccessAuthenticatedHome ? surfaceHome : '/login')} replace />} />
       </Routes>
     </div>
   );

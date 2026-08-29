@@ -32,6 +32,14 @@ export const AuthProvider = ({ children }) => {
   // This is NOT based on localStorage — it represents whether the Supabase
   // client internally has a restored auth session/JWT.
   const [initializing, setInitializing] = useState(true);
+  const [isPasswordRecoverySession, setIsPasswordRecoverySession] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      return hash.includes('type=recovery') || search.includes('type=recovery');
+    }
+    return false;
+  });
 
   // Helper to fetch user profile from public.admins (staff) or public.users (patients)
   const fetchUserProfile = useCallback(async (authUser) => {
@@ -209,9 +217,12 @@ export const AuthProvider = ({ children }) => {
       if (!mounted) return;
       setSession(currentSession);
 
-      if (event === 'SIGNED_OUT') {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecoverySession(true);
+      } else if (event === 'SIGNED_OUT') {
         console.log('[Auth] SIGNED_OUT received');
         if (mounted) {
+          setIsPasswordRecoverySession(false);
           setUser(null);
           setSession(null);
           try {
@@ -254,6 +265,10 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchUserProfile]);
 
+  const clearPasswordRecoveryState = useCallback(() => {
+    setIsPasswordRecoverySession(false);
+  }, []);
+
   const login = (profile) => {
     setUser(profile);
     try {
@@ -274,6 +289,7 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.warn('[Auth] Sign out exception:', e);
     } finally {
+      setIsPasswordRecoverySession(false);
       setUser(null);
       setSession(null);
       try {
@@ -306,6 +322,8 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         initializing,
+        isPasswordRecoverySession,
+        clearPasswordRecoveryState,
         login,
         logout,
         updateUser,
