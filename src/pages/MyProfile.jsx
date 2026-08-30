@@ -564,7 +564,7 @@ const MyProfile = () => {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
           backdropFilter: 'blur(2px)',
           display: 'flex',
           alignItems: 'center',
@@ -572,10 +572,10 @@ const MyProfile = () => {
           zIndex: 4000,
           padding: 20
         }}>
-          <div style={{ width: '96%', maxWidth: 960, background: '#ffffff', borderRadius: 16, padding: 24, maxHeight: '88vh', overflow: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ width: '96%', maxWidth: 960, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxHeight: '88vh', overflow: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Activity History Log</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Activity History Log</h3>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Historical audit and clinical records for your staff account</div>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

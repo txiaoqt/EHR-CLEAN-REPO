@@ -2,13 +2,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
+import { useTheme } from '../../ThemeContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
-import { UserIcon, LogoutIcon } from '../icons/Icons.jsx';
+import { UserIcon, LogoutIcon, SunIcon, MoonIcon } from '../icons/Icons.jsx';
 
 const PatientHeader = ({ onToggleNav }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const menuRef = useRef(null);
@@ -86,120 +88,154 @@ const PatientHeader = ({ onToggleNav }) => {
           </div>
         </div>
 
-        {/* Right: Authenticated User Avatar & Dropdown Trigger */}
-        <div ref={menuRef} style={{ position: 'relative' }}>
+        {/* Right: Theme Toggle & Authenticated User Avatar Dropdown Trigger */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Theme Toggle Button */}
           <button
             type="button"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="User profile menu"
-            aria-expanded={menuOpen}
+            className="patient-theme-toggle-btn"
+            onClick={toggleTheme}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             style={{
               background: 'transparent',
-              border: 'none',
-              padding: 2,
-              cursor: 'pointer',
-              display: 'flex',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md, 8px)',
+              color: 'var(--text)',
+              width: 36,
+              height: 36,
+              minWidth: 36,
+              minHeight: 36,
+              display: 'inline-flex',
               alignItems: 'center',
-              borderRadius: '50%',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              padding: 0,
+              transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
             }}
           >
-            <img
-              src={avatarSrc}
-              alt={displayName}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2px solid #ffffff',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-              }}
-            />
+            {isDark ? (
+              <SunIcon size={18} style={{ color: '#fbbf24' }} />
+            ) : (
+              <MoonIcon size={17} style={{ color: 'var(--text)' }} />
+            )}
           </button>
 
-          {/* Profile Dropdown Menu */}
-          {menuOpen && (
-            <div
-              className="patient-profile-dropdown"
+          {/* User Profile Avatar Dropdown Trigger */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="User profile menu"
+              aria-expanded={menuOpen}
               style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)',
-                right: 0,
-                width: 230,
-                background: 'var(--panel, #ffffff)',
-                border: '1px solid var(--border)',
-                borderRadius: 12,
-                boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
-                zIndex: 2000,
-                padding: '8px 0',
-                animation: 'dropdownFadeIn 0.15s ease-out',
+                background: 'transparent',
+                border: 'none',
+                padding: 2,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '50%',
               }}
             >
-              {/* User Identity Preview */}
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {displayName}
+              <img
+                src={avatarSrc}
+                alt={displayName}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '2px solid var(--border-subtle, #ffffff)',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                }}
+              />
+            </button>
+
+            {/* Profile Dropdown Menu */}
+            {menuOpen && (
+              <div
+                className="patient-profile-dropdown"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: 230,
+                  background: 'var(--panel, #ffffff)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
+                  zIndex: 2000,
+                  padding: '8px 0',
+                  animation: 'dropdownFadeIn 0.15s ease-out',
+                }}
+              >
+                {/* User Identity Preview */}
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {displayName}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                    {displayRole}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--primary, #8b0000)', fontWeight: 600, marginTop: 2 }}>
+                    {studentId}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {displayRole}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--primary, #8b0000)', fontWeight: 600, marginTop: 2 }}>
-                  {studentId}
+
+                {/* Menu Actions */}
+                <div style={{ padding: '4px 0' }}>
+                  <button
+                    type="button"
+                    onClick={handleProfileClick}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg, #f1f5f9)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <UserIcon size={16} />
+                    <span>Profile</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); setShowLogoutConfirm(true); }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--danger, #dc2626)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <LogoutIcon size={16} />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Menu Actions */}
-              <div style={{ padding: '4px 0' }}>
-                <button
-                  type="button"
-                  onClick={handleProfileClick}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 16px',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg, #f1f5f9)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <UserIcon size={16} />
-                  <span>Profile</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); setShowLogoutConfirm(true); }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 16px',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'var(--danger, #dc2626)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <LogoutIcon size={16} />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 

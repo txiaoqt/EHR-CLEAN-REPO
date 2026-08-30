@@ -18,6 +18,7 @@ import {
 import { Bar, Pie } from 'react-chartjs-2';
 import 'jspdf-autotable';
 import { formatDate, logAudit } from '../utils.js';
+import { useTheme } from '../ThemeContext.jsx';
 import { CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
@@ -35,6 +36,7 @@ const DEFAULT_LOOKBACK_DAYS = 30;
 
 const Reports = () => {
   const { user } = useAuth(); // get user (kept for role gating if needed)
+  const { isDark } = useTheme();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [type, setType] = useState('census');
@@ -67,7 +69,7 @@ const Reports = () => {
     if (!mountedRef.current) return;
     runReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, type]);
+  }, [from, to, type, isDark]);
 
   const validateDates = (f, t) => {
     if (!f || !t) return false;
@@ -124,8 +126,13 @@ const Reports = () => {
           options: {
             responsive: true,
             plugins: {
-              title: { display: true, text: `Monthly Cases (${useFrom} → ${useTo})` },
+              title: { display: true, text: `Monthly Cases (${useFrom} → ${useTo})`, color: isDark ? '#f1f5f9' : '#1e293b', font: { size: 14, weight: 'bold' } },
+              legend: { labels: { color: isDark ? '#cbd5e1' : '#475569' } }
             },
+            scales: {
+              x: { ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } },
+              y: { ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
+            }
           },
         });
       } else if (type === 'diagnoses') {
@@ -149,7 +156,10 @@ const Reports = () => {
           },
           options: {
             responsive: true,
-            plugins: { title: { display: true, text: `Top Diagnoses (${useFrom} → ${useTo})` } }
+            plugins: {
+              title: { display: true, text: `Top Diagnoses (${useFrom} → ${useTo})`, color: isDark ? '#f1f5f9' : '#1e293b', font: { size: 14, weight: 'bold' } },
+              legend: { labels: { color: isDark ? '#cbd5e1' : '#475569' } }
+            }
           }
         });
       } else if (type === 'visits') {
@@ -171,7 +181,14 @@ const Reports = () => {
           },
           options: {
             responsive: true,
-            plugins: { title: { display: true, text: `Daily Visits (${useFrom} → ${useTo})` } }
+            plugins: {
+              title: { display: true, text: `Daily Visits (${useFrom} → ${useTo})`, color: isDark ? '#f1f5f9' : '#1e293b', font: { size: 14, weight: 'bold' } },
+              legend: { labels: { color: isDark ? '#cbd5e1' : '#475569' } }
+            },
+            scales: {
+              x: { ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } },
+              y: { ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
+            }
           }
         });
       } else {
@@ -320,7 +337,6 @@ const Reports = () => {
   };
 
   // placeChart draws title, chart image, and table below it.
-  // It does NOT add the clinic header/logo — only a small footer page number is added.
   const placeChart = async (doc, title, config, smallTableRows = null) => {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
@@ -631,8 +647,8 @@ const Reports = () => {
                 </button>
                 {showExportMenu && (
                   <div style={{
-                    position: 'absolute', right: 0, top: '100%', marginTop: 6, background: '#ffffff',
-                    border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+                    position: 'absolute', right: 0, top: '100%', marginTop: 6, background: 'var(--panel)',
+                    color: 'var(--text)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
                     borderRadius: 12, zIndex: 2000, overflow: 'hidden', minWidth: 220, padding: '6px 0'
                   }}>
                     <button onClick={() => requestReportExport('csv-full')} style={menuBtnStyle} disabled={!reportData || reportData.length === 0 || exporting}>Export CSV (Full)</button>
@@ -645,7 +661,7 @@ const Reports = () => {
           </div>
 
           {dateError && (
-            <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: 'var(--danger)', fontSize: 13, marginTop: 12 }}>
+            <div style={{ padding: '10px 14px', background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border, var(--border))', borderRadius: 8, color: 'var(--danger)', fontSize: 13, marginTop: 12 }}>
               {dateError}
             </div>
           )}
@@ -777,10 +793,10 @@ const Reports = () => {
       </div>
 
       {showExportPasswordModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2100 }}>
-          <div style={{ background:'#ffffff', padding:24, borderRadius:16, maxWidth:420, width:'92%', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ position:'fixed', inset:0, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2100 }}>
+          <div style={{ background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', padding:24, borderRadius:16, maxWidth:420, width:'92%', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Reports Export Authorization</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Reports Export Authorization</h3>
               <button type="button" className="modal-close-btn" onClick={() => setShowExportPasswordModal(false)} aria-label="Close modal">
                 <CloseIcon size={18} />
               </button>
@@ -822,6 +838,7 @@ const menuBtnStyle = {
   textAlign: 'left',
   border: 'none',
   background: 'transparent',
+  color: 'var(--text)',
   cursor: 'pointer',
   fontSize: 13
 };

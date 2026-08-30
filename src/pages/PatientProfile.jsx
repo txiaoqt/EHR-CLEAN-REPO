@@ -552,11 +552,11 @@ const PatientProfile = () => {
           {/* preview modal */}
           {previewSrc && (
             <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
+              position: 'fixed', inset: 0, background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
             }}>
-              <div style={{ width: '90%', maxWidth: 960, background: '#ffffff', borderRadius: 16, padding: 20, boxShadow: 'var(--shadow-lg)' }}>
+              <div style={{ width: '90%', maxWidth: 960, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, boxShadow: 'var(--shadow-lg)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <strong style={{ fontSize: 17 }}>Preview</strong>
+                  <strong style={{ fontSize: 17, color: 'var(--text)' }}>Preview</strong>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <button className="btn secondary small" onClick={() => download(previewSrc)}>Download</button>
                     <button type="button" className="modal-close-btn" onClick={() => { setPreviewSrc(null); setPreviewType(null); }} aria-label="Close preview">
@@ -564,7 +564,7 @@ const PatientProfile = () => {
                     </button>
                   </div>
                 </div>
-                <div style={{ height: '70vh', overflow: 'auto', background: 'var(--grey-100)', borderRadius: 10, padding: 8 }}>
+                <div style={{ height: '70vh', overflow: 'auto', background: 'var(--surface-raised)', borderRadius: 10, padding: 8 }}>
                   {previewType === 'image' ? (
                     <img src={previewSrc} alt="preview" style={{ maxWidth: '100%', maxHeight: '100%', display: 'block', margin: '0 auto', borderRadius: 6 }} />
                   ) : (
@@ -577,8 +577,8 @@ const PatientProfile = () => {
 
           {/* delete modal */}
           {showDeleteModal && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 440, maxWidth: '92%', background: '#ffffff', padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 440, maxWidth: '92%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Patient Record</h3>
                   <button type="button" className="modal-close-btn" onClick={() => { setShowDeleteModal(false); setDeletePassword(''); setDeleteMessage(''); }} aria-label="Close modal">

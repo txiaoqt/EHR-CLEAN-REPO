@@ -415,7 +415,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
             {/* Calendar & Available Time Slots Grid */}
             <div className="booking-two-col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 20 }}>
               {/* Calendar Card */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 16, background: '#ffffff' }}>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 16, background: 'var(--panel)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                   <button
                     className="btn secondary small"
@@ -513,14 +513,14 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               </div>
 
               {/* Time Slots Container */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '12px 16px', background: 'var(--bg, #f8fafc)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--panel)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
                   Selected Date: {formatLongDate(form.appointment_date)}
                 </div>
 
                 {/* Desktop/Tablet Table View (>= 768px) */}
                 <div className="patient-slots-table-view" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', background: 'var(--table-header-bg, #f8fafc)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                     <div style={{ padding: '10px 14px' }}>Time Slot</div>
                     <div style={{ padding: '10px 14px' }}>Capacity</div>
                     <div style={{ padding: '10px 14px' }}>Availability</div>
@@ -539,7 +539,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                             gridTemplateColumns: '1.4fr 1fr 1fr',
                             borderBottom: '1px solid var(--border)',
                             alignItems: 'center',
-                            background: selected ? 'rgba(140,21,21,0.04)' : '#ffffff',
+                            background: selected ? 'var(--primary-light, rgba(140,21,21,0.08))' : 'var(--panel)',
                           }}
                         >
                           <div style={{ padding: '8px 12px' }}>

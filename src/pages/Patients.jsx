@@ -312,12 +312,12 @@ const Patients = () => {
         {showRegisterModal && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)', padding: 16
+            background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', padding: 16
           }}>
-            <div style={{ width: 880, maxWidth: '98%', background: '#ffffff', borderRadius: 16, boxShadow: 'var(--shadow-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 880, maxWidth: '98%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: 'var(--shadow-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Register New Patient</h3>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Register New Patient</h3>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Search existing student directory or create manual patient entry</div>
                 </div>
                 <button
@@ -372,7 +372,7 @@ const Patients = () => {
                         />
                       </div>
 
-                      <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
+                      <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--panel)' }}>
                         {studentSuggestions.length > 0 ? (
                           studentSuggestions.map(s => (
                             <div key={s.id} onClick={() => { setSelectedStudent(s); setStudentSearch(`${s.name} (${s.id})`); setStudentSuggestions([]); }} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.12s' }}>
@@ -439,7 +439,7 @@ const Patients = () => {
                 </div>
 
                 {/* Right column: preview */}
-                <div style={{ padding: 24, borderLeft: '1px solid var(--border-subtle)', background: 'var(--grey-100)' }}>
+                <div style={{ padding: 24, borderLeft: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Patient Preview</div>
 
                   {!previewStudent ? (
@@ -448,7 +448,7 @@ const Patients = () => {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div className="card" style={{ padding: 16, background: '#ffffff' }}>
+                      <div className="card" style={{ padding: 16, background: 'var(--panel)' }}>
                         <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{previewStudent.name}</div>
                         <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
                         <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 12, color: 'var(--text-light)' }}>
@@ -461,7 +461,7 @@ const Patients = () => {
               </div>
 
               {/* Form Modal Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid var(--border-subtle)', background: '#fafafa' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                 <button
                   className="btn secondary"
                   onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}

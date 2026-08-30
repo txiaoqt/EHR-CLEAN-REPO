@@ -187,7 +187,7 @@ const Help = () => {
                   </button>
 
                   {expandedFaq === index && (
-                    <div style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.55, borderTop: '1px solid var(--border-subtle)', background: '#ffffff' }}>
+                    <div style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.55, borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                       {faq.answer}
                     </div>
                   )}
@@ -223,7 +223,7 @@ const Help = () => {
                       padding: '10px 14px',
                       textAlign: 'left',
                       border: 'none',
-                      background: expandedGuide === index ? 'var(--grey-100)' : 'transparent',
+                      background: expandedGuide === index ? 'var(--surface-raised)' : 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -240,7 +240,7 @@ const Help = () => {
                   </button>
 
                   {expandedGuide === index && (
-                    <div style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.55, borderTop: '1px solid var(--border-subtle)', background: '#ffffff' }}>
+                    <div style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.55, borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                       {guide.content}
                     </div>
                   )}

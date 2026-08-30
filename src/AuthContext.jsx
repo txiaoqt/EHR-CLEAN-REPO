@@ -2,6 +2,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 
+const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
+const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
+const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
+
+export const isRoleCompatibleWithSurface = (role) => {
+  const normalized = (role || '').toLowerCase();
+  if (!normalized) return false;
+  return IS_ADMIN_SURFACE ? normalized !== 'patient' : normalized === 'patient';
+};
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -15,7 +25,14 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem('ehr_user');
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !isRoleCompatibleWithSurface(parsed.role)) {
+        localStorage.removeItem('ehr_user');
+        localStorage.removeItem('authUser');
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -259,11 +276,23 @@ export const AuthProvider = ({ children }) => {
         if (initSession?.user) {
           const profile = await fetchUserProfile(initSession.user);
           if (mounted && profile) {
-            setUser(profile);
-            try {
-              localStorage.setItem('ehr_user', JSON.stringify(profile));
-              localStorage.setItem('authUser', JSON.stringify(profile));
-            } catch (_) {}
+            if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
+              setUser(profile);
+              try {
+                localStorage.setItem('ehr_user', JSON.stringify(profile));
+                localStorage.setItem('authUser', JSON.stringify(profile));
+              } catch (_) {}
+            } else {
+              // Incompatible role on this portal surface — sign out and clear
+              setUser(null);
+              try {
+                localStorage.removeItem('ehr_user');
+                localStorage.removeItem('authUser');
+              } catch (_) {}
+              if (!isRoleCompatibleWithSurface(profile.role)) {
+                supabase.auth.signOut().catch(() => {});
+              }
+            }
           }
         } else {
           // No active Supabase session — clear cached user so we don't show
@@ -323,11 +352,20 @@ export const AuthProvider = ({ children }) => {
           }
           fetchUserProfile(currentSession.user).then((profile) => {
             if (mounted && profile) {
-              setUser(profile);
-              try {
-                localStorage.setItem('ehr_user', JSON.stringify(profile));
-                localStorage.setItem('authUser', JSON.stringify(profile));
-              } catch (_) {}
+              if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
+                setUser(profile);
+                try {
+                  localStorage.setItem('ehr_user', JSON.stringify(profile));
+                  localStorage.setItem('authUser', JSON.stringify(profile));
+                } catch (_) {}
+              } else {
+                // Incompatible role on this surface — do NOT set user
+                setUser(null);
+                try {
+                  localStorage.removeItem('ehr_user');
+                  localStorage.removeItem('authUser');
+                } catch (_) {}
+              }
             }
           });
           return prevUser;
@@ -348,6 +386,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (profile) => {
+    if (!profile || !isRoleCompatibleWithSurface(profile.role)) {
+      console.warn('[Auth] Rejected login: profile role incompatible with surface', { role: profile?.role, DEPLOY_SURFACE });
+      return;
+    }
     setUser(profile);
     try {
       localStorage.setItem('ehr_user', JSON.stringify(profile));

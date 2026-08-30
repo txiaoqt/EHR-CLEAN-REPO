@@ -41,6 +41,7 @@ const Events = () => {
   const [recipients, setRecipients] = useState([]);
   const [selectedRecipientIds, setSelectedRecipientIds] = useState(new Set());
   const [recipientYearFilter, setRecipientYearFilter] = useState('all');
+  const [recipientBloodTypeFilter, setRecipientBloodTypeFilter] = useState('all');
   const [recipientSearch, setRecipientSearch] = useState('');
   const [showFullRecipientModal, setShowFullRecipientModal] = useState(false);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
@@ -186,16 +187,32 @@ const Events = () => {
 
   const filteredRecipients = useMemo(() => {
     return recipients.filter((r) => {
-      const matchesYear = recipientYearFilter === 'all' || String(r.year) === String(recipientYearFilter);
+      // 1. Year filter
+      const matchesYear =
+        recipientYearFilter === 'all' || String(r.year) === String(recipientYearFilter);
+
+      // 2. Blood Type filter
+      let matchesBloodType = true;
+      if (recipientBloodTypeFilter !== 'all') {
+        if (recipientBloodTypeFilter === 'unspecified') {
+          matchesBloodType = !r.blood_type;
+        } else {
+          matchesBloodType =
+            (r.blood_type || '').toUpperCase() === recipientBloodTypeFilter.toUpperCase();
+        }
+      }
+
+      // 3. Search filter
       const q = recipientSearch.trim().toLowerCase();
       const matchesSearch =
         !q ||
         r.name.toLowerCase().includes(q) ||
         r.student_id.toLowerCase().includes(q) ||
         r.email.toLowerCase().includes(q);
-      return matchesYear && matchesSearch;
+
+      return matchesYear && matchesBloodType && matchesSearch;
     });
-  }, [recipients, recipientYearFilter, recipientSearch]);
+  }, [recipients, recipientYearFilter, recipientBloodTypeFilter, recipientSearch]);
 
   const visibleSelectedCount = useMemo(() => {
     return filteredRecipients.filter((r) => selectedRecipientIds.has(r.id)).length;
@@ -229,36 +246,64 @@ const Events = () => {
     setEmailResult(null);
     setSendingEmail(false);
     setRecipientYearFilter('all');
+    setRecipientBloodTypeFilter('all');
     setRecipientSearch('');
     setShowFullRecipientModal(false);
     setShowEmailModal(true);
     setLoadingRecipients(true);
 
     try {
+      // 1. Query registered active patient users
       const { data: usersData, error: usersErr } = await supabase
         .from('users')
-        .select('id, name, student_id, email')
+        .select('id, name, student_id, email, patient_id, auth_user_id')
         .eq('role', 'patient')
         .eq('active', true)
         .not('email', 'is', null);
 
       if (usersErr) throw usersErr;
 
+      // 2. Query authoritative patient_profiles for blood_type and year
+      const { data: profilesData } = await supabase
+        .from('patient_profiles')
+        .select('user_id, student_id, email, blood_type, year');
+
+      // 3. Query students table for year fallback
       const { data: studentsData } = await supabase
         .from('students')
         .select('id, year');
 
       const yearMap = new Map((studentsData || []).map((s) => [s.id, s.year]));
 
+      const profileByUserMap = new Map();
+      const profileByStudentMap = new Map();
+      const profileByEmailMap = new Map();
+
+      (profilesData || []).forEach((p) => {
+        if (p.user_id) profileByUserMap.set(p.user_id, p);
+        if (p.student_id) profileByStudentMap.set(p.student_id.trim().toUpperCase(), p);
+        if (p.email) profileByEmailMap.set(p.email.trim().toLowerCase(), p);
+      });
+
       const eligible = (usersData || [])
         .filter((u) => u.email && u.email.trim().toLowerCase().endsWith('@tup.edu.ph'))
-        .map((u) => ({
-          id: u.id,
-          name: u.name || 'Student',
-          student_id: u.student_id || 'N/A',
-          email: u.email.trim().toLowerCase(),
-          year: yearMap.get(u.student_id) || 1,
-        }));
+        .map((u) => {
+          const emailKey = u.email.trim().toLowerCase();
+          const studentKey = (u.student_id || '').trim().toUpperCase();
+          const profile =
+            (u.auth_user_id && profileByUserMap.get(u.auth_user_id)) ||
+            (studentKey && profileByStudentMap.get(studentKey)) ||
+            profileByEmailMap.get(emailKey);
+
+          return {
+            id: u.id,
+            name: u.name || 'Student',
+            student_id: u.student_id || 'N/A',
+            email: emailKey,
+            year: profile?.year || yearMap.get(u.student_id) || 1,
+            blood_type: profile?.blood_type?.trim() || null,
+          };
+        });
 
       setRecipients(eligible);
       setSelectedRecipientIds(new Set(eligible.map((r) => r.id)));
@@ -495,20 +540,22 @@ const Events = () => {
                             <button
                               type="button"
                               className="btn small secondary"
-                              style={{ color: '#991b1b', borderColor: '#fee2e2' }}
                               title="Email Registered Students"
                               onClick={() => openEmailBlastModal(ev)}
                             >
                               Email Blast
                             </button>
                           )}
-                          <button type="button" className="btn small" onClick={() => openEditModal(ev)}>
+                          <button
+                            type="button"
+                            className="btn small secondary"
+                            onClick={() => openEditModal(ev)}
+                          >
                             Edit
                           </button>
                           <button
                             type="button"
-                            className="btn small secondary"
-                            style={{ color: 'var(--danger)' }}
+                            className="btn small danger"
                             onClick={() => setDeleteEvent(ev)}
                           >
                             Delete
@@ -529,7 +576,8 @@ const Events = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -540,13 +588,15 @@ const Events = () => {
           >
             <div
               style={{
-                background: 'var(--panel, #ffffff)',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 12,
                 width: 'min(92vw, 600px)',
                 maxHeight: '90vh',
                 overflowY: 'auto',
                 padding: 24,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                boxShadow: 'var(--shadow-lg)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -694,7 +744,8 @@ const Events = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -705,17 +756,19 @@ const Events = () => {
           >
             <div
               style={{
-                background: 'var(--panel, #ffffff)',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 14,
                 width: 'min(740px, calc(100vw - 32px))',
                 maxHeight: '90vh',
                 overflowY: 'auto',
                 padding: '28px 28px 24px',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+                boxShadow: 'var(--shadow-lg)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 21, fontWeight: 700, color: '#991b1b' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 21, fontWeight: 700, color: 'var(--text)' }}>
                 Email Registered Students
               </h3>
               <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 18, lineHeight: 1.5 }}>
@@ -749,7 +802,7 @@ const Events = () => {
                   )}
                 </div>
 
-                {/* Filter Controls: Searchbar FIRST, Year Filter SECOND following Admin filter design system */}
+                {/* Filter Controls: Searchbar FIRST, Year Filter SECOND, Blood Type Filter THIRD */}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                   <input
                     type="text"
@@ -757,8 +810,8 @@ const Events = () => {
                     value={recipientSearch}
                     onChange={(e) => setRecipientSearch(e.target.value)}
                     style={{
-                      flex: '1 1 280px',
-                      minWidth: '200px',
+                      flex: '1 1 220px',
+                      minWidth: '180px',
                       height: '40px',
                       padding: '8px 14px',
                       borderRadius: 8,
@@ -770,7 +823,7 @@ const Events = () => {
                     }}
                   />
 
-                  <div style={{ position: 'relative', width: '160px', flex: '0 0 160px', minWidth: '140px', height: '40px' }}>
+                  <div style={{ position: 'relative', width: '130px', flex: '0 0 130px', minWidth: '120px', height: '40px' }}>
                     <select
                       value={recipientYearFilter}
                       onChange={(e) => setRecipientYearFilter(e.target.value)}
@@ -780,7 +833,7 @@ const Events = () => {
                         padding: '8px 36px 8px 12px',
                         borderRadius: 8,
                         border: '1px solid var(--border)',
-                        background: 'var(--panel, #ffffff)',
+                        background: 'var(--panel)',
                         fontSize: 13,
                         fontWeight: 500,
                         color: 'var(--text)',
@@ -799,6 +852,57 @@ const Events = () => {
                       <option value="4">Year 4</option>
                       <option value="5">Year 5</option>
                       <option value="6">Year 6</option>
+                    </select>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--muted, #64748b)',
+                        lineHeight: 0,
+                      }}
+                    >
+                      <ChevronDownIcon size={14} />
+                    </span>
+                  </div>
+
+                  <div style={{ position: 'relative', width: '150px', flex: '0 0 150px', minWidth: '130px', height: '40px' }}>
+                    <select
+                      value={recipientBloodTypeFilter}
+                      onChange={(e) => setRecipientBloodTypeFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px 36px 8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'var(--panel)',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--text)',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                      }}
+                    >
+                      <option value="all">All Blood Types</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="unspecified">Not Specified</option>
                     </select>
                     <span
                       style={{
@@ -855,7 +959,7 @@ const Events = () => {
                   </div>
                 ) : filteredRecipients.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--muted)' }}>
-                    No students match the selected filter.
+                    No registered students match the selected filters.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
@@ -888,14 +992,25 @@ const Events = () => {
                               <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                 {r.name}
                               </span>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6, flexShrink: 0 }}>
-                                Year {r.year}
-                              </span>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                                {r.blood_type && (
+                                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                    {r.blood_type}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                                  Year {r.year}
+                                </span>
+                              </div>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                               <span>{r.student_id}</span>
                               <span>&bull;</span>
                               <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.email}</span>
+                              <span>&bull;</span>
+                              <span style={{ color: r.blood_type ? '#991b1b' : 'var(--muted)', fontWeight: r.blood_type ? 600 : 400 }}>
+                                Blood Type: {r.blood_type || 'Not specified'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1010,7 +1125,8 @@ const Events = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.6)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1021,13 +1137,15 @@ const Events = () => {
           >
             <div
               style={{
-                background: 'var(--panel, #ffffff)',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 14,
                 width: 'min(760px, calc(100vw - 32px))',
                 maxHeight: '85vh',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+                boxShadow: 'var(--shadow-lg)',
                 overflow: 'hidden',
               }}
               onClick={(e) => e.stopPropagation()}
@@ -1050,7 +1168,7 @@ const Events = () => {
                   Filter and select students eligible to receive this clinic announcement.
                 </div>
 
-                {/* Filter and Search Bar: Searchbar FIRST, Year Filter SECOND */}
+                {/* Filter and Search Bar: Searchbar FIRST, Year Filter SECOND, Blood Type Filter THIRD */}
                 <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
                   <input
                     type="text"
@@ -1058,8 +1176,8 @@ const Events = () => {
                     value={recipientSearch}
                     onChange={(e) => setRecipientSearch(e.target.value)}
                     style={{
-                      flex: '1 1 280px',
-                      minWidth: '200px',
+                      flex: '1 1 220px',
+                      minWidth: '180px',
                       height: '40px',
                       padding: '8px 14px',
                       borderRadius: 8,
@@ -1071,7 +1189,7 @@ const Events = () => {
                     }}
                   />
 
-                  <div style={{ position: 'relative', width: '160px', flex: '0 0 160px', minWidth: '140px', height: '40px' }}>
+                  <div style={{ position: 'relative', width: '130px', flex: '0 0 130px', minWidth: '120px', height: '40px' }}>
                     <select
                       value={recipientYearFilter}
                       onChange={(e) => setRecipientYearFilter(e.target.value)}
@@ -1081,7 +1199,7 @@ const Events = () => {
                         padding: '8px 36px 8px 12px',
                         borderRadius: 8,
                         border: '1px solid var(--border)',
-                        background: 'var(--panel, #ffffff)',
+                        background: 'var(--panel)',
                         fontSize: 13,
                         fontWeight: 500,
                         color: 'var(--text)',
@@ -1100,6 +1218,57 @@ const Events = () => {
                       <option value="4">Year 4</option>
                       <option value="5">Year 5</option>
                       <option value="6">Year 6</option>
+                    </select>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--muted, #64748b)',
+                        lineHeight: 0,
+                      }}
+                    >
+                      <ChevronDownIcon size={14} />
+                    </span>
+                  </div>
+
+                  <div style={{ position: 'relative', width: '150px', flex: '0 0 150px', minWidth: '130px', height: '40px' }}>
+                    <select
+                      value={recipientBloodTypeFilter}
+                      onChange={(e) => setRecipientBloodTypeFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px 36px 8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'var(--panel)',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--text)',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                      }}
+                    >
+                      <option value="all">All Blood Types</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="unspecified">Not Specified</option>
                     </select>
                     <span
                       style={{
@@ -1154,7 +1323,7 @@ const Events = () => {
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {filteredRecipients.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 14 }}>
-                    No students found matching the selected filter criteria.
+                    No registered students match the selected filters.
                   </div>
                 ) : (
                   filteredRecipients.map((r) => {
@@ -1186,14 +1355,25 @@ const Events = () => {
                             <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
                               {r.name}
                             </span>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6, flexShrink: 0 }}>
-                              Year {r.year}
-                            </span>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                              {r.blood_type && (
+                                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                  {r.blood_type}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                                Year {r.year}
+                              </span>
+                            </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             <span><strong>ID:</strong> {r.student_id}</span>
                             <span>&bull;</span>
                             <span>{r.email}</span>
+                            <span>&bull;</span>
+                            <span style={{ color: r.blood_type ? '#991b1b' : 'var(--muted)', fontWeight: r.blood_type ? 600 : 400 }}>
+                              Blood Type: {r.blood_type || 'Not specified'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1225,7 +1405,8 @@ const Events = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1236,11 +1417,13 @@ const Events = () => {
           >
             <div
               style={{
-                background: 'var(--panel, #ffffff)',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 12,
                 width: 'min(92vw, 460px)',
                 padding: 24,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                boxShadow: 'var(--shadow-lg)',
               }}
               onClick={(e) => e.stopPropagation()}
             >

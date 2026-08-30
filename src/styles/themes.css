@@ -1,30 +1,250 @@
-/* THEMES: explicit LIGHT and DARK */
+/* src/styles/themes.css */
+/* GLOBAL DELIBERATE LIGHT & DARK DESIGN TOKEN SYSTEM */
 
-/* LIGHT THEME */
+/* ========================================================= */
+/* 1. LIGHT THEME TOKENS (Default & Explicit Light)          */
+/* ========================================================= */
 :root[data-theme="light"],
 :root {
-  --bg: #f8f9fb;
+  /* Surfaces & Canvas */
+  --bg: #f8fafc;
   --panel: #ffffff;
-  --text: #1a1a1a;
-  --muted: #6b7280;
+  --surface: #ffffff;
+  --surface-raised: #f1f5f9;
+  --surface-input: #ffffff;
+  --input-bg: #ffffff;
+  --card-bg: #ffffff;
+  --modal-bg: #ffffff;
+  --popover-bg: #ffffff;
+  --sidebar-bg: #ffffff;
 
-  --accent: #8C1515;    /* cardinal red */
-  --danger: #ef4444;    /* red */
+  /* Typography & Hierarchy */
+  --text: #1e293b;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --text-disabled: #94a3b8;
+  --muted: #64748b;
 
-  --input-border: rgba(0,0,0,0.08);
-  --card-shadow: rgba(0,0,0,0.05);
+  /* Borders & Dividers */
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-hover: #94a3b8;
+  --input-border: #cbd5e1;
+
+  /* Primary Brand Accent (TUP Red) */
+  --color-primary: #c92a2a;
+  --color-primary-hover: #a61e1e;
+  --color-primary-active: #8c1515;
+  --color-primary-tint: #fff1f2;
+  --color-primary-tint-hover: #ffe4e6;
+  --color-primary-border: rgba(201, 42, 42, 0.18);
+  --primary: #c92a2a;
+  --primary-hover: #a61e1e;
+  --accent: #c92a2a;
+  --danger: #dc2626;
+
+  /* Semantic Category & Status Colors */
+  --color-purple: #7c3aed;
+  --color-purple-bg: rgba(124, 58, 237, 0.08);
+  --color-purple-text: #6d28d9;
+
+  --color-blue: #2563eb;
+  --color-blue-bg: rgba(37, 99, 235, 0.08);
+  --color-blue-text: #1d4ed8;
+
+  --color-emerald: #059669;
+  --color-emerald-bg: rgba(5, 150, 105, 0.08);
+  --color-emerald-text: #047857;
+  --success: #059669;
+
+  --color-amber: #d97706;
+  --color-amber-bg: rgba(217, 119, 6, 0.08);
+  --color-amber-text: #b45309;
+  --warning: #d97706;
+
+  --color-rose: #e11d48;
+  --color-rose-bg: rgba(225, 29, 72, 0.08);
+  --color-rose-text: #be123c;
+
+  /* Greys Spectrum */
+  --grey-50: #ffffff;
+  --grey-100: #f8fafc;
+  --grey-150: #f1f5f9;
+  --grey-200: #e2e8f0;
+  --grey-300: #cbd5e1;
+  --grey-400: #94a3b8;
+  --grey-500: #64748b;
+  --grey-600: #475569;
+  --grey-700: #334155;
+  --grey-800: #1e293b;
+  --grey-900: #0f172a;
+
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -4px rgba(0, 0, 0, 0.02);
+  --shadow-card: 0 2px 10px rgba(15, 23, 42, 0.04);
+  --card-shadow: rgba(0, 0, 0, 0.05);
+
+  /* Modal Backdrop */
+  --overlay-bg: rgba(0, 0, 0, 0.5);
 }
 
-/* DARK THEME */
-:root[data-theme="dark"]{
-  --bg: #071022;
-  --panel: #0b1220;
-  --text: #e6eef6;
+/* ========================================================= */
+/* 2. DARK THEME TOKENS (Deliberate Modern Healthcare Slate) */
+/* ========================================================= */
+:root[data-theme="dark"] {
+  /* Surfaces & Canvas: Layered Deep Slate (No Harsh Pure Black) */
+  --bg: #0f172a;               /* Page background: slate-900 */
+  --panel: #1e293b;            /* Primary card / panel surface: slate-800 */
+  --surface: #1e293b;          /* Primary surface */
+  --surface-raised: #172033;   /* Secondary / raised / nested surface */
+  --surface-input: #0f172a;    /* Input surface */
+  --input-bg: #0f172a;         /* Control background */
+  --card-bg: #1e293b;          /* Card background */
+  --modal-bg: #1e293b;         /* Modal background */
+  --popover-bg: #1e293b;       /* Popover dropdown background */
+  --sidebar-bg: #1e293b;       /* Sidebar background */
+
+  /* Typography & Hierarchy: Soft Light Text (No Glaring Pure White Everywhere) */
+  --text: #f1f5f9;             /* Primary text: slate-100 */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;   /* Secondary text: slate-300 */
+  --text-muted: #94a3b8;       /* Muted text: slate-400 */
+  --text-light: #64748b;       /* Disabled text: slate-500 */
+  --text-disabled: #64748b;
   --muted: #94a3b8;
 
-  --accent: #8C1515;
+  /* Borders: Subtle Structural Boundaries (Slate-700 / Slate-800) */
+  --border: #334155;           /* Card & Table borders: slate-700 */
+  --border-subtle: #273449;    /* Dividers & nested borders */
+  --border-hover: #475569;
+  --input-border: #334155;     /* Input border */
+
+  /* Brand / Primary Accent (Restrained Dark TUP Red) */
+  --color-primary: #b4232a;
+  --color-primary-hover: #991b1b;
+  --color-primary-active: #881318;
+  --color-primary-tint: rgba(180, 35, 42, 0.16);
+  --color-primary-tint-hover: rgba(180, 35, 42, 0.26);
+  --color-primary-border: rgba(180, 35, 42, 0.38);
+  --primary: #b4232a;
+  --primary-hover: #991b1b;
+  --accent: #b4232a;
   --danger: #ef4444;
 
-  --input-border: rgba(255,255,255,0.08);
-  --card-shadow: rgba(0,0,0,0.25);
+  /* Semantic Status Colors: Calibrated for Dark Surfaces (Not Neon) */
+  --color-purple: #a78bfa;
+  --color-purple-bg: rgba(167, 139, 250, 0.14);
+  --color-purple-text: #c4b5fd;
+
+  --color-blue: #60a5fa;
+  --color-blue-bg: rgba(96, 165, 250, 0.14);
+  --color-blue-text: #93c5fd;
+
+  --color-emerald: #34d399;
+  --color-emerald-bg: rgba(52, 211, 153, 0.14);
+  --color-emerald-text: #6ee7b7;
+  --success: #34d399;
+
+  --color-amber: #fbbf24;
+  --color-amber-bg: rgba(251, 191, 36, 0.14);
+  --color-amber-text: #fde68a;
+  --warning: #fbbf24;
+
+  --color-rose: #f87171;
+  --color-rose-bg: rgba(248, 113, 113, 0.14);
+  --color-rose-text: #fca5a5;
+
+  /* Greys Inverted Spectrum for Dark Hierarchy */
+  --grey-50: #1e293b;
+  --grey-100: #172033;
+  --grey-150: #0f172a;
+  --grey-200: #273449;
+  --grey-300: #334155;
+  --grey-400: #64748b;
+  --grey-500: #94a3b8;
+  --grey-600: #cbd5e1;
+  --grey-700: #e2e8f0;
+  --grey-800: #f1f5f9;
+  --grey-900: #ffffff;
+
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --card-shadow: rgba(0, 0, 0, 0.4);
+
+  /* Modal Backdrop */
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+}
+
+/* ========================================================= */
+/* 3. SMOOTH CONTROLLED VISUAL TRANSITIONS                   */
+/* ========================================================= */
+html {
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+body,
+#app-root,
+#sidebar-container,
+.sidebar,
+.patient-app-header,
+.patient-profile-dropdown,
+.topbar,
+main,
+.card,
+.panel,
+.kpi-card,
+.input,
+input,
+select,
+textarea,
+.btn,
+.search-pill,
+.appointments-search-wrapper,
+.patients-search-wrapper,
+.encounters-search-wrapper,
+.inventory-search-wrapper,
+.table-container,
+th,
+td {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* Accessibility: Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  #app-root,
+  #sidebar-container,
+  .sidebar,
+  .patient-app-header,
+  .patient-profile-dropdown,
+  .topbar,
+  main,
+  .card,
+  .panel,
+  .kpi-card,
+  .input,
+  input,
+  select,
+  textarea,
+  .btn,
+  .search-pill,
+  .appointments-search-wrapper,
+  .patients-search-wrapper,
+  .encounters-search-wrapper,
+  .inventory-search-wrapper,
+  .table-container,
+  th,
+  td {
+    transition: none !important;
+  }
 }

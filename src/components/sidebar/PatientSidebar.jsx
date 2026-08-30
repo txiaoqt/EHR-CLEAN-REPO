@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// src/components/sidebar/PatientSidebar.jsx
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
@@ -13,6 +14,8 @@ import {
   UserIcon,
   LogoutIcon,
   CloseIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '../icons/Icons.jsx';
 
 const PATIENT_NAV = [
@@ -23,7 +26,7 @@ const PATIENT_NAV = [
   { path: '/patient/records', label: 'Records', icon: EncountersIcon },
 ];
 
-const PatientSidebar = ({ onClose }) => {
+const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
@@ -50,7 +53,7 @@ const PatientSidebar = ({ onClose }) => {
 
   return (
     <>
-      <aside className="sidebar patient-sidebar" aria-label="Patient navigation">
+      <aside className={`sidebar patient-sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Patient navigation">
         {/* Brand Header */}
         <div className="sidebar-header">
           <div
@@ -66,7 +69,7 @@ const PatientSidebar = ({ onClose }) => {
             </div>
           </div>
 
-          {onClose && (
+          {onClose ? (
             <button
               type="button"
               className="sidebar-close-btn"
@@ -85,6 +88,17 @@ const PatientSidebar = ({ onClose }) => {
               }}
             >
               <CloseIcon size={18} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              id={collapsed ? "patientSidebarExpandBtn" : "patientSidebarCollapseBtn"}
+              className="sidebar-collapse-btn"
+              onClick={toggle}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <ChevronRightIcon size={16} /> : <ChevronLeftIcon size={16} />}
             </button>
           )}
         </div>
@@ -132,7 +146,7 @@ const PatientSidebar = ({ onClose }) => {
                   key={path}
                   className={`menu-item patient-menu-item ${isActive ? 'active' : ''}`}
                   onClick={() => handleNavigation(path)}
-                  title={label}
+                  title={collapsed ? label : undefined}
                   aria-label={label}
                   role="button"
                   tabIndex={0}
@@ -150,17 +164,33 @@ const PatientSidebar = ({ onClose }) => {
           </div>
         </nav>
 
-        {/* Sidebar Footer with Sign Out Button */}
+        {/* Sidebar Footer with Collapsed Profile Button and Sign Out Button */}
         <div className="sidebar-footer">
+          {/* Collapsed Compact Profile Avatar Button */}
           <button
             type="button"
+            className="sidebar-collapsed-profile-btn"
+            onClick={() => handleNavigation('/patient/profile')}
+            title={`Profile: ${displayName}`}
+            aria-label={`View Profile for ${displayName}`}
+          >
+            <img
+              src={user?.avatar || avatarPlaceholder}
+              alt={displayName}
+              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
+            />
+          </button>
+
+          {/* Sign Out Button (Seamless transition between expanded text button and collapsed icon button) */}
+          <button
+            type="button"
+            id={collapsed ? "patientSidebarSignoutCollapsed" : "patientSidebarSignout"}
             className="sidebar-signout-btn"
             onClick={() => setShowConfirm(true)}
-            aria-label="Sign out from portal"
+            title={collapsed ? "Sign Out" : undefined}
+            aria-label="Sign Out"
           >
-            <span className="sidebar-signout-icon">
-              <LogoutIcon size={18} />
-            </span>
+            <LogoutIcon size={18} className="sidebar-signout-icon" />
             <span className="sidebar-signout-text">Sign Out</span>
           </button>
         </div>
@@ -173,7 +203,8 @@ const PatientSidebar = ({ onClose }) => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -184,11 +215,13 @@ const PatientSidebar = ({ onClose }) => {
           >
             <div
               style={{
-                background: 'var(--panel, #ffffff)',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 12,
                 width: 'min(92vw, 380px)',
                 padding: 24,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                boxShadow: 'var(--shadow-lg)',
                 textAlign: 'center',
               }}
               onClick={(e) => e.stopPropagation()}

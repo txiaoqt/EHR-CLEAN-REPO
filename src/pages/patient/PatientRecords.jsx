@@ -197,7 +197,7 @@ const PatientRecords = () => {
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>
                         Vitals Summary
                       </div>
-                      <span style={{ background: '#ffffff', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: 6, display: 'inline-block', fontSize: 12, color: 'var(--text)' }}>
+                      <span style={{ background: 'var(--panel)', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: 6, display: 'inline-block', fontSize: 12, color: 'var(--text)' }}>
                         {formatVitals(r.vitals)}
                       </span>
                     </div>

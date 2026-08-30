@@ -9,17 +9,20 @@ import {
   formatTime
 } from '../utils.js';                                        // utilities
 import { useAuth } from '../AuthContext.jsx';                // auth context
+import { useTheme, normalizeTheme } from '../ThemeContext.jsx';
 import { isPhysician } from '../accessControl.js';          // access control
 import { CloseIcon } from '../components/icons/Icons.jsx';
-
-const normalizeTheme = (value) => (typeof value === 'string' && value.trim().toLowerCase() === 'dark' ? 'dark' : 'light');
 
 const Settings = () => {
   const location = useLocation();
   const { user: authUser } = useAuth();
+  const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
 
-  const [settings, setSettings] = useState(() => loadSettings());
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState(() => ({
+    ...loadSettings(),
+    theme: globalTheme,
+  }));
+  const [loading, setLoading] = useState(false);
 
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
@@ -34,22 +37,8 @@ const Settings = () => {
   const backupCardRef = useRef(null);
 
   useEffect(() => {
-    // Initialize loading and ensure theme value exists in settings
-    setLoading(false);
-    const theme = normalizeTheme(settings.theme);
-    if (!settings.theme) {
-      const saved = loadSettings().theme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      setSettings(prev => ({ ...prev, theme: normalizeTheme(saved) }));
-      // apply initial theme
-      window.applyTheme && window.applyTheme(saved);
-    } else {
-      if (theme !== settings.theme) {
-        setSettings(prev => ({ ...prev, theme }));
-      }
-      window.applyTheme && window.applyTheme(theme);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setSettings((prev) => (prev.theme !== globalTheme ? { ...prev, theme: globalTheme } : prev));
+  }, [globalTheme]);
 
   useEffect(() => {
     if (location?.state?.focus === 'backup' && backupCardRef.current) {
@@ -246,16 +235,16 @@ const Settings = () => {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
           backdropFilter: 'blur(2px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 3000
         }}>
-          <form onSubmit={handleBackupSubmit} style={{ background: '#ffffff', width: 440, padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
+          <form onSubmit={handleBackupSubmit} style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', width: 440, padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Authorize Database Backup</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Authorize Database Backup</h3>
               <button
                 type="button"
                 className="modal-close-btn"
@@ -482,13 +471,12 @@ const Settings = () => {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button
                   type="button"
-                  className={settings.theme === 'light' ? 'btn' : 'btn secondary'}
+                  className={globalTheme === 'light' ? 'btn' : 'btn secondary'}
                   style={{ flex: 1 }}
                   onClick={() => {
-                    const next = { ...settings, theme: 'light' };
+                    setGlobalTheme('light');
                     handleSettingChange('theme', 'light');
-                    saveSettingsUtil(next);
-                    window.applyTheme && window.applyTheme('light');
+                    saveSettingsUtil({ ...settings, theme: 'light' });
                   }}
                 >
                   Light Mode
@@ -496,13 +484,12 @@ const Settings = () => {
 
                 <button
                   type="button"
-                  className={settings.theme === 'dark' ? 'btn' : 'btn secondary'}
+                  className={globalTheme === 'dark' ? 'btn' : 'btn secondary'}
                   style={{ flex: 1 }}
                   onClick={() => {
-                    const next = { ...settings, theme: 'dark' };
+                    setGlobalTheme('dark');
                     handleSettingChange('theme', 'dark');
-                    saveSettingsUtil(next);
-                    window.applyTheme && window.applyTheme('dark');
+                    saveSettingsUtil({ ...settings, theme: 'dark' });
                   }}
                 >
                   Dark Mode

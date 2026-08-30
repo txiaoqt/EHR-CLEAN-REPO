@@ -8,9 +8,26 @@
   <meta name="apple-mobile-web-app-title" content="TUP Clinic EHR" />
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
-  <script type="module" crossorigin src="/assets/index-CSCRnqLQ.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-6grxBzPS.css">
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('tup-clinic-theme') || localStorage.getItem('ehr_theme');
+        if (!saved) {
+          var settingsRaw = localStorage.getItem('clinic-settings');
+          if (settingsRaw) {
+            var parsed = JSON.parse(settingsRaw);
+            if (parsed && typeof parsed.theme === 'string') saved = parsed.theme;
+          }
+        }
+        var theme = (saved === 'dark' || saved === 'light')
+          ? saved
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+  </script>
+  <script type="module" crossorigin src="/assets/index-CazB-0v-.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-C95UMoi0.css">
 <link rel="manifest" href="/manifest.webmanifest"></head>
 <body>
   <div id="root"></div>

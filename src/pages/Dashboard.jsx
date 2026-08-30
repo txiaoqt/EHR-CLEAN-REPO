@@ -28,6 +28,7 @@ import {
 } from 'chart.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
+import { useTheme } from '../ThemeContext.jsx';
 
 ChartJS.register(
   CategoryScale,
@@ -58,6 +59,7 @@ const DONUT_COLORS = [
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDark } = useTheme();
 
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [checkedInToday, setCheckedInToday] = useState(0);
@@ -323,7 +325,7 @@ const Dashboard = () => {
     plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
-      y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 11 }, color: '#94a3b8' } }
+      y: { grid: { color: isDark ? '#334155' : 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 11 }, color: '#94a3b8' } }
     },
     elements: { line: { borderWidth: 2 } }
   };
@@ -348,8 +350,8 @@ const Dashboard = () => {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11.5 }, color: '#94a3b8', stepSize: 2 }, beginAtZero: true },
-      y: { grid: { display: false }, ticks: { font: { size: 11.5 }, color: '#475569' } }
+      x: { grid: { color: isDark ? '#334155' : 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11.5 }, color: '#94a3b8', stepSize: 2 }, beginAtZero: true },
+      y: { grid: { display: false }, ticks: { font: { size: 11.5 }, color: isDark ? '#cbd5e1' : '#475569' } }
     }
   };
 
@@ -359,7 +361,7 @@ const Dashboard = () => {
     plugins: { legend: { display: false } },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 11.5 }, color: '#94a3b8' } },
-      y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11.5 }, color: '#94a3b8', stepSize: 0.2 }, beginAtZero: true }
+      y: { grid: { color: isDark ? '#334155' : 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11.5 }, color: '#94a3b8', stepSize: 0.2 }, beginAtZero: true }
     }
   };
 
@@ -501,7 +503,7 @@ const Dashboard = () => {
                 <input type="search" placeholder="Search patient, appointment, or ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ fontSize: 13.5, width: '100%' }} />
               </div>
               {searchSuggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid var(--border)', maxHeight: '220px', overflowY: 'auto', zIndex: 50, borderRadius: 12, marginTop: 6, boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', maxHeight: '220px', overflowY: 'auto', zIndex: 50, borderRadius: 12, marginTop: 6, boxShadow: 'var(--shadow-lg)' }}>
                   {searchSuggestions.map(s => (
                     <div key={s.id} onClick={() => navigate(`/patient-profile?id=${s.id}`)} style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 13.5 }}>
                       <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
@@ -727,10 +729,10 @@ const Dashboard = () => {
 
         {/* New Appointment Modal */}
         {showNewApptModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1300, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 560, maxWidth:'94%', background:'#ffffff', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ position:'fixed', inset:0, zIndex:1300, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width: 560, maxWidth:'94%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>New Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>New Appointment</h3>
                 <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -740,7 +742,7 @@ const Dashboard = () => {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Search Patient (ID or Name)</label>
                 <input className="input" placeholder="Type name or student ID..." value={patientSearch} onChange={(e)=>setPatientSearch(e.target.value)} style={{ width: '100%' }} />
                 {patientSuggestions.length > 0 && (
-                  <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 150, overflowY: 'auto', marginTop: 4 }}>
+                  <div style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 150, overflowY: 'auto', marginTop: 4 }}>
                     {patientSuggestions.map(p => (
                       <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 12.5, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
                         <strong>{p.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.id})</span>
@@ -773,10 +775,10 @@ const Dashboard = () => {
 
         {/* Export Password Modal */}
         {showExportPasswordModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 420, maxWidth:'92%', background:'#ffffff', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width: 420, maxWidth:'92%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Census Export Authorization</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Census Export Authorization</h3>
                 <button type="button" className="modal-close-btn" onClick={() => { setShowExportPasswordModal(false); setExportPasswordInput(''); setExportPasswordError(''); }} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -803,15 +805,15 @@ const Dashboard = () => {
 
         {/* Export Success Modal */}
         {showExportSuccessModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 380, maxWidth:'92%', background:'#ffffff', borderRadius: 16, padding: 24, textAlign: 'center', boxShadow: 'var(--shadow-lg)', position: 'relative' }}>
+          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width: 380, maxWidth:'92%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, textAlign: 'center', boxShadow: 'var(--shadow-lg)', position: 'relative' }}>
               <div style={{ position: 'absolute', top: 16, right: 16 }}>
                 <button type="button" className="modal-close-btn" onClick={() => setShowExportSuccessModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
               <div style={{ fontSize: 32, marginBottom: 8, color: 'var(--color-emerald-text)' }}>✓</div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 700 }}>Census Exported</h3>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Census Exported</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 18 }}>The census CSV file has been generated and downloaded successfully.</p>
               <button className="btn" style={{ width: '100%' }} onClick={() => setShowExportSuccessModal(false)}>Done</button>
             </div>
@@ -820,10 +822,10 @@ const Dashboard = () => {
 
         {/* Low Stock Alerts Modal */}
         {showAlertsModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 500, maxWidth:'94%', background:'#ffffff', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width: 500, maxWidth:'94%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Low Stock Alert Items</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Low Stock Alert Items</h3>
                 <button type="button" className="modal-close-btn" onClick={closeAlertsModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -833,7 +835,7 @@ const Dashboard = () => {
               ) : (
                 <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {lowStockItems.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fee2e2' }}>
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border, var(--border))' }}>
                       <div>
                         <strong style={{ fontSize: 13, color: 'var(--text)' }}>{item.item_name}</strong>
                         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2 }}>
@@ -852,13 +854,13 @@ const Dashboard = () => {
         {/* Weather Forecast Modal */}
         {showWeatherModal && (
           <div
-            style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={(e) => { if (e.target === e.currentTarget) setShowWeatherModal(false); }}
           >
-            <div style={{ width: 680, maxWidth: '94%', background: '#ffffff', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }} role="dialog" aria-modal="true" aria-labelledby="weather-modal-title">
+            <div style={{ width: 680, maxWidth: '94%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }} role="dialog" aria-modal="true" aria-labelledby="weather-modal-title">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
-                  <h3 id="weather-modal-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Weather & Meteorological Outlook</h3>
+                  <h3 id="weather-modal-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Weather & Meteorological Outlook</h3>
                   <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Location: {weatherState.place || 'Asia/Manila'}</span>
                 </div>
                 <button type="button" className="modal-close-btn" onClick={() => setShowWeatherModal(false)} aria-label="Close weather modal">
@@ -866,7 +868,7 @@ const Dashboard = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--grey-100)', borderRadius: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ fontSize: 36 }}>{weatherState.current ? weatherCodeToEmoji(weatherState.current.weathercode) : '⛅'}</div>
                   <div>
@@ -881,11 +883,11 @@ const Dashboard = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: 16, rowGap: 4, fontSize: 13, textAlign: 'right' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Precipitation</span>
-                  <span style={{ fontWeight: 600 }}>{weatherState.daily?.precipitation_sum?.[0] ? `${weatherState.daily.precipitation_sum[0]} mm` : '41.7 mm'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.daily?.precipitation_sum?.[0] ? `${weatherState.daily.precipitation_sum[0]} mm` : '41.7 mm'}</span>
                   <span style={{ color: 'var(--text-muted)' }}>Wind Speed</span>
-                  <span style={{ fontWeight: 600 }}>{weatherState.current?.windspeed ? `${weatherState.current.windspeed} m/s` : '25.6 m/s'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.current?.windspeed ? `${weatherState.current.windspeed} m/s` : '25.6 m/s'}</span>
                   <span style={{ color: 'var(--text-muted)' }}>Weather Status</span>
-                  <span style={{ fontWeight: 600 }}>{weatherState.current ? weatherCodeToText(weatherState.current.weathercode) : 'Light rain'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.current ? weatherCodeToText(weatherState.current.weathercode) : 'Light rain'}</span>
                 </div>
               </div>
 
@@ -908,7 +910,7 @@ const Dashboard = () => {
                       const minT = Math.round(weatherState.daily.temperature_2m_min?.[idx] || 0);
                       const code = weatherState.daily.weathercode?.[idx] || 0;
                       return (
-                        <div key={idx} style={{ flex: 1, padding: '8px 4px', background: 'var(--grey-100)', borderRadius: 8 }}>
+                        <div key={idx} style={{ flex: 1, padding: '8px 4px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{dayName}</div>
                           <div style={{ fontSize: 18, margin: '4px 0' }}>{weatherCodeToEmoji(code)}</div>
                           <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{maxT}° / {minT}°</div>

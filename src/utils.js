@@ -43,8 +43,10 @@ export const saveSettings = (settings) => {
     };
     localStorage.setItem('clinic-settings', JSON.stringify(normalizedSettings));
     localStorage.setItem('ehr_theme', normalizedSettings.theme);
+    localStorage.setItem('tup-clinic-theme', normalizedSettings.theme);
     // Trigger settings change event
     window.dispatchEvent(new CustomEvent('settingsChanged', { detail: normalizedSettings }));
+    window.dispatchEvent(new CustomEvent('tupThemeChanged', { detail: { theme: normalizedSettings.theme } }));
     return true;
   } catch {
     return false;

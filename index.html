@@ -8,7 +8,24 @@
   <meta name="apple-mobile-web-app-title" content="TUP Clinic EHR" />
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('tup-clinic-theme') || localStorage.getItem('ehr_theme');
+        if (!saved) {
+          var settingsRaw = localStorage.getItem('clinic-settings');
+          if (settingsRaw) {
+            var parsed = JSON.parse(settingsRaw);
+            if (parsed && typeof parsed.theme === 'string') saved = parsed.theme;
+          }
+        }
+        var theme = (saved === 'dark' || saved === 'light')
+          ? saved
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

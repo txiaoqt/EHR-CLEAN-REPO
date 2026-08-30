@@ -152,7 +152,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #ffffff;
+  background: var(--panel);
   padding: 4px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -390,7 +390,7 @@ main.login-page-main,
   min-width: 200px;
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
@@ -454,7 +454,7 @@ main.login-page-main,
   -moz-appearance: none;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
@@ -469,14 +469,14 @@ main.login-page-main,
 
 .appointments-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .appointments-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .appointments-filter-chevron {
@@ -503,7 +503,7 @@ main.login-page-main,
   justify-content: space-between;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 12px 8px 14px;
@@ -520,7 +520,7 @@ main.login-page-main,
 
 .appointments-datepicker-btn:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .appointments-datepicker-btn:focus {
@@ -531,7 +531,7 @@ main.login-page-main,
 
 .appointments-datepicker-btn.active {
   border-color: var(--color-primary, #c92a2a);
-  background: rgba(201, 42, 42, 0.05);
+  background: var(--color-primary-tint);
   color: var(--color-primary, #c92a2a);
 }
 
@@ -541,11 +541,11 @@ main.login-page-main,
   right: 0;
   z-index: 100;
   width: 290px;
-  background: #ffffff;
+  background: var(--popover-bg, var(--panel));
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-lg);
 }
 
 /* ========================================================= */
@@ -555,7 +555,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--grey-100, #f8fafc);
+  background: var(--surface-raised);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
@@ -571,7 +571,7 @@ main.login-page-main,
   min-width: 200px;
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
@@ -635,7 +635,7 @@ main.login-page-main,
   -moz-appearance: none;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
@@ -650,14 +650,14 @@ main.login-page-main,
 
 .patients-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .patients-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .patients-filter-chevron {
@@ -680,7 +680,7 @@ main.login-page-main,
   height: 40px;
   width: 44px;
   min-width: 44px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
@@ -692,7 +692,7 @@ main.login-page-main,
 
 .patients-direction-btn:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .patients-direction-btn:focus {
@@ -708,7 +708,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--grey-100, #f8fafc);
+  background: var(--surface-raised);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
@@ -724,7 +724,7 @@ main.login-page-main,
   min-width: 200px;
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
@@ -741,6 +741,7 @@ main.login-page-main,
 .encounters-search-wrapper:focus-within {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
+  outline: none;
 }
 
 .encounters-search-wrapper input[type="search"],
@@ -788,7 +789,7 @@ main.login-page-main,
   -moz-appearance: none;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
@@ -803,14 +804,14 @@ main.login-page-main,
 
 .encounters-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .encounters-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .encounters-filter-chevron {
@@ -851,12 +852,12 @@ main.login-page-main,
 
 .inventory-history-icon-btn:hover {
   color: var(--text, #1e293b);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--surface-raised);
 }
 
 .inventory-history-icon-btn:focus-visible {
   color: var(--color-primary, #c92a2a);
-  background: rgba(201, 42, 42, 0.08);
+  background: var(--color-primary-tint);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.2);
 }
 
@@ -864,7 +865,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--grey-100, #f8fafc);
+  background: var(--surface-raised);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
@@ -880,7 +881,7 @@ main.login-page-main,
   min-width: 200px;
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
@@ -944,7 +945,7 @@ main.login-page-main,
   -moz-appearance: none;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
@@ -959,14 +960,14 @@ main.login-page-main,
 
 .inventory-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .inventory-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .inventory-filter-chevron {
@@ -988,7 +989,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--grey-100, #f8fafc);
+  background: var(--surface-raised);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
@@ -1002,7 +1003,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 4px 10px;
@@ -1059,7 +1060,7 @@ main.login-page-main,
   -moz-appearance: none;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
@@ -1075,14 +1076,14 @@ main.login-page-main,
 
 .reports-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .reports-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .reports-filter-chevron {
@@ -1500,7 +1501,7 @@ main.login-page-main,
     margin-left: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    padding: 20px 20px !important;
+    padding: 76px 20px 20px !important;
     overflow-x: hidden;
     box-sizing: border-box !important;
   }
@@ -1760,7 +1761,7 @@ main.login-page-main,
   width: 100%;
   min-height: 40px;
   height: 40px;
-  background: #ffffff;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 36px 8px 14px;
@@ -1775,14 +1776,14 @@ main.login-page-main,
 
 .patient-events-filter-select:hover {
   border-color: var(--border-hover, #94a3b8);
-  background: #f8fafc;
+  background: var(--surface-raised);
 }
 
 .patient-events-filter-select:focus {
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
   outline: none;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .patient-events-filter-chevron {

@@ -296,7 +296,7 @@ Deno.serve(async (req: Request) => {
                     <table border="0" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                       <tr>
                         <td align="center" bgcolor="#8B0000" style="border-radius:6px;background-color:#8B0000;">
-                          <a href="https://tupclinic.edu.ph/patient/events" target="_blank" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;padding:12px 28px;display:inline-block;border-radius:6px;line-height:1.2;">
+                          <a href="https://tup-icare.tech/patient/events" target="_blank" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;padding:12px 28px;display:inline-block;border-radius:6px;line-height:1.2;">
                             View in Patient Portal
                           </a>
                         </td>

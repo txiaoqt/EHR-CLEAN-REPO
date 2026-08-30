@@ -31,15 +31,12 @@ import { useSidebar } from './useSidebar.js';
 import './styles/main.css';
 import { exportCsv } from './utils.js';
 import { useAuth } from './AuthContext.jsx';
+import { useTheme, normalizeTheme } from './ThemeContext.jsx';
 import { getClinicHoursMessage, hasRequiredRole, isWithinClinicHours } from './accessControl.js';
 
 const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
 const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
-const normalizeTheme = (value) => {
-  const mode = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  return mode === 'dark' ? 'dark' : 'light';
-};
 
 const getRoleHome = (role) => ((role || '').toLowerCase() === 'patient' ? '/patient/dashboard' : '/dashboard');
 const isPatientRole = (role) => (role || '').toLowerCase() === 'patient';
@@ -74,8 +71,22 @@ const ProtectedRoute = ({
   }
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (!isWithinClinicHours()) return <Navigate to="/login" replace state={{ sessionMessage: getClinicHoursMessage() }} />;
+
+  const userRole = (user?.role || '').toLowerCase();
+  const isRoleAllowedOnSurface = IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient';
+  if (!isRoleAllowedOnSurface) {
+    const errorMessage = IS_ADMIN_SURFACE && userRole === 'patient'
+      ? 'Patient accounts are not allowed on this portal.'
+      : 'Only patient accounts can log in on this portal.';
+    return <Navigate to="/login" replace state={{ sessionMessage: errorMessage }} />;
+  }
+
   if (!hasRequiredRole(user, allowedRoles)) {
-    return <Navigate to={IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard'} replace />;
+    const fallbackHome = IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard';
+    if (location.pathname === fallbackHome) {
+      return <Navigate to="/login" replace state={{ sessionMessage: 'You do not have permission to access this page.' }} />;
+    }
+    return <Navigate to={fallbackHome} replace />;
   }
   if (isStaffProtected && !isStaffDeviceSupported) {
     return <PCAccessRequired viewport={viewport} onLogout={logout} />;
@@ -85,70 +96,23 @@ const ProtectedRoute = ({
 
 function AppShell() {
   const { isAuthenticated, user, loading, initializing, logout, isPasswordRecoverySession } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const resolveInitialTheme = () => {
-    try {
-      const settingsRaw = localStorage.getItem('clinic-settings');
-      if (settingsRaw) {
-        const parsed = JSON.parse(settingsRaw);
-        if (typeof parsed?.theme === 'string') return normalizeTheme(parsed.theme);
-      }
-    } catch (e) {
-      // ignore parse issues and fallback below
-    }
-    const saved = localStorage.getItem('ehr_theme');
-    if (typeof saved === 'string') return normalizeTheme(saved);
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  };
-  const persistTheme = (mode) => {
-    const normalizedMode = normalizeTheme(mode);
-    localStorage.setItem('ehr_theme', normalizedMode);
-    try {
-      const settingsRaw = localStorage.getItem('clinic-settings');
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      localStorage.setItem('clinic-settings', JSON.stringify({ ...parsed, theme: normalizedMode }));
-    } catch (e) {
-      localStorage.setItem('clinic-settings', JSON.stringify({ theme: normalizedMode }));
-    }
-  };
-  const [theme, setTheme] = useState(() => {
-    return resolveInitialTheme();
-  });
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar();
   const autoLogoutInProgressRef = useRef(false);
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 980);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const { isSupported: isStaffDeviceSupported, viewport } = useStaffDeviceCheck();
 
   useEffect(() => { document.title = 'TUP Clinic EHR'; }, []);
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    persistTheme(theme);
-  }, [theme]);
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 980);
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
   useEffect(() => {
-    const onSettingsChanged = (ev) => {
-      setTheme(normalizeTheme(ev?.detail?.theme));
-    };
-    const onStorageChanged = (ev) => {
-      if (ev.key === 'ehr_theme' || ev.key === 'clinic-settings') {
-        setTheme(resolveInitialTheme());
-      }
-    };
-    window.applyTheme = (mode) => {
-      setTheme(normalizeTheme(mode));
-    };
-    window.addEventListener('settingsChanged', onSettingsChanged);
-    window.addEventListener('storage', onStorageChanged);
     window.exportCsv = exportCsv;
     return () => {
-      window.removeEventListener('settingsChanged', onSettingsChanged);
-      window.removeEventListener('storage', onStorageChanged);
-      delete window.applyTheme;
       delete window.exportCsv;
     };
   }, []);
@@ -221,27 +185,42 @@ function AppShell() {
     </ProtectedRoute>
   );
 
-  const canAccessAuthenticatedHome = isAuthenticated && !isPasswordRecoverySession && isWithinClinicHours();
+  const userRole = (user?.role || '').toLowerCase();
+  const isRoleAllowedOnSurface = Boolean(
+    user && (IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient')
+  );
+  const canAccessAuthenticatedHome = isAuthenticated && isRoleAllowedOnSurface && !isPasswordRecoverySession && isWithinClinicHours();
   const roleHome = getRoleHome(user?.role);
   const surfaceHome = IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard';
-  const userRole = (user?.role || '').toLowerCase();
-  const isRoleAllowedOnSurface = !isAuthenticated
-    ? true
-    : (IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient');
 
-  const shouldRenderSidebar = canAccessAuthenticatedHome && isRoleAllowedOnSurface && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
+  const shouldRenderSidebar = canAccessAuthenticatedHome && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
 
   return (
     <div id="app-root" className={sidebarCollapsed ? 'sidebar-collapsed' : ''}>
       {shouldRenderSidebar && (
         <div id="sidebar-container" className={`sidebar-container ${sidebarCollapsed ? 'collapsed' : ''}`}>
-          {IS_USER_SURFACE ? <PatientSidebar onClose={isMobile && !sidebarCollapsed ? toggleSidebar : undefined} /> : <Sidebar collapsed={sidebarCollapsed} toggle={toggleSidebar} />}
+          {IS_USER_SURFACE ? (
+            <PatientSidebar
+              collapsed={!isMobile && sidebarCollapsed}
+              toggle={toggleSidebar}
+              onClose={isMobile && !sidebarCollapsed ? toggleSidebar : undefined}
+            />
+          ) : (
+            <Sidebar collapsed={sidebarCollapsed} toggle={toggleSidebar} />
+          )}
         </div>
       )}
-      {shouldRenderSidebar && isMobile && IS_USER_SURFACE && (
+      {shouldRenderSidebar && IS_USER_SURFACE && (
         <>
           <PatientHeader onToggleNav={toggleSidebar} />
-          {!sidebarCollapsed && <button type="button" aria-label="Close navigation" className="mobile-sidebar-backdrop" onClick={toggleSidebar} />}
+          {isMobile && !sidebarCollapsed && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="mobile-sidebar-backdrop"
+              onClick={toggleSidebar}
+            />
+          )}
         </>
       )}
 

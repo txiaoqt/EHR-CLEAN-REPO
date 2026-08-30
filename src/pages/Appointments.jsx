@@ -522,7 +522,7 @@ const Appointments = () => {
         padding: '10px 8px',
         borderRadius: 8,
         border: isSelected ? '2px solid var(--color-primary, #c92a2a)' : '1px solid var(--border-subtle)',
-        background: isToday ? 'var(--color-primary, #c92a2a)' : (isSelected ? 'rgba(201, 42, 42, 0.08)' : '#ffffff'),
+        background: isToday ? 'var(--color-primary, #c92a2a)' : (isSelected ? 'var(--color-primary-tint, rgba(201, 42, 42, 0.08))' : 'var(--panel)'),
         color: isToday ? '#ffffff' : 'var(--text)',
         display: 'flex',
         flexDirection: 'column',
@@ -727,7 +727,7 @@ const Appointments = () => {
 
           {/* Active Date Filter Chip (if selected) */}
           {selectedDate && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, background: '#ffffff', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 14 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, background: 'var(--panel)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 14 }}>
               <span style={{ color: 'var(--text-muted)' }}>Filtered date:</span>
               <strong style={{ color: 'var(--color-primary, #c92a2a)' }}>{formatSelectedDateLabel(selectedDate)}</strong>
               <button
@@ -830,12 +830,12 @@ const Appointments = () => {
         {/* New Appointment modal */}
         {showModal && (
           <div style={{
-            position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+            position: 'fixed', inset: 0, zIndex: 1200, background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <div style={{ width: 640, maxWidth: '95%', background: '#ffffff', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ width: 640, maxWidth: '95%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>New Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>New Appointment</h3>
                 <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -853,9 +853,9 @@ const Appointments = () => {
                     style={{ width: '100%' }}
                   />
                   {patientSuggestions.length > 0 && (
-                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, marginTop: 6, maxHeight: 160, overflowY: 'auto', background: '#ffffff', boxShadow: 'var(--shadow-md)' }}>
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, marginTop: 6, maxHeight: 160, overflowY: 'auto', background: 'var(--panel)', boxShadow: 'var(--shadow-md)' }}>
                       {patientSuggestions.map(s => (
-                        <div key={s.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 13 }} onClick={() => pickPatientSuggestion(s)}>
+                        <div key={s.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, color: 'var(--text)' }} onClick={() => pickPatientSuggestion(s)}>
                           <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
                         </div>
                       ))}
@@ -883,7 +883,7 @@ const Appointments = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Clinician</label>
-                  <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--grey-100)', fontSize: 13, color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                  <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', fontSize: 13, color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
                     <strong>{newAppt.clinician_name || 'Staff Clinician'}</strong>
                   </div>
                 </div>
@@ -904,7 +904,7 @@ const Appointments = () => {
           <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -912,7 +912,9 @@ const Appointments = () => {
             zIndex: 1250
           }}>
             <div style={{
-              background: '#ffffff',
+              background: 'var(--panel)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
               padding: '24px',
               borderRadius: '16px',
               boxShadow: 'var(--shadow-lg)',

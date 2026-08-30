@@ -514,7 +514,7 @@ const Inventory = () => {
 
         {/* Reorder Alerts */}
         {reorderItems.length > 0 && (
-          <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--danger)', background: '#fff5f5' }}>
+          <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--danger)', background: 'var(--color-rose-bg)' }}>
             <div className="card-header" style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
@@ -526,7 +526,7 @@ const Inventory = () => {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
               {reorderItems.map(item => (
-                <div key={item.id} style={{ background: '#ffffff', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca', fontSize: 13 }}>
+                <div key={item.id} style={{ background: 'var(--panel)', color: 'var(--text)', padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
                   <strong>{item.item_name}</strong>: Current stock <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{item.stock_quantity} {item.unit}</span> (Reorder threshold: {item.reorder_level})
                 </div>
               ))}
@@ -670,7 +670,7 @@ const Inventory = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.45)',
+              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
               backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
@@ -682,7 +682,9 @@ const Inventory = () => {
           >
             <div
               style={{
-                background: '#ffffff',
+                background: 'var(--panel)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
                 borderRadius: 16,
                 boxShadow: 'var(--shadow-lg)',
                 maxWidth: '1100px',
@@ -731,30 +733,25 @@ const Inventory = () => {
                     <tbody>
                       {transactions.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                            No transactions logged yet.
+                          <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                            No transaction records logged.
                           </td>
                         </tr>
                       ) : (
-                        transactions.map(trans => {
-                          const isAdd = (trans.transaction_type || '').toLowerCase().includes('add');
-                          return (
-                            <tr key={trans.id}>
-                              <td style={{ fontWeight: 700, color: 'var(--text)' }}>{trans.item_name}</td>
-                              <td>
-                                <span className={isAdd ? 'badge badge-success' : 'badge badge-purple'}>
-                                  {isAdd ? 'Stock Added' : 'Stock Deducted'}
-                                </span>
-                              </td>
-                              <td style={{ fontWeight: 700 }}>{trans.quantity}</td>
-                              <td style={{ color: 'var(--text-muted)' }}>{trans.reason || 'Routine Adjustment'}</td>
-                              <td>{trans.performed_by || 'Staff'}</td>
-                              <td style={{ color: 'var(--text-light)', fontSize: 12.5 }}>
-                                {new Date(trans.created_at).toLocaleString()}
-                              </td>
-                            </tr>
-                          );
-                        })
+                        transactions.map(t => (
+                          <tr key={t.id}>
+                            <td style={{ fontWeight: 700 }}>{t.item_name || '—'}</td>
+                            <td>
+                              <span className={`badge ${t.transaction_type === 'add' || t.transaction_type === 'restock' ? 'badge-success' : 'badge-danger'}`}>
+                                {t.transaction_type}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{t.quantity}</td>
+                            <td style={{ color: 'var(--text-muted)' }}>{t.reason || '—'}</td>
+                            <td style={{ color: 'var(--text-muted)' }}>{t.performed_by || 'Staff'}</td>
+                            <td style={{ color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))
                       )}
                     </tbody>
                   </table>
@@ -762,7 +759,7 @@ const Inventory = () => {
               </div>
 
               {/* Modal Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--grey-50, #f8fafc)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                 <button
                   type="button"
                   className="btn secondary"
@@ -780,14 +777,16 @@ const Inventory = () => {
           <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1200
           }}>
             <div style={{
-              background: '#ffffff',
+              background: 'var(--panel)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
               padding: '24px',
               borderRadius: '16px',
               boxShadow: 'var(--shadow-lg)',
@@ -795,7 +794,7 @@ const Inventory = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Add Inventory Item</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Add Inventory Item</h3>
                 <button type="button" className="modal-close-btn" onClick={() => setShowAddModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -904,7 +903,7 @@ const Inventory = () => {
           <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -912,7 +911,9 @@ const Inventory = () => {
             zIndex: 1200
           }}>
             <div style={{
-              background: '#ffffff',
+              background: 'var(--panel)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
               padding: '24px',
               borderRadius: '16px',
               boxShadow: 'var(--shadow-lg)',
@@ -920,13 +921,13 @@ const Inventory = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Adjust Stock: {adjustItem.item_name}</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Adjust Stock: {adjustItem.item_name}</h3>
                 <button type="button" className="modal-close-btn" onClick={() => setShowAdjustModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
 
-              <div style={{ padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+              <div style={{ padding: '10px 14px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16, fontSize: 13, color: 'var(--text)' }}>
                 Current stock: <strong>{adjustItem.stock_quantity} {adjustItem.unit}</strong>
               </div>
 
@@ -980,7 +981,7 @@ const Inventory = () => {
                     marginBottom: '14px',
                     borderRadius: '10px',
                     color: adjustModalMessageType === 'error' ? 'var(--danger)' : '#059669',
-                    background: adjustModalMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
+                    background: adjustModalMessageType === 'error' ? 'var(--color-rose-bg)' : 'rgba(5, 150, 105, 0.1)',
                     fontSize: '13px',
                     fontWeight: 600
                   }}>
@@ -1002,7 +1003,7 @@ const Inventory = () => {
           <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1010,7 +1011,9 @@ const Inventory = () => {
             zIndex: 1250
           }}>
             <div style={{
-              background: '#ffffff',
+              background: 'var(--panel)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
               padding: '24px',
               borderRadius: '16px',
               boxShadow: 'var(--shadow-lg)',
