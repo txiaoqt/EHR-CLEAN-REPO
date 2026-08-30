@@ -77,7 +77,7 @@ const PatientProfilePortal = () => {
         id: user.patient_id,
         name: extData?.full_name || pData?.name || uName || '',
         year: extData?.year || pData?.year || '',
-        contact_number: extData?.contact_number || pData?.contact || '',
+        contact_number: extData?.contact_number || '',
         address: extData?.address || '',
         emergency_contact: extData?.emergency_contact || '',
         emergency_contact_number: extData?.emergency_contact_number || '',
@@ -300,26 +300,26 @@ const PatientProfilePortal = () => {
     try {
       const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id || null;
 
-      // 1. Update patients master table (preserving immutable registered name)
+      // 1. Update patients master table (preserving immutable registered name, strictly using existing columns)
       const { error: pErr } = await supabase
         .from('patients')
         .update({
           year: parsedYear,
-          contact: trimmedContact,
           allergies: trimmedAllergies,
           medications: trimmedMedications,
           notes: trimmedNotes,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', user.patient_id);
 
       if (pErr) {
-        console.error('Patients update error:', pErr);
+        console.error('Patients master record update failed:', pErr.message || pErr);
         setMsg('Unable to save your profile changes. Please try again.');
         setSaving(false);
         return;
       }
 
-      // 2. Upsert patient_profiles extended record
+      // 2. Upsert patient_profiles extended record (where contact_number, address, emergency contact reside)
       const { error: ppErr } = await supabase
         .from('patient_profiles')
         .upsert([
@@ -344,7 +344,7 @@ const PatientProfilePortal = () => {
         ], { onConflict: 'patient_id' });
 
       if (ppErr) {
-        console.error('Patient profiles update error:', ppErr);
+        console.error('Patient profiles extended record update failed:', ppErr.message || ppErr);
         setMsg('Unable to save your profile changes. Please try again.');
         setSaving(false);
         return;
@@ -371,7 +371,7 @@ const PatientProfilePortal = () => {
       setMsg('Profile details saved successfully.');
       setEditing(false);
     } catch (err) {
-      console.error('Save profile exception:', err);
+      console.error('Save profile exception:', err.message || err);
       setMsg('Unable to save your profile changes. Please try again.');
     } finally {
       setSaving(false);
