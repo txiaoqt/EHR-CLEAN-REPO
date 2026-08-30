@@ -208,10 +208,10 @@ async function runTests() {
     // TEST 10: Realtime isolation in frontend code
     // -------------------------------------------------------------------------
     const patientMsgFile = fs.readFileSync(path.join(projectRoot, 'src/pages/patient/PatientMessages.jsx'), 'utf8');
-    const helpFile = fs.readFileSync(path.join(projectRoot, 'src/pages/Help.jsx'), 'utf8');
+    const staffMsgFile = fs.readFileSync(path.join(projectRoot, 'src/pages/StaffPatientMessages.jsx'), 'utf8');
 
     const studentRealtimeIsolated = patientMsgFile.includes('msgMatchesActive') || patientMsgFile.includes('newMsg.conversation_id === activeConversationId');
-    const staffRealtimeIsolated = helpFile.includes('msgMatchesActive') || helpFile.includes('newMsg.conversation_id === activeConversationId');
+    const staffRealtimeIsolated = staffMsgFile.includes('msgMatchesActive') || staffMsgFile.includes('newMsg.conversation_id === activeConversationId');
 
     assert(studentRealtimeIsolated && staffRealtimeIsolated, 'TEST 8: Realtime message stream checks active conversation boundary before injecting messages into active chat');
 
@@ -219,7 +219,7 @@ async function runTests() {
     // TEST 11: Two-panel conversation inbox rendering
     // -------------------------------------------------------------------------
     const studentHasConvList = patientMsgFile.includes('filteredConversations.map(') || patientMsgFile.includes('conversations.map(');
-    const staffHasConvList = helpFile.includes('filteredConversations.map(') || helpFile.includes('conversations.map(');
+    const staffHasConvList = staffMsgFile.includes('filteredConversations.map(') || staffMsgFile.includes('conversations.map(');
 
     assert(studentHasConvList && staffHasConvList, 'TEST 9: Both Student and Staff portals implement distinct conversation inbox lists');
 
@@ -227,7 +227,7 @@ async function runTests() {
     // TEST 12: Mobile responsive navigation
     // -------------------------------------------------------------------------
     const hasStudentMobileBack = patientMsgFile.includes('tup-mobile-back') && patientMsgFile.includes('setMobileViewingChat(false)');
-    const hasStaffMobileBack = helpFile.includes('tup-staff-mobile-back') && helpFile.includes('setMobileViewingChat(false)');
+    const hasStaffMobileBack = staffMsgFile.includes('tup-mobile-back') && staffMsgFile.includes('setMobileViewingChat(false)');
 
     assert(hasStudentMobileBack && hasStaffMobileBack, 'TEST 10: Mobile view supports conversation list -> chat -> back navigation');
 

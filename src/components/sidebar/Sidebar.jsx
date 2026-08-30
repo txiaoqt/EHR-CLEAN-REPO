@@ -45,7 +45,7 @@ const NAV_GROUPS = [
     label: 'COMMUNICATION',
     items: [
       { page: 'events', label: 'Events', icon: CalendarIcon },
-      { page: 'help', label: 'Patient Messages', icon: MessagesIcon },
+      { page: 'patient-messages', label: 'Patient Messages', icon: MessagesIcon },
     ]
   },
   {

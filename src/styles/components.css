@@ -1075,6 +1075,7 @@ textarea::placeholder {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  object-fit: cover;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1082,6 +1083,11 @@ textarea::placeholder {
   font-size: 14px;
   flex-shrink: 0;
   user-select: none;
+}
+
+img.tup-messenger-avatar {
+  display: block;
+  object-fit: cover;
 }
 
 .tup-avatar-clinic {
@@ -1431,21 +1437,64 @@ textarea::placeholder {
 }
 
 /* Responsive Rules for Messaging */
-@media (max-width: 1023px) {
+.tup-header-inquiry-btn,
+.tup-chat-header-inquiry-btn {
+  display: inline-flex;
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
   .tup-two-panel-messenger,
   .tup-staff-messenger {
-    grid-template-columns: 260px 1fr;
-    height: 580px;
+    display: grid;
+    grid-template-columns: 35% 65%;
+    height: 600px;
+    max-height: calc(100vh - 180px);
+    min-height: 480px;
+  }
+
+  /* Hide large page header button and redundant chat header button on tablet */
+  .tup-header-inquiry-btn,
+  .tup-chat-header-inquiry-btn {
+    display: none !important;
+  }
+
+  .tup-inbox-panel,
+  .tup-staff-inbox-panel {
+    display: flex !important;
+  }
+
+  .tup-chat-panel,
+  .tup-staff-chat-panel {
+    display: flex !important;
+  }
+
+  .tup-mobile-back,
+  .tup-staff-mobile-back {
+    display: none !important;
+  }
+
+  .tup-chat-bubble {
+    max-width: 80%;
   }
 }
 
+/* Mobile (<= 767px) - Single Pane Messenger Experience */
 @media (max-width: 767px) {
+  /* Hide large page header button and redundant chat header button on mobile */
+  .tup-header-inquiry-btn,
+  .tup-chat-header-inquiry-btn {
+    display: none !important;
+  }
+
   .tup-two-panel-messenger,
   .tup-staff-messenger {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 160px);
-    border-radius: 10px;
+    height: calc(100vh - 150px);
+    min-height: 480px;
+    border-radius: 12px;
+    overflow: hidden;
   }
 
   .tup-inbox-panel.hidden-mobile,
@@ -1458,19 +1507,52 @@ textarea::placeholder {
     display: none !important;
   }
 
+  .tup-inbox-panel,
+  .tup-staff-inbox-panel {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border-right: none;
+  }
+
   .tup-chat-panel,
   .tup-staff-chat-panel {
     flex: 1;
+    width: 100%;
     min-height: 0;
+  }
+
+  .tup-messenger-header {
+    padding: 10px 12px;
+    gap: 8px;
   }
 
   .tup-mobile-back,
   .tup-staff-mobile-back {
-    display: flex;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    font-size: 12.5px;
   }
 
   .tup-chat-bubble {
-    max-width: 90%;
+    max-width: 82%;
+  }
+
+  .tup-chat-composer {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .tup-chat-input {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .tup-chat-send-btn {
+    padding: 8px 12px;
+    font-size: 13px;
   }
 }
 

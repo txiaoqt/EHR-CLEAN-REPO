@@ -12,6 +12,7 @@ import PatientProfile from './pages/PatientProfile.jsx';
 import Reports from './pages/Reports.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Help from './pages/Help.jsx';
+import StaffPatientMessages from './pages/StaffPatientMessages.jsx';
 import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
@@ -240,6 +241,8 @@ function AppShell() {
             <Route path="/reports" element={guard(<Reports />, ['admin', 'physician', 'nurse'])} />
             <Route path="/inventory" element={guard(<Inventory />, ['admin', 'physician', 'nurse'])} />
             <Route path="/events" element={guard(<Events />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/patient-messages" element={guard(<StaffPatientMessages />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/messages" element={guard(<StaffPatientMessages />, ['admin', 'physician', 'nurse'])} />
             <Route path="/help" element={guard(<Help />, ['admin', 'physician', 'nurse'])} />
             <Route path="/settings" element={guard(<Settings />, ['admin', 'physician', 'nurse'])} />
             <Route path="/my-profile" element={guard(<MyProfile />, ['admin', 'physician', 'nurse'])} />

@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon } from '../../components/icons/Icons.jsx';
+import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 
 const CONCERN_TYPES = [
   'General clinic inquiry',
@@ -55,6 +56,10 @@ const getDateDividerLabel = (isoString) => {
 
 const PatientMessages = () => {
   const { user } = useAuth();
+
+  // Tab state: 'active' (Open) vs 'history' (Past Inquiries / Resolved)
+  const [activeTab, setActiveTab] = useState('active');
+
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -95,7 +100,7 @@ const PatientMessages = () => {
       try {
         const { data, error } = await supabase
           .from('staff_directory')
-          .select('id, auth_user_id, name, role')
+          .select('id, auth_user_id, name, role, avatar, department')
           .in('role', ['physician', 'nurse', 'admin'])
           .order('name');
 
@@ -112,6 +117,17 @@ const PatientMessages = () => {
     };
   }, []);
 
+  const getStaffAvatar = (conv) => {
+    if (!conv) return avatarPlaceholder;
+    const staff = staffList.find(
+      (s) =>
+        (conv.recipient_staff_id && s.id === conv.recipient_staff_id) ||
+        (conv.recipient_auth_user_id && s.auth_user_id === conv.recipient_auth_user_id) ||
+        (conv.recipient_name && s.name && conv.recipient_name.toLowerCase().includes(s.name.toLowerCase()))
+    );
+    return staff?.avatar || avatarPlaceholder;
+  };
+
   // 2. Load conversations for this student
   const loadConversations = async () => {
     if (!user?.patient_id) return;
@@ -125,9 +141,6 @@ const PatientMessages = () => {
 
       if (!error && data) {
         setConversations(data);
-        if (!activeConversationId && data.length > 0) {
-          setActiveConversationId(data[0].id);
-        }
       } else if (error?.code === 'PGRST205') {
         // Fallback: Read from patient_messages if table not yet provisioned on cloud
         const { data: rawMsgs } = await supabase
@@ -153,11 +166,7 @@ const PatientMessages = () => {
               });
             }
           });
-          const threadList = Array.from(threadMap.values());
-          setConversations(threadList);
-          if (!activeConversationId && threadList.length > 0) {
-            setActiveConversationId(threadList[0].id);
-          }
+          setConversations(Array.from(threadMap.values()));
         }
       }
     } catch (err) {
@@ -171,10 +180,38 @@ const PatientMessages = () => {
     loadConversations();
   }, [user?.patient_id]);
 
+  // Separate into Open vs Past (Resolved) Inquiries
+  const openConversations = useMemo(() => {
+    return conversations.filter((c) => (c.status || 'open').toLowerCase() === 'open');
+  }, [conversations]);
+
+  const pastConversations = useMemo(() => {
+    return conversations.filter((c) => (c.status || 'open').toLowerCase() !== 'open');
+  }, [conversations]);
+
+  // Current tab list
+  const currentTabConversations = useMemo(() => {
+    return activeTab === 'active' ? openConversations : pastConversations;
+  }, [activeTab, openConversations, pastConversations]);
+
+  // Auto-select first conversation in active tab
+  useEffect(() => {
+    if (currentTabConversations.length > 0) {
+      const exists = currentTabConversations.some((c) => c.id === activeConversationId);
+      if (!exists) {
+        setActiveConversationId(currentTabConversations[0].id);
+      }
+    } else {
+      setActiveConversationId(null);
+    }
+  }, [activeTab, currentTabConversations, activeConversationId]);
+
   // Active conversation record
   const activeConversation = useMemo(() => {
     return conversations.find((c) => c.id === activeConversationId) || null;
   }, [conversations, activeConversationId]);
+
+  const isCurrentConversationResolved = (activeConversation?.status || 'open').toLowerCase() !== 'open';
 
   // 3. Load messages for the currently active conversation only
   useEffect(() => {
@@ -225,7 +262,7 @@ const PatientMessages = () => {
   useEffect(() => {
     if (!user?.patient_id) return;
 
-    // Realtime for Conversations (Inbox updates)
+    // Realtime for Conversations (Inbox updates & status transitions)
     const convChannel = supabase
       .channel(`patient_conversations_${user.patient_id}`)
       .on(
@@ -314,16 +351,16 @@ const PatientMessages = () => {
     };
   }, [user?.patient_id, activeConversationId, activeConversation]);
 
-  // Filter conversations by search query
+  // Filter current tab conversations by search query
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
+    if (!searchQuery.trim()) return currentTabConversations;
     const q = searchQuery.toLowerCase().trim();
-    return conversations.filter(
+    return currentTabConversations.filter(
       (c) =>
         (c.recipient_name || '').toLowerCase().includes(q) ||
         (c.concern_type || '').toLowerCase().includes(q)
     );
-  }, [conversations, searchQuery]);
+  }, [currentTabConversations, searchQuery]);
 
   // Group active conversation messages by date
   const groupedMessages = useMemo(() => {
@@ -351,10 +388,10 @@ const PatientMessages = () => {
     return groups;
   }, [messages]);
 
-  // Send message in existing conversation
+  // Send message in existing open conversation
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
-    if (!composerText.trim() || !activeConversationId || sending) return;
+    if (!composerText.trim() || !activeConversationId || sending || isCurrentConversationResolved) return;
 
     setSending(true);
     const textToSend = composerText.trim();
@@ -495,6 +532,7 @@ const PatientMessages = () => {
       }
 
       await loadConversations();
+      setActiveTab('active'); // Switch to active tab
       if (newConvId) {
         setActiveConversationId(newConvId);
         setMobileViewingChat(true);
@@ -539,7 +577,7 @@ const PatientMessages = () => {
           </div>
           <button
             type="button"
-            className="btn primary"
+            className="btn primary tup-header-inquiry-btn"
             onClick={() => setInquiryModalOpen(true)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '8px 16px', fontSize: 13.5 }}
           >
@@ -561,13 +599,31 @@ const PatientMessages = () => {
             color: 'var(--muted)',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
           }}
         >
-          <span style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: 14 }}>ℹ</span>
           <span>
             <strong style={{ color: 'var(--text)' }}>Clinical Notice:</strong> This messaging interface is intended for non-emergency inquiries, appointment questions, and routine follow-ups. In case of medical emergencies, please proceed directly to the university clinic or nearest emergency room.
           </span>
+        </div>
+
+        {/* Tab Navigation: Active vs Past Inquiries */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+          <button
+            type="button"
+            className={`btn ${activeTab === 'active' ? 'primary' : 'secondary'}`}
+            onClick={() => setActiveTab('active')}
+            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
+          >
+            Active ({openConversations.length})
+          </button>
+          <button
+            type="button"
+            className={`btn ${activeTab === 'history' ? 'primary' : 'secondary'}`}
+            onClick={() => setActiveTab('history')}
+            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
+          >
+            Past Inquiries ({pastConversations.length})
+          </button>
         </div>
 
         {/* Two-Panel Messenger Workspace */}
@@ -575,7 +631,7 @@ const PatientMessages = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 14 }}>
             Loading conversations...
           </div>
-        ) : conversations.length === 0 ? (
+        ) : currentTabConversations.length === 0 ? (
           /* Empty State */
           <div
             style={{
@@ -594,20 +650,24 @@ const PatientMessages = () => {
               <MessagesIcon size={26} />
             </div>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-              No conversations yet
+              {activeTab === 'active' ? 'No active conversations' : 'No past inquiries'}
             </div>
             <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 380, lineHeight: 1.5, marginBottom: 18 }}>
-              Send a new inquiry to clinic personnel to start a direct consultation thread.
+              {activeTab === 'active'
+                ? 'Send a new inquiry to clinic personnel to start a direct consultation thread.'
+                : 'Resolved consultation inquiries will be stored here for your reference.'}
             </div>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => setInquiryModalOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              <PlusIcon size={16} />
-              Start New Inquiry
-            </button>
+            {activeTab === 'active' && (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => setInquiryModalOpen(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <PlusIcon size={16} />
+                Start New Inquiry
+              </button>
+            )}
           </div>
         ) : (
           <div className="tup-two-panel-messenger">
@@ -615,17 +675,19 @@ const PatientMessages = () => {
             <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
               <div className="tup-inbox-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                    Conversations ({conversations.length})
+                  <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                    {activeTab === 'active' ? 'Active Inquiries' : 'Past Inquiries'} ({currentTabConversations.length})
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setInquiryModalOpen(true)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 4, display: 'flex' }}
-                    title="New Inquiry"
-                  >
-                    <PlusIcon size={16} />
-                  </button>
+                  {activeTab === 'active' && (
+                    <button
+                      type="button"
+                      onClick={() => setInquiryModalOpen(true)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 4, display: 'flex' }}
+                      title="New Inquiry"
+                    >
+                      <PlusIcon size={16} />
+                    </button>
+                  )}
                 </div>
                 <div className="tup-inbox-search">
                   <SearchIcon size={14} className="tup-inbox-search-icon" />
@@ -646,6 +708,7 @@ const PatientMessages = () => {
                 ) : (
                   filteredConversations.map((c) => {
                     const isActive = activeConversationId === c.id;
+                    const isResolved = (c.status || 'open').toLowerCase() !== 'open';
                     return (
                       <button
                         key={c.id}
@@ -655,9 +718,16 @@ const PatientMessages = () => {
                           setMobileViewingChat(true);
                         }}
                       >
-                        <div className="tup-messenger-avatar tup-avatar-clinic" style={{ width: 36, height: 36, fontSize: 13 }}>
-                          <MessagesIcon size={16} />
-                        </div>
+                        <img
+                          src={getStaffAvatar(c)}
+                          alt={c.recipient_name || 'Clinic Personnel'}
+                          className="tup-messenger-avatar tup-avatar-clinic"
+                          style={{ width: 36, height: 36 }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = avatarPlaceholder;
+                          }}
+                        />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
                             <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -671,8 +741,8 @@ const PatientMessages = () => {
                             {c.concern_type}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                            <span className={`badge ${c.status === 'open' ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 10, padding: '1px 6px', textTransform: 'capitalize' }}>
-                              {c.status}
+                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 9.5, padding: '1px 6px', textTransform: 'capitalize' }}>
+                              {c.status || 'open'}
                             </span>
                           </div>
                         </div>
@@ -695,12 +765,19 @@ const PatientMessages = () => {
                     aria-label="Back to conversations"
                   >
                     <ChevronLeftIcon size={16} />
-                    <span>Inbox</span>
+                    <span>{activeTab === 'active' ? 'Inbox' : 'Past Inquiries'}</span>
                   </button>
 
-                  <div className="tup-messenger-avatar tup-avatar-clinic">
-                    <MessagesIcon size={18} />
-                  </div>
+                  <img
+                    src={getStaffAvatar(activeConversation)}
+                    alt={activeConversation?.recipient_name || 'Clinic Personnel'}
+                    className="tup-messenger-avatar tup-avatar-clinic"
+                    style={{ width: 40, height: 40 }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = avatarPlaceholder;
+                    }}
+                  />
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                       {activeConversation?.recipient_name || 'Clinic Personnel (General)'}
@@ -716,15 +793,21 @@ const PatientMessages = () => {
                   <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
                     {activeConversation?.concern_type || 'General clinic inquiry'}
                   </span>
-                  <button
-                    type="button"
-                    className="btn small secondary"
-                    onClick={() => setInquiryModalOpen(true)}
-                    style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  >
-                    <PlusIcon size={13} />
-                    New Inquiry
-                  </button>
+                  {isCurrentConversationResolved ? (
+                    <span className="badge badge-neutral" style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }}>
+                      ✓ Resolved
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn small secondary tup-chat-header-inquiry-btn"
+                      onClick={() => setInquiryModalOpen(true)}
+                      style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <PlusIcon size={13} />
+                      New Inquiry
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -782,29 +865,63 @@ const PatientMessages = () => {
                 )}
               </div>
 
-              {/* Bottom Composer */}
-              <form className="tup-chat-composer" onSubmit={handleSendMessage}>
-                <textarea
-                  ref={textareaRef}
-                  className="tup-chat-input"
-                  rows={1}
-                  placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
-                  value={composerText}
-                  onChange={(e) => setComposerText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={sending || !activeConversationId}
-                  aria-label="Message content input"
-                />
-                <button
-                  type="submit"
-                  className="tup-chat-send-btn"
-                  disabled={sending || !composerText.trim() || !activeConversationId}
-                  aria-label="Send message"
+              {/* Read-Only Banner for Resolved, or Active Composer for Open */}
+              {isCurrentConversationResolved ? (
+                <div
+                  style={{
+                    padding: '14px 20px',
+                    background: 'var(--surface-raised)',
+                    borderTop: '1px solid var(--border)',
+                    textAlign: 'center',
+                    fontSize: 13,
+                    color: 'var(--muted)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
                 >
-                  <SendIcon size={16} />
-                  <span>{sending ? 'Sending...' : 'Send'}</span>
-                </button>
-              </form>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontWeight: 600 }}>
+                    <span>✓</span>
+                    <span>This inquiry has been resolved.</span>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    If you have further questions or a new medical concern, please{' '}
+                    <button
+                      type="button"
+                      onClick={() => setInquiryModalOpen(true)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}
+                    >
+                      Start a New Inquiry
+                    </button>
+                    .
+                  </div>
+                </div>
+              ) : (
+                <form className="tup-chat-composer" onSubmit={handleSendMessage}>
+                  <textarea
+                    ref={textareaRef}
+                    className="tup-chat-input"
+                    rows={1}
+                    placeholder="Type your message..."
+                    value={composerText}
+                    onChange={(e) => setComposerText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={sending || !activeConversationId}
+                    aria-label="Message content input"
+                  />
+                  <button
+                    type="submit"
+                    className="tup-chat-send-btn"
+                    disabled={sending || !composerText.trim() || !activeConversationId}
+                    aria-label="Send message"
+                  >
+                    <SendIcon size={16} />
+                    <span>{sending ? 'Sending...' : 'Send'}</span>
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         )}
