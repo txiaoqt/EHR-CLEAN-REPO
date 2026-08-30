@@ -1550,6 +1550,62 @@ create trigger trg_check_one_active_appointment
 before insert or update on public.appointments
 for each row execute function public.check_one_active_appointment_per_student();
 
+create or replace function public.check_appointment_date_mode()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  v_manila_today date;
+  v_manila_now time;
+  v_slot_end_time time;
+  v_time_parts text[];
+begin
+  v_manila_today := (now() at time zone 'Asia/Manila')::date;
+  v_manila_now := (now() at time zone 'Asia/Manila')::time;
+
+  if NEW.appointment_type = 'Same-day Appointment' then
+    if NEW.appointment_date <> v_manila_today then
+      raise exception 'Same-day appointments are only available for today (%).', v_manila_today
+        using errcode = '22000';
+    end if;
+
+    -- Enforce time-of-day expiration for same-day bookings
+    if NEW.appointment_time is not null and NEW.appointment_time <> '' then
+      if position('-' in NEW.appointment_time) > 0 then
+        v_time_parts := string_to_array(NEW.appointment_time, '-');
+        begin
+          v_slot_end_time := trim(v_time_parts[2])::time;
+          if v_manila_now >= v_slot_end_time then
+            raise exception 'This time slot has already ended. Please select another available slot.'
+              using errcode = '22000';
+          end if;
+        exception
+          when sqlstate '22000' then
+            raise;
+          when others then
+            null;
+        end;
+      end if;
+    end if;
+
+  elsif NEW.appointment_type = 'Future Appointment' then
+    if NEW.appointment_date <= v_manila_today then
+      raise exception 'Future appointments must be scheduled for tomorrow or a later date (after %).', v_manila_today
+        using errcode = '22000';
+    end if;
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists trg_check_appointment_date_mode on public.appointments;
+create trigger trg_check_appointment_date_mode
+before insert or update on public.appointments
+for each row
+execute function public.check_appointment_date_mode();
+
 create or replace function public.get_slot_occupancy(
   p_start_date date default current_date,
   p_end_date date default (current_date + 90)

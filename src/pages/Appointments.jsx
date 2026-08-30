@@ -234,9 +234,31 @@ const Appointments = () => {
         alert('Please fill required fields.');
         return;
       }
-      const { data, error } = await supabase.from('appointments').insert([newAppt]).select();
+
+      const todayManila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
+      if (newAppt.appointment_date < todayManila) {
+        alert('Cannot schedule an appointment for a past date.');
+        return;
+      }
+      const apptType = newAppt.appointment_type || (newAppt.appointment_date === todayManila ? 'Same-day Appointment' : 'Future Appointment');
+      const payload = {
+        ...newAppt,
+        appointment_type: apptType,
+      };
+
+      const { data, error } = await supabase.from('appointments').insert([payload]).select();
       if (error) {
         const errMsg = String(error.message || '').toLowerCase();
+        if (errMsg.includes('this time slot has already ended') || errMsg.includes('slot has already ended')) {
+          alert('Failed to save appointment: This time slot has already ended. Please select an upcoming or future time slot.');
+          return;
+        }
+        if (errMsg.includes('same-day appointments are only available') || errMsg.includes('future appointments must be scheduled')) {
+          alert(errMsg.includes('future')
+            ? 'Future appointments must be scheduled for tomorrow or a later date.'
+            : 'Same-day appointments are only available for today.');
+          return;
+        }
         if (error.code === '23505' && (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))) {
           alert('Failed to save appointment: This time slot is no longer available. Please select another available slot.');
           return;

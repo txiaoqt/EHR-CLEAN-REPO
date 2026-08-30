@@ -32,6 +32,61 @@ const formatLongDate = (key) => {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 };
 
+// Asia/Manila timezone-aware date & time helpers
+const getManilaToday = () => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(new Date());
+  } catch (_) {
+    return toDateKey(new Date());
+  }
+};
+
+const getManilaTime = () => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Manila',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(new Date());
+  } catch (_) {
+    const d = new Date();
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+};
+
+const getSlotEndTime = (slotTimeStr) => {
+  if (!slotTimeStr) return '23:59:59';
+  if (slotTimeStr.includes('-')) {
+    const parts = slotTimeStr.split('-');
+    return parts[1].trim();
+  }
+  return slotTimeStr.trim();
+};
+
+const isSlotExpiredForDate = (dateKey, slotTimeStr, manilaToday, manilaTime) => {
+  if (dateKey !== manilaToday) return false;
+  const endTime = getSlotEndTime(slotTimeStr);
+  const normEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+  const normCurrentTime = manilaTime.length === 5 ? `${manilaTime}:00` : manilaTime;
+  return normCurrentTime >= normEndTime;
+};
+
+const getManilaTomorrow = (baseDateStr) => {
+  const base = baseDateStr || getManilaToday();
+  const d = new Date(`${base}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return toDateKey(d);
+};
+
 const createReferenceCode = (dateKey) => {
   const raw = `${dateKey.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
   return `APT-${raw}`;
@@ -39,7 +94,8 @@ const createReferenceCode = (dateKey) => {
 
 const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const { user } = useAuth();
-  const today = toDateKey(new Date());
+  const [today, setToday] = useState(() => getManilaToday());
+  const [currentTime, setCurrentTime] = useState(() => getManilaTime());
   const [appointments, setAppointments] = useState([]);
   const [slotOccupancy, setSlotOccupancy] = useState(new Map());
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
@@ -51,15 +107,18 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viewMonth, setViewMonth] = useState(startOfMonth(new Date()));
-  const [form, setForm] = useState({
-    department: 'Medical Clinic',
-    appointment_type: 'Same-day Appointment',
-    appointment_date: today,
-    appointment_time: '',
-    clinician_name: '',
-    service_type: 'Consultation',
-    patient_id: user?.patient_id || '',
-    patient_name: user?.name || '',
+  const [form, setForm] = useState(() => {
+    const initialToday = getManilaToday();
+    return {
+      department: 'Medical Clinic',
+      appointment_type: 'Same-day Appointment',
+      appointment_date: initialToday,
+      appointment_time: '',
+      clinician_name: '',
+      service_type: 'Consultation',
+      patient_id: user?.patient_id || '',
+      patient_name: user?.name || '',
+    };
   });
 
   const loadActiveAppointment = async (patientId) => {
@@ -156,19 +215,41 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
   // Lifecycle synchronization triggers: initial load, focus, visibility, and Realtime subscription
   useEffect(() => {
-    loadAppointments();
+    const syncTodayAndAvailability = () => {
+      const currentManila = getManilaToday();
+      const currentMTime = getManilaTime();
+      setToday((prev) => (prev !== currentManila ? currentManila : prev));
+      setCurrentTime(currentMTime);
+      loadAppointments();
+    };
+
+    syncTodayAndAvailability();
 
     const handleFocus = () => {
-      loadAppointments();
+      syncTodayAndAvailability();
     };
     const handleVisibility = () => {
       if (!document.hidden) {
-        loadAppointments();
+        syncTodayAndAvailability();
       }
     };
 
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
+
+    // Periodic clock and midnight rollover check (every 10s for live time updates)
+    const timer = setInterval(() => {
+      const currentManila = getManilaToday();
+      const currentMTime = getManilaTime();
+      setToday((prev) => {
+        if (prev !== currentManila) {
+          loadAppointments();
+          return currentManila;
+        }
+        return prev;
+      });
+      setCurrentTime((prev) => (prev !== currentMTime ? currentMTime : prev));
+    }, 10000);
 
     // Supabase Realtime channel subscription for instant multi-student updates
     const channel = supabase
@@ -185,6 +266,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     return () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(timer);
       supabase.removeChannel(channel);
     };
   }, [today]);
@@ -206,7 +288,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
           setStaffList(data);
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const { data } = await supabase
         .from('admins')
@@ -224,26 +306,6 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     }
   }, [user?.patient_id, user?.name, kioskMode]);
 
-  useEffect(() => {
-    setForm((p) => ({
-      ...p,
-      appointment_date: p.appointment_type === 'Same-day Appointment' ? today : (p.appointment_date < today ? today : p.appointment_date),
-      service_type: SERVICES[p.department][0],
-      appointment_time: p.appointment_type === 'Same-day Appointment' && p.appointment_date !== today ? '' : p.appointment_time,
-    }));
-  }, [form.department, form.appointment_type, today]);
-
-  // Deselect currently selected time slot if it becomes occupied by another student
-  useEffect(() => {
-    if (form.appointment_time && form.appointment_date && form.department) {
-      const key = `${form.department}|${form.appointment_date}|${form.appointment_time}`;
-      const occupied = slotOccupancy.get(key) || 0;
-      if (occupied >= SLOT_CAPACITY) {
-        setForm((p) => ({ ...p, appointment_time: '' }));
-      }
-    }
-  }, [slotOccupancy, form.department, form.appointment_date, form.appointment_time]);
-
   const visibleStaff = useMemo(() => {
     if (form.department === 'Dental Clinic') {
       return staffList.filter((s) => /dent/i.test(s.name || ''));
@@ -254,8 +316,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const selectedWeekDay = new Date(`${form.appointment_date}T00:00:00`).getDay();
 
   const isDateSelectable = (dateKey) => {
-    if (form.appointment_type === 'Same-day Appointment') return dateKey === today;
-    return dateKey >= today;
+    if (form.appointment_type === 'Same-day Appointment') {
+      return dateKey === today;
+    }
+    // Future Appointment: must be strictly greater than today (tomorrow onward in Asia/Manila)
+    return dateKey > today;
   };
 
   const calendarCells = useMemo(() => {
@@ -286,19 +351,22 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         continue;
       }
 
-      let dayBooked = 0;
+      let availableCount = 0;
       SLOT_TIMES.forEach((time) => {
         const slotKey = `${form.department}|${key}|${time}`;
-        dayBooked += (slotOccupancy.get(slotKey) || 0);
+        const slotBooked = slotOccupancy.get(slotKey) || 0;
+        const isExpired = isSlotExpiredForDate(key, time, today, currentTime);
+        if (!isExpired && slotBooked < SLOT_CAPACITY) {
+          availableCount += (SLOT_CAPACITY - slotBooked);
+        }
       });
 
       const dayCapacity = DAILY_PATIENT_LIMIT;
-      const available = Math.max(dayCapacity - dayBooked, 0);
-      const pct = dayCapacity ? Math.round((available / dayCapacity) * 100) : 0;
+      const pct = dayCapacity ? Math.round((availableCount / dayCapacity) * 100) : 0;
       map.set(key, pct);
     }
     return map;
-  }, [slotOccupancy, availabilityError, form.department, form.appointment_type, today, viewMonth]);
+  }, [slotOccupancy, availabilityError, form.department, form.appointment_type, today, currentTime, viewMonth]);
 
   const availableSlots = useMemo(() => {
     if (availabilityError) return [];
@@ -312,9 +380,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     return SLOT_TIMES.filter((time) => {
       const slotKey = `${form.department}|${form.appointment_date}|${time}`;
       const slotBooked = slotOccupancy.get(slotKey) || 0;
-      return dailyBooked < DAILY_PATIENT_LIMIT && slotBooked < SLOT_CAPACITY;
+      const isExpired = isSlotExpiredForDate(form.appointment_date, time, today, currentTime);
+      return !isExpired && dailyBooked < DAILY_PATIENT_LIMIT && slotBooked < SLOT_CAPACITY;
     });
-  }, [slotOccupancy, availabilityError, form.appointment_date, form.department]);
+  }, [slotOccupancy, availabilityError, form.appointment_date, form.department, today, currentTime]);
 
   const sameDayHasAvailableSlot = useMemo(() => {
     if (availabilityError) return false;
@@ -322,15 +391,18 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     return SLOT_TIMES.some((time) => {
       const slotKey = `${form.department}|${today}|${time}`;
       const slotBooked = slotOccupancy.get(slotKey) || 0;
-      return slotBooked < SLOT_CAPACITY;
+      const isExpired = isSlotExpiredForDate(today, time, today, currentTime);
+      return !isExpired && slotBooked < SLOT_CAPACITY;
     });
-  }, [slotOccupancy, availabilityError, form.department, today]);
+  }, [slotOccupancy, availabilityError, form.department, today, currentTime]);
 
   const nextAvailableFutureDate = useMemo(() => {
     if (availabilityError) return '';
 
     for (let i = 1; i <= 30; i += 1) {
-      const dateKey = toDateKey(addDays(new Date(), i));
+      const d = new Date(`${today}T00:00:00`);
+      d.setDate(d.getDate() + i);
+      const dateKey = toDateKey(d);
       let dayBooked = 0;
       SLOT_TIMES.forEach((time) => {
         const slotKey = `${form.department}|${dateKey}|${time}`;
@@ -339,21 +411,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       if (dayBooked < DAILY_PATIENT_LIMIT) return dateKey;
     }
     return '';
-  }, [slotOccupancy, availabilityError, form.department]);
-
-  useEffect(() => {
-    if (form.appointment_type === 'Same-day Appointment' && !sameDayHasAvailableSlot && !availabilityLoading) {
-      setForm((p) => ({
-        ...p,
-        appointment_type: 'Future Appointment',
-        appointment_date: nextAvailableFutureDate || p.appointment_date,
-        appointment_time: '',
-      }));
-      setNotice(nextAvailableFutureDate
-        ? `Same-day slots are full. Switched to next available date (${nextAvailableFutureDate}).`
-        : 'Same-day slots are full. Please choose a future appointment date.');
-    }
-  }, [form.appointment_type, sameDayHasAvailableSlot, nextAvailableFutureDate, availabilityLoading]);
+  }, [slotOccupancy, availabilityError, form.department, today]);
 
   const slotRows = useMemo(() => {
     let dailyBooked = 0;
@@ -365,22 +423,96 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
     return SLOT_TIMES.map((time) => {
       const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+      const isExpired = isSlotExpiredForDate(form.appointment_date, time, today, currentTime);
       const windowBookedCount = availabilityError ? SLOT_CAPACITY : (slotOccupancy.get(slotKey) || 0);
-      const availableCount = Math.max(SLOT_CAPACITY - windowBookedCount, 0);
-      const pct = SLOT_CAPACITY ? Math.round((availableCount / SLOT_CAPACITY) * 100) : 0;
+      const availableCount = isExpired ? 0 : Math.max(SLOT_CAPACITY - windowBookedCount, 0);
+      const pct = isExpired ? 0 : (SLOT_CAPACITY ? Math.round((availableCount / SLOT_CAPACITY) * 100) : 0);
       return {
         time,
         availableCount,
         pct,
-        disabled: availabilityError || dailyRemaining <= 0 || availableCount <= 0,
+        isExpired,
+        disabled: availabilityError || isExpired || dailyRemaining <= 0 || availableCount <= 0,
         windowBookedCount,
       };
     });
-  }, [slotOccupancy, availabilityError, form.appointment_date, form.department]);
+  }, [slotOccupancy, availabilityError, form.appointment_date, form.department, today, currentTime]);
+
+  // Mode switching and date normalization (Same-day -> Today only; Future -> Tomorrow or later)
+  useEffect(() => {
+    setForm((p) => {
+      let newDate = p.appointment_date;
+      let newTime = p.appointment_time;
+
+      if (p.appointment_type === 'Same-day Appointment') {
+        newDate = today;
+        if (p.appointment_date !== today) {
+          newTime = '';
+        }
+      } else if (p.appointment_type === 'Future Appointment') {
+        if (p.appointment_date <= today) {
+          newDate = nextAvailableFutureDate || getManilaTomorrow(today);
+          newTime = '';
+        }
+      }
+
+      return {
+        ...p,
+        appointment_date: newDate,
+        appointment_time: newTime,
+        service_type: SERVICES[p.department][0],
+      };
+    });
+  }, [form.department, form.appointment_type, today, nextAvailableFutureDate]);
+
+  // Deselect currently selected time slot if it becomes occupied or expires
+  useEffect(() => {
+    if (form.appointment_time && form.appointment_date && form.department) {
+      const key = `${form.department}|${form.appointment_date}|${form.appointment_time}`;
+      const occupied = slotOccupancy.get(key) || 0;
+      const isExpired = isSlotExpiredForDate(form.appointment_date, form.appointment_time, today, currentTime);
+      if (occupied >= SLOT_CAPACITY || isExpired) {
+        setForm((p) => ({ ...p, appointment_time: '' }));
+      }
+    }
+  }, [slotOccupancy, form.department, form.appointment_date, form.appointment_time, today, currentTime]);
+
+  useEffect(() => {
+    if (form.appointment_type === 'Same-day Appointment' && !sameDayHasAvailableSlot && !availabilityLoading) {
+      setForm((p) => ({
+        ...p,
+        appointment_type: 'Future Appointment',
+        appointment_date: nextAvailableFutureDate || getManilaTomorrow(today),
+        appointment_time: '',
+      }));
+      setNotice(nextAvailableFutureDate
+        ? `Same-day slots are full or have ended. Switched to next available date (${nextAvailableFutureDate}).`
+        : 'Same-day slots are full or have ended. Please choose a future appointment date.');
+    }
+  }, [form.appointment_type, sameDayHasAvailableSlot, nextAvailableFutureDate, availabilityLoading, today]);
 
   const submit = async () => {
     if (!form.patient_id || !form.patient_name || !form.appointment_date || !form.appointment_time || !form.service_type) {
       setNotice('Please complete all required fields (time slot and service).');
+      return;
+    }
+
+    // Validate Same-day vs Future date rules relative to current Asia/Manila date & time
+    const currentManilaToday = getManilaToday();
+    const currentManilaTime = getManilaTime();
+
+    if (form.appointment_type === 'Same-day Appointment') {
+      if (form.appointment_date !== currentManilaToday) {
+        setNotice('Same-day appointments are only available for today.');
+        return;
+      }
+      if (isSlotExpiredForDate(form.appointment_date, form.appointment_time, currentManilaToday, currentManilaTime)) {
+        setNotice('This time slot has already ended. Please select another available slot.');
+        return;
+      }
+    }
+    if (form.appointment_type === 'Future Appointment' && form.appointment_date <= currentManilaToday) {
+      setNotice('Future appointments must be scheduled for tomorrow or a later date.');
       return;
     }
 
@@ -497,8 +629,33 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
       const { error } = await supabase.from('appointments').insert([payload]);
       if (error) {
-        // Level 3: Handle database unique index / trigger violation (code 23505) cleanly
         const errMsg = String(error.message || '').toLowerCase();
+
+        // Catch database date/mode and slot-expiration rule validation
+        if (
+          errMsg.includes('this time slot has already ended') ||
+          errMsg.includes('slot has already ended')
+        ) {
+          setForm((p) => ({ ...p, appointment_time: '' }));
+          await loadAppointments();
+          setNotice('This time slot has already ended. Please select another available slot.');
+          return;
+        }
+
+        if (
+          errMsg.includes('same-day appointments are only available') ||
+          errMsg.includes('future appointments must be scheduled') ||
+          errMsg.includes('check_appointment_date_mode')
+        ) {
+          setNotice(
+            form.appointment_type === 'Future Appointment'
+              ? 'Future appointments must be scheduled for tomorrow or a later date.'
+              : 'Same-day appointments are only available for today.'
+          );
+          return;
+        }
+
+        // Level 3: Handle database unique index / trigger violation (code 23505) cleanly
         if (
           error.code === '23505' &&
           (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))
@@ -714,7 +871,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
             {!sameDayHasAvailableSlot && (
               <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: 13 }}>
-                Same-day slots are currently full for {form.department}. Please select a date for a Future Appointment below.
+                Same-day slots are currently unavailable for {form.department}. Please select a date for a Future Appointment below.
               </div>
             )}
 
@@ -789,13 +946,13 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                           background: selected
                             ? 'rgba(140,21,21,0.08)'
                             : selectable
-                            ? '#ffffff'
-                            : 'var(--bg, #f8fafc)',
+                              ? '#ffffff'
+                              : 'var(--bg, #f8fafc)',
                           color: selected
                             ? 'var(--primary, #8b0000)'
                             : selectable
-                            ? 'var(--text)'
-                            : 'var(--muted)',
+                              ? 'var(--text)'
+                              : 'var(--muted)',
                           opacity: selectable ? 1 : 0.4,
                           cursor: selectable ? 'pointer' : 'not-allowed',
                           display: 'flex',
@@ -865,10 +1022,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                             </button>
                           </div>
                           <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text)' }}>
-                            {row.availableCount} of {SLOT_CAPACITY} slot
+                            {row.isExpired ? '0 of 1 slot (Ended)' : `${row.availableCount} of ${SLOT_CAPACITY} slot`}
                           </div>
                           <div style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: row.pct > 0 ? '#16a34a' : 'var(--danger)' }}>
-                            {row.pct}% Free
+                            {row.isExpired ? '0% Free (Ended)' : `${row.pct}% Free`}
                           </div>
                         </div>
                       );
@@ -898,11 +1055,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <strong style={{ fontSize: 14, color: 'var(--text)' }}>{row.time}</strong>
                           <span style={{ fontSize: 12, fontWeight: 700, color: row.pct > 0 ? '#16a34a' : 'var(--danger)' }}>
-                            {row.pct}% Free
+                            {row.isExpired ? '0% Free (Ended)' : `${row.pct}% Free`}
                           </span>
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {row.availableCount} of {SLOT_CAPACITY} slot available
+                          {row.isExpired ? 'Slot ended' : `${row.availableCount} of ${SLOT_CAPACITY} slot available`}
                         </div>
                         <button
                           type="button"
@@ -916,7 +1073,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                             fontSize: 13,
                           }}
                         >
-                          {selected ? 'Selected Slot' : isAvailable ? 'Select Slot' : 'Slot Full'}
+                          {selected ? 'Selected Slot' : row.isExpired ? 'Slot Ended' : isAvailable ? 'Select Slot' : 'Slot Full'}
                         </button>
                       </div>
                     );
@@ -1007,9 +1164,9 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 type="button"
                 className="btn primary"
                 onClick={submit}
-                disabled={saving || !form.appointment_time || !!activeAppointment}
-                style={{ padding: '10px 24px', fontSize: 15, opacity: (saving || !form.appointment_time || !!activeAppointment) ? 0.6 : 1 }}
-                title={activeAppointment ? 'You already have an active appointment' : undefined}
+                disabled={saving || !form.appointment_time || !isDateSelectable(form.appointment_date) || !!activeAppointment}
+                style={{ padding: '10px 24px', fontSize: 15, opacity: (saving || !form.appointment_time || !isDateSelectable(form.appointment_date) || !!activeAppointment) ? 0.6 : 1 }}
+                title={activeAppointment ? 'You already have an active appointment' : !isDateSelectable(form.appointment_date) ? 'Selected date is not valid for this appointment mode' : undefined}
               >
                 {saving ? 'Submitting...' : activeAppointment ? 'Active Appointment Exists' : 'Confirm & Book Appointment'}
               </button>
