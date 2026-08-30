@@ -235,7 +235,18 @@ const Appointments = () => {
         return;
       }
       const { data, error } = await supabase.from('appointments').insert([newAppt]).select();
-      if (error) throw error;
+      if (error) {
+        const errMsg = String(error.message || '').toLowerCase();
+        if (error.code === '23505' && (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))) {
+          alert('Failed to save appointment: This time slot is no longer available. Please select another available slot.');
+          return;
+        }
+        if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
+          alert('Failed to save appointment: This student already has an active (Scheduled or Checked-in) appointment.');
+          return;
+        }
+        throw error;
+      }
       const newRecord = { ...data[0], students: { name: selectedName } };
       setAppointments(prev => [...prev, newRecord]);
       await logAudit('Appointment Creation', `Added appointment ${newAppt.patient_id} on ${newAppt.appointment_date} ${newAppt.appointment_time}`);

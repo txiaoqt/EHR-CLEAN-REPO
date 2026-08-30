@@ -427,7 +427,23 @@ const Dashboard = () => {
   const submitNewAppointment = async () => {
     if (!newAppt.patient_id || !newAppt.appointment_date || !newAppt.appointment_time) return;
     setSavingAppt(true);
-    await supabase.from('appointments').insert([newAppt]);
+    const { error } = await supabase.from('appointments').insert([newAppt]);
+    if (error) {
+      const errMsg = String(error.message || '').toLowerCase();
+      if (error.code === '23505' && (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))) {
+        alert('Failed to save appointment: This time slot is no longer available. Please select another available slot.');
+        setSavingAppt(false);
+        return;
+      }
+      if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
+        alert('Failed to save appointment: This student already has an active (Scheduled or Checked-in) appointment.');
+        setSavingAppt(false);
+        return;
+      }
+      alert('Error saving appointment: ' + (error.message || error));
+      setSavingAppt(false);
+      return;
+    }
     window.dispatchEvent(new Event('appointmentAdded'));
     setSavingAppt(false);
     closeNewModal();

@@ -17,7 +17,7 @@ const PatientHeader = ({ onToggleNav }) => {
 
   const displayName = user?.name || 'Angel Keith Carbon';
   const displayRole = 'Student / Patient';
-  const studentId = user?.patient_id || 'TUPM-23-5030';
+  const studentId = user?.patient_id || 'TUPM-XX-XXXX';
   const avatarSrc = user?.avatar || avatarPlaceholder;
 
   // Close dropdown menu on outside click

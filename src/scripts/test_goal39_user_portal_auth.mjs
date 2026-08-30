@@ -83,7 +83,10 @@ assert(loginContent.includes('otpSent'), 'otpSent state tracks OTP request statu
 assert(loginContent.includes('otpCode'), 'otpCode state tracks OTP input');
 assert(loginContent.includes('handleSendOtp'), 'handleSendOtp dispatches Supabase verification code');
 assert(loginContent.includes('supabase.auth.verifyOtp'), 'supabase.auth.verifyOtp verifies OTP before account completion');
-assert(loginContent.includes('Verification code sent. Check your TUP email.'), 'User feedback on OTP dispatch');
+assert(
+  loginContent.includes('If the provided information is eligible for registration, you will receive a verification code by email.'),
+  'User feedback on OTP dispatch (anti-enumeration normalized)'
+);
 assert(loginContent.includes('The verification code is incorrect or has expired'), 'User feedback on OTP error');
 assert(loginContent.includes('Verification Code'), 'Verification Code input field defined');
 

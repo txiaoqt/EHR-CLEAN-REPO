@@ -300,6 +300,8 @@ create table if not exists public.event_email_logs (
 
 -- INDEXES
 create index if not exists idx_users_email on public.users (email);
+create unique index if not exists idx_users_unique_patient_id on public.users (patient_id) where role = 'patient' and patient_id is not null;
+create unique index if not exists idx_users_unique_student_id on public.users (student_id) where role = 'patient' and student_id is not null;
 
 create index if not exists idx_students_name on public.students (name);
 
@@ -310,6 +312,8 @@ create index if not exists idx_appointments_date on public.appointments (appoint
 create index if not exists idx_appointments_patient_id on public.appointments (patient_id);
 create index if not exists idx_appointments_status on public.appointments (status);
 create index if not exists idx_appointments_created_at on public.appointments (created_at desc);
+create unique index if not exists idx_appointments_one_active_per_student on public.appointments (patient_id) where status in ('Scheduled', 'Checked-in');
+create unique index if not exists idx_appointments_one_active_per_slot on public.appointments (department, appointment_date, appointment_time) where status in ('Scheduled', 'Checked-in');
 
 create index if not exists idx_encounters_patient_id on public.encounters (patient_id);
 create index if not exists idx_encounters_status on public.encounters (status);
@@ -1376,23 +1380,46 @@ begin
     v_clean_year := 1;
   end if;
 
-  -- 5. Upsert public.students master record
+  -- 5. ANTI-OVERWRITE & DUPLICATE ACCOUNT DEFENSE
+  -- Check if student ID is already associated with another user in public.users
+  select id into v_existing_user_id
+  from public.users
+  where (patient_id = v_normalized_student_id or student_id = v_normalized_student_id)
+    and auth_user_id is not null
+    and auth_user_id <> v_auth_uid
+  limit 1;
+
+  if v_existing_user_id is not null then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'These student details are already associated with an account. Please sign in or use Password Recovery.'
+    );
+  end if;
+
+  -- Check if student ID is already associated with another profile in public.patient_profiles
+  if exists (
+    select 1 from public.patient_profiles
+    where (patient_id = v_normalized_student_id or student_id = v_normalized_student_id)
+      and user_id is not null
+      and user_id <> v_auth_uid
+  ) then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'These student details are already associated with an account. Please sign in or use Password Recovery.'
+    );
+  end if;
+
+  -- 6. Insert master student record if it does NOT already exist (DO NOT OVERWRITE EXISTING)
   insert into public.students (id, name, year, updated_at)
   values (v_normalized_student_id, v_clean_name, v_clean_year, now())
-  on conflict (id) do update set
-    name = excluded.name,
-    year = excluded.year,
-    updated_at = now();
+  on conflict (id) do nothing;
 
-  -- 6. Upsert public.patients master record
+  -- 7. Insert master patient record if it does NOT already exist (DO NOT OVERWRITE EXISTING)
   insert into public.patients (id, name, year, sensitivity_level, updated_at)
   values (v_normalized_student_id, v_clean_name, v_clean_year, 'normal', now())
-  on conflict (id) do update set
-    name = excluded.name,
-    year = excluded.year,
-    updated_at = now();
+  on conflict (id) do nothing;
 
-  -- 7. Upsert public.users application account (strictly role = 'patient')
+  -- 8. Create or bind public.users application account
   insert into public.users (
     id,
     auth_user_id,
@@ -1425,9 +1452,10 @@ begin
     student_id = excluded.student_id,
     active = true,
     updated_at = now()
+  where public.users.auth_user_id = v_auth_uid or public.users.auth_user_id is null
   returning id into v_user_id;
 
-  -- 8. Upsert public.patient_profiles extended record
+  -- 9. Insert or link public.patient_profiles (PRESERVES EXISTING MEDICAL / PROFILE DATA)
   insert into public.patient_profiles (
     patient_id,
     user_id,
@@ -1451,14 +1479,12 @@ begin
     now()
   )
   on conflict (patient_id) do update set
-    user_id = excluded.user_id,
-    student_id = excluded.student_id,
-    full_name = excluded.full_name,
-    email = excluded.email,
-    year = excluded.year,
-    contact_number = coalesce(excluded.contact_number, public.patient_profiles.contact_number),
-    address = coalesce(excluded.address, public.patient_profiles.address),
-    updated_at = now();
+    user_id = case when public.patient_profiles.user_id is null then excluded.user_id else public.patient_profiles.user_id end,
+    email = case when public.patient_profiles.email is null then excluded.email else public.patient_profiles.email end,
+    contact_number = coalesce(public.patient_profiles.contact_number, excluded.contact_number),
+    address = coalesce(public.patient_profiles.address, excluded.address),
+    updated_at = now()
+  where public.patient_profiles.user_id is null or public.patient_profiles.user_id = v_auth_uid;
 
   return jsonb_build_object(
     'success', true,
@@ -1497,6 +1523,32 @@ drop trigger if exists trg_set_appointments_clinician_auth_user_id on public.app
 create trigger trg_set_appointments_clinician_auth_user_id
 before insert on public.appointments
 for each row execute function public.set_clinician_auth_user_id();
+
+create or replace function public.check_one_active_appointment_per_student()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  if new.status in ('Scheduled', 'Checked-in') then
+    if exists (
+      select 1 from public.appointments
+      where patient_id = new.patient_id
+        and status in ('Scheduled', 'Checked-in')
+        and id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid)
+    ) then
+      raise exception 'Active appointment already exists for patient % (Status must be Cancelled before booking a new appointment)', new.patient_id
+        using errcode = '23505';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_check_one_active_appointment on public.appointments;
+create trigger trg_check_one_active_appointment
+before insert or update on public.appointments
+for each row execute function public.check_one_active_appointment_per_student();
 
 drop trigger if exists trg_set_encounters_clinician_auth_user_id on public.encounters;
 create trigger trg_set_encounters_clinician_auth_user_id

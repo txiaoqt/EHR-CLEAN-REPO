@@ -41,6 +41,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const { user } = useAuth();
   const today = toDateKey(new Date());
   const [appointments, setAppointments] = useState([]);
+  const [activeAppointment, setActiveAppointment] = useState(null);
+  const [loadingActiveAppt, setLoadingActiveAppt] = useState(true);
   const [staffList, setStaffList] = useState([]);
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -57,6 +59,38 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     patient_name: user?.name || '',
   });
 
+  const loadActiveAppointment = async (patientId) => {
+    if (!patientId) {
+      setActiveAppointment(null);
+      setLoadingActiveAppt(false);
+      return null;
+    }
+    setLoadingActiveAppt(true);
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('patient_id', patientId.trim())
+        .in('status', ['Scheduled', 'Checked-in'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        setActiveAppointment(data[0]);
+        return data[0];
+      } else {
+        setActiveAppointment(null);
+        return null;
+      }
+    } catch (err) {
+      console.warn('Error loading active appointment:', err);
+      setActiveAppointment(null);
+      return null;
+    } finally {
+      setLoadingActiveAppt(false);
+    }
+  };
+
   const loadAppointments = async () => {
     const { data } = await supabase
       .from('appointments')
@@ -64,11 +98,20 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       .gte('appointment_date', today)
       .order('appointment_date', { ascending: true });
     setAppointments(data || []);
+    if (form.patient_id) {
+      await loadActiveAppointment(form.patient_id);
+    }
   };
 
   useEffect(() => {
     loadAppointments();
-  }, []);
+  }, [today]);
+
+  useEffect(() => {
+    if (form.patient_id) {
+      loadActiveAppointment(form.patient_id);
+    }
+  }, [form.patient_id]);
 
   useEffect(() => {
     const loadStaff = async () => {
@@ -239,31 +282,64 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       setNotice('Please complete all required fields (time slot and service).');
       return;
     }
-    const dayBookedCount = appointments.filter((a) =>
-      a.appointment_date === form.appointment_date &&
-      a.department === form.department &&
-      a.status !== 'Cancelled',
-    ).length;
-    if (dayBookedCount >= DAILY_PATIENT_LIMIT) {
-      setNotice(`Selected date is fully booked (${DAILY_PATIENT_LIMIT}/${DAILY_PATIENT_LIMIT} patients). Please choose another date.`);
+
+    // Level 1: Client state guard
+    if (activeAppointment) {
+      setNotice('You already have an active appointment. Please complete or cancel your current appointment before booking another.');
       return;
     }
-    const selectedSlotBookedCount = appointments.filter((a) =>
-      a.appointment_date === form.appointment_date &&
-      a.department === form.department &&
-      (a.appointment_time || '') === form.appointment_time &&
-      a.status !== 'Cancelled',
-    ).length;
-    if (selectedSlotBookedCount >= SLOT_CAPACITY) {
-      setNotice('Selected timeframe is no longer available. Please select another slot.');
-      return;
-    }
+
     setSaving(true);
     setNotice('');
+
     try {
+      // Level 2: Authoritative pre-insert database verification (guards against multi-tab stale state)
+      const { data: activeRows, error: activeErr } = await supabase
+        .from('appointments')
+        .select('id, appointment_date, appointment_time, department, service_type, status, queue_number, reference_code')
+        .eq('patient_id', form.patient_id.trim())
+        .in('status', ['Scheduled', 'Checked-in'])
+        .limit(1);
+
+      if (!activeErr && activeRows && activeRows.length > 0) {
+        setActiveAppointment(activeRows[0]);
+        setNotice('You already have an active appointment. Please complete or cancel your current appointment before booking another.');
+        setSaving(false);
+        return;
+      }
+
+      // Level 2b: Re-verify slot capacity from server to guard against stale local client state
+      const { data: slotOccupants, error: slotErr } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('department', form.department)
+        .eq('appointment_date', form.appointment_date)
+        .eq('appointment_time', form.appointment_time)
+        .in('status', ['Scheduled', 'Checked-in'])
+        .limit(1);
+
+      if (!slotErr && slotOccupants && slotOccupants.length >= SLOT_CAPACITY) {
+        setNotice('This time slot is no longer available. Please select another available slot.');
+        await loadAppointments();
+        setSaving(false);
+        return;
+      }
+
+      // Verify overall day capacity from local appointments
+      const dayBookedCount = appointments.filter((a) =>
+        a.appointment_date === form.appointment_date &&
+        a.department === form.department &&
+        a.status !== 'Cancelled',
+      ).length;
+      if (dayBookedCount >= DAILY_PATIENT_LIMIT) {
+        setNotice(`Selected date is fully booked (${DAILY_PATIENT_LIMIT}/${DAILY_PATIENT_LIMIT} patients). Please choose another date.`);
+        setSaving(false);
+        return;
+      }
+
       let queueNumber = null;
       let referenceCode = null;
-      let status = 'Scheduled';
+      const status = 'Scheduled'; // All new appointments consistently start as Scheduled
 
       if (form.appointment_type === 'Same-day Appointment') {
         const sameDayRows = appointments.filter((a) =>
@@ -274,7 +350,6 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         );
         const maxQueue = sameDayRows.reduce((m, a) => Math.max(m, a.queue_number || 0), 0);
         queueNumber = maxQueue + 1;
-        status = 'Checked-in';
       } else {
         referenceCode = createReferenceCode(form.appointment_date);
       }
@@ -296,15 +371,38 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       };
 
       const { error } = await supabase.from('appointments').insert([payload]);
-      if (error) throw error;
+      if (error) {
+        // Level 3: Handle database unique index / trigger violation (code 23505) cleanly
+        const errMsg = String(error.message || '').toLowerCase();
+        if (
+          error.code === '23505' &&
+          (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))
+        ) {
+          await loadAppointments();
+          setNotice('This time slot is no longer available. Please select another available slot.');
+          return;
+        }
+        if (
+          error.code === '23505' ||
+          errMsg.includes('active appointment') ||
+          errMsg.includes('idx_appointments_one_active_per_student') ||
+          errMsg.includes('duplicate')
+        ) {
+          await loadActiveAppointment(form.patient_id);
+          setNotice('You already have an active appointment. Please complete or cancel your current appointment before booking another.');
+          return;
+        }
+        throw error;
+      }
 
       setNotice(
         form.appointment_type === 'Same-day Appointment'
-          ? `Appointment reserved! Queue Number: #${queueNumber}. Please proceed to the clinic waiting area.`
-          : `Appointment confirmed! Reference Code: ${referenceCode}.`,
+          ? `Appointment reserved! Queue Number: #${queueNumber}. Status: Scheduled. Please proceed to the clinic waiting area.`
+          : `Appointment confirmed! Reference Code: ${referenceCode}. Status: Scheduled.`,
       );
       setForm((p) => ({ ...p, appointment_time: '' }));
       await loadAppointments();
+      await loadActiveAppointment(form.patient_id);
     } catch (e) {
       console.error(e);
       setNotice(`Booking failed: ${e.message || 'Unknown error'}`);
@@ -332,6 +430,59 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
         <div className="card booking-flow-card" style={{ padding: 24, border: '1px solid var(--border)', borderRadius: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Active Appointment Notice Card (if student already has Scheduled or Checked-in appointment) */}
+            {activeAppointment && (
+              <div
+                className="patient-active-appointment-card"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: 10,
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <strong style={{ fontSize: 15, color: 'var(--text)' }}>
+                      Active Appointment in Progress
+                    </strong>
+                    <span
+                      style={{
+                        background: activeAppointment.status === 'Checked-in' ? 'var(--color-emerald-bg)' : 'var(--color-blue-bg)',
+                        color: activeAppointment.status === 'Checked-in' ? 'var(--color-emerald-text)' : 'var(--color-blue-text)',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                      }}
+                    >
+                      {activeAppointment.status}
+                    </span>
+                  </div>
+                  {activeAppointment.queue_number && (
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+                      Queue #{activeAppointment.queue_number}
+                    </span>
+                  )}
+                  {activeAppointment.reference_code && (
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+                      Ref: {activeAppointment.reference_code}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>
+                  Schedule: <strong>{activeAppointment.appointment_date}</strong> at <strong>{activeAppointment.appointment_time}</strong> • Department: <strong>{activeAppointment.department}</strong> ({activeAppointment.service_type || 'Consultation'})
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginTop: 2 }}>
+                  You already have an active appointment. Please complete or cancel your current appointment before booking another.
+                </div>
+              </div>
+            )}
+
             {/* Department & Appointment Mode Segmented Controls */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 16 }}>
               <div>
@@ -462,7 +613,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     }
                     const key = toDateKey(cell);
                     const selected = key === form.appointment_date;
-                    const selectable = isDateSelectable(key);
+                    const selectable = isDateSelectable(key) && !activeAppointment;
                     const pct = dayAvailability.get(key);
 
                     return (
@@ -529,7 +680,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {slotRows.map((row) => {
                       const selected = form.appointment_time === row.time;
-                      const isAvailable = availableSlots.includes(row.time) && !row.disabled;
+                      const isAvailable = availableSlots.includes(row.time) && !row.disabled && !activeAppointment;
 
                       return (
                         <div
@@ -574,7 +725,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 <div className="patient-slots-cards-view" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {slotRows.map((row) => {
                     const selected = form.appointment_time === row.time;
-                    const isAvailable = availableSlots.includes(row.time) && !row.disabled;
+                    const isAvailable = availableSlots.includes(row.time) && !row.disabled && !activeAppointment;
 
                     return (
                       <div
@@ -701,10 +852,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 type="button"
                 className="btn primary"
                 onClick={submit}
-                disabled={saving || !form.appointment_time}
-                style={{ padding: '10px 24px', fontSize: 15 }}
+                disabled={saving || !form.appointment_time || !!activeAppointment}
+                style={{ padding: '10px 24px', fontSize: 15, opacity: (saving || !form.appointment_time || !!activeAppointment) ? 0.6 : 1 }}
+                title={activeAppointment ? 'You already have an active appointment' : undefined}
               >
-                {saving ? 'Submitting...' : 'Confirm & Book Appointment'}
+                {saving ? 'Submitting...' : activeAppointment ? 'Active Appointment Exists' : 'Confirm & Book Appointment'}
               </button>
             </div>
           </div>
@@ -737,9 +889,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-                {notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('unable') ? 'Booking Notice' : 'Appointment Confirmed'}
+                {notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('already') || notice.toLowerCase().includes('unable')
+                  ? 'Booking Notice'
+                  : 'Appointment Confirmed'}
               </h3>
-              <div style={{ color: notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('unable') ? 'var(--danger)' : 'var(--text)', fontSize: 14, lineHeight: 1.5 }}>
+              <div style={{ color: notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('already') || notice.toLowerCase().includes('unable') ? 'var(--danger)' : 'var(--text)', fontSize: 14, lineHeight: 1.5 }}>
                 {notice}
               </div>
               <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>

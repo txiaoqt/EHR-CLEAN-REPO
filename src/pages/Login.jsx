@@ -36,7 +36,7 @@ const USER_TEST_ACCOUNT = {
     email: 'patient.test@tup.edu.ph',
     avatar: null,
     role: 'patient',
-    patient_id: 'TUPM-23-5030',
+    patient_id: 'TUPM-XX-XXXX',
   },
 };
 
@@ -268,6 +268,8 @@ const Login = () => {
 
   const handleSendOtp = async () => {
     const targetEmail = signupData.email.trim().toLowerCase();
+    const studentId = signupData.studentId.trim().toUpperCase();
+
     if (!targetEmail) {
       setMsg('Please enter your official TUP email address.');
       return;
@@ -276,12 +278,19 @@ const Login = () => {
       setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
       return;
     }
+    if (studentId && !isValidStudentId(studentId)) {
+      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).');
+      return;
+    }
     if (otpSending || otpCooldown > 0) return;
 
     setOtpSending(true);
     setMsg('');
+    const GENERIC_ELIGIBILITY_MSG =
+      'If the provided information is eligible for registration, you will receive a verification code by email.';
+
     try {
-      // 1. Sign up with Supabase Auth to trigger OTP verification email
+      // 1. Sign up with Supabase Auth to trigger OTP verification email (State 1: New Account)
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email: targetEmail,
         password: signupData.password || 'TupPatientTempPass@2026',
@@ -289,30 +298,69 @@ const Login = () => {
           data: {
             name: signupData.fullName.trim() || 'Patient',
             role: 'patient',
-            patient_id: signupData.studentId.trim().toUpperCase() || targetEmail.split('@')[0],
+            patient_id: studentId || targetEmail.split('@')[0],
           },
         },
       });
 
       if (authErr) {
-        if (authErr.message?.toLowerCase().includes('already registered')) {
+        const errMsg = (authErr.message || '').toLowerCase();
+
+        // Safe rate limit handling
+        if (errMsg.includes('rate limit') || errMsg.includes('too many') || authErr.status === 429) {
+          setMsg('Too many requests. Please wait a moment before trying again.');
+          setOtpSending(false);
+          return;
+        }
+
+        // State 2 & 3: Account already exists in Auth
+        if (
+          errMsg.includes('already registered') ||
+          errMsg.includes('already exists') ||
+          errMsg.includes('user already registered')
+        ) {
+          // Attempt resend for unverified account (State 2: Existing Unverified)
           const { error: resendErr } = await supabase.auth.resend({
             type: 'signup',
             email: targetEmail,
           });
-          if (resendErr) throw resendErr;
-        } else {
-          throw authErr;
+
+          if (resendErr) {
+            const resendMsg = (resendErr.message || '').toLowerCase();
+            if (resendMsg.includes('rate limit') || resendMsg.includes('too many') || resendErr.status === 429) {
+              setMsg('Too many requests. Please wait a moment before trying again.');
+              setOtpSending(false);
+              return;
+            }
+            // If already confirmed (State 3: Existing Verified), do not expose error;
+            // return the identical generic eligibility response.
+          }
+
+          // Return identical outward state and generic message
+          setOtpSent(true);
+          setOtpEmail(targetEmail);
+          setOtpCooldown(60);
+          setMsg(GENERIC_ELIGIBILITY_MSG);
+          return;
         }
+
+        // Other unexpected errors
+        throw authErr;
       }
 
+      // State 1: New Account created & OTP dispatched
       setOtpSent(true);
       setOtpEmail(targetEmail);
       setOtpCooldown(60);
-      setMsg('Verification code sent. Check your TUP email.');
+      setMsg(GENERIC_ELIGIBILITY_MSG);
     } catch (err) {
       console.error('Send OTP error:', err);
-      setMsg(err.message || 'Unable to send the verification code. Please try again.');
+      const errStr = (err.message || '').toLowerCase();
+      if (errStr.includes('rate limit') || errStr.includes('too many') || err?.status === 429) {
+        setMsg('Too many requests. Please wait a moment before trying again.');
+      } else {
+        setMsg('Unable to process registration request. Please check your details and try again.');
+      }
     } finally {
       setOtpSending(false);
     }
@@ -334,7 +382,7 @@ const Login = () => {
       return;
     }
     if (!isValidStudentId(payload.studentId)) {
-      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-23-5030).');
+      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).');
       return;
     }
     if (!isValidTupEmail(payload.email)) {
@@ -387,71 +435,17 @@ const Login = () => {
         authUserId = (await supabase.auth.getUser())?.data?.user?.id;
       }
 
-      // 2. Execute atomic patient registration RPC
-      let rpcSucceeded = false;
-      try {
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_patient_registration', {
-          p_student_id: payload.studentId,
-          p_name: payload.fullName,
-          p_year: payload.year,
-        });
-        if (!rpcErr && rpcData?.success) {
-          rpcSucceeded = true;
-        } else if (rpcErr) {
-          console.warn('complete_patient_registration RPC fallback:', rpcErr.message);
-        }
-      } catch (rpcEx) {
-        console.warn('RPC invocation notice:', rpcEx);
-      }
+      // 2. Execute atomic patient registration RPC (CREATE ONLY, NO OVERWRITE)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_patient_registration', {
+        p_student_id: payload.studentId,
+        p_name: payload.fullName,
+        p_year: payload.year,
+      });
 
-      // 3. Fallback / Direct multi-table persistence guarantee
-      if (!rpcSucceeded) {
-        // Ensure student master record exists
-        await supabase
-          .from('students')
-          .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year }], { onConflict: 'id' });
-
-        // Ensure patient master record exists
-        await supabase
-          .from('patients')
-          .upsert([{ id: payload.studentId, name: payload.fullName, year: payload.year, sensitivity_level: 'normal' }], { onConflict: 'id' });
-
-        // Upsert public.users application account (strictly role = 'patient')
-        await supabase
-          .from('users')
-          .upsert(
-            [
-              {
-                auth_user_id: authUserId,
-                name: payload.fullName,
-                email: payload.email,
-                role: 'patient',
-                active: true,
-                patient_id: payload.studentId,
-                student_id: payload.studentId,
-              },
-            ],
-            { onConflict: 'email' }
-          );
-
-        // Upsert public.patient_profiles extended record
-        try {
-          await supabase
-            .from('patient_profiles')
-            .upsert(
-              [
-                {
-                  patient_id: payload.studentId,
-                  user_id: authUserId,
-                  student_id: payload.studentId,
-                  full_name: payload.fullName,
-                  email: payload.email,
-                  year: payload.year,
-                },
-              ],
-              { onConflict: 'patient_id' }
-            );
-        } catch (_) {}
+      if (rpcErr || !rpcData?.success) {
+        setMsg('Unable to complete registration. Please check your information or contact clinic support.');
+        setLoading(false);
+        return;
       }
 
       setMsg('Account created and verified successfully! You can now log in.');
@@ -469,8 +463,8 @@ const Login = () => {
         confirmPassword: '',
       });
     } catch (e) {
-      console.error(e);
-      setMsg(`Registration failed: ${e.message || 'Unknown error'}`);
+      console.error('Registration error:', e);
+      setMsg('Unable to complete registration. Please check your information or contact clinic support.');
     } finally {
       setLoading(false);
     }
@@ -499,7 +493,7 @@ const Login = () => {
       setMsg('Password reset instructions have been sent to your TUP email.');
     } catch (err) {
       console.error('Password reset error:', err);
-      setMsg(err.message || 'Unable to send password reset email. Please try again.');
+      setMsg('Unable to send password reset email. Please try again.');
     } finally {
       setForgotLoading(false);
     }
@@ -812,13 +806,13 @@ const Login = () => {
                       id="signup-student-id"
                       className="input"
                       style={authInputStyle}
-                      placeholder="TUPM-23-5030"
+                      placeholder="e.g. TUPM-XX-XXXX"
                       value={signupData.studentId}
                       onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
                     />
                     {showStudentIdError && (
                       <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
-                        Format must be TUPM-YY-XXXX (e.g. TUPM-23-5030).
+                        Format must be TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).
                       </div>
                     )}
                   </div>
@@ -903,7 +897,7 @@ const Login = () => {
                     )}
                     {otpSent && (
                       <div style={{ color: '#c6f6d5', fontSize: 11.5, marginTop: 2, fontWeight: 600 }}>
-                        Verification code sent. Check your TUP email.
+                        If the provided information is eligible for registration, you will receive a verification code by email.
                       </div>
                     )}
                   </div>
