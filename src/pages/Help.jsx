@@ -47,16 +47,20 @@ const getDateDividerLabel = (isoString) => {
 
 const Help = () => {
   const { user } = useAuth();
-  const isDoctor = (user?.role || '').toLowerCase() === 'physician';
+  const userRole = (user?.role || '').toLowerCase();
+  const isStaff = ['physician', 'nurse', 'admin'].includes(userRole);
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [expandedGuide, setExpandedGuide] = useState(null);
 
-  // Messaging state
+  // Messaging state (Conversation-Driven)
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [activePatientId, setActivePatientId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [msgNotice, setMsgNotice] = useState('');
   const [mobileViewingChat, setMobileViewingChat] = useState(false);
 
@@ -108,37 +112,169 @@ const Help = () => {
     }
   ];
 
-  // Initial load of patient messages for staff
-  const loadMessages = async () => {
-    if (!isDoctor) return;
+  // 1. Load Conversations for this clinician/staff
+  const loadConversations = async () => {
+    if (!isStaff) return;
     try {
-      const { data, error } = await supabase
-        .from('patient_messages')
+      setLoadingConversations(true);
+      let query = supabase
+        .from('patient_message_conversations')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(300);
+        .order('updated_at', { ascending: false });
+
+      if (userRole !== 'admin') {
+        const staffAdminId = user?.id;
+        const staffAuthId = user?.auth_user_id;
+
+        if (staffAdminId && staffAuthId) {
+          query = query.or(`recipient_auth_user_id.eq.${staffAuthId},recipient_staff_id.eq.${staffAdminId},recipient_staff_id.is.null`);
+        } else if (staffAdminId) {
+          query = query.or(`recipient_staff_id.eq.${staffAdminId},recipient_staff_id.is.null`);
+        }
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
-        setMessages(data);
-        if (!activePatientId && data.length > 0) {
-          setActivePatientId(data[0].patient_id);
+        setConversations(data);
+        if (!activeConversationId && data.length > 0) {
+          setActiveConversationId(data[0].id);
+        }
+      } else if (error?.code === 'PGRST205') {
+        // Fallback: Read from patient_messages if table not yet provisioned on cloud
+        const { data: rawMsgs } = await supabase
+          .from('patient_messages')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (rawMsgs) {
+          const threadMap = new Map();
+          rawMsgs.forEach((msg) => {
+            const isAddressedToStaff =
+              userRole === 'admin' ||
+              !msg.recipient_name ||
+              msg.recipient_name === 'Clinic Personnel (General)' ||
+              msg.recipient_name.toLowerCase().includes(user?.name?.toLowerCase() || '') ||
+              (userRole === 'physician' && msg.recipient_name.toLowerCase().includes('rivera')) ||
+              (userRole === 'nurse' && msg.recipient_name.toLowerCase().includes('santos'));
+
+            if (isAddressedToStaff) {
+              const key = msg.conversation_id || `${msg.patient_id}_${msg.recipient_name || 'Clinic'}_${msg.concern_type}`;
+              if (!threadMap.has(key)) {
+                threadMap.set(key, {
+                  id: key,
+                  patient_id: msg.patient_id,
+                  patient_name: msg.patient_name || 'Patient',
+                  recipient_name: msg.recipient_name || 'Clinic Personnel (General)',
+                  concern_type: msg.concern_type || 'General clinic inquiry',
+                  status: 'open',
+                  updated_at: msg.created_at,
+                  isFallback: true,
+                });
+              }
+            }
+          });
+          const threadList = Array.from(threadMap.values());
+          setConversations(threadList);
+          if (!activeConversationId && threadList.length > 0) {
+            setActiveConversationId(threadList[0].id);
+          }
         }
       }
     } catch (err) {
-      console.warn('Staff load messages error:', err);
+      console.warn('Staff load conversations error:', err);
+    } finally {
+      setLoadingConversations(false);
     }
   };
 
   useEffect(() => {
-    loadMessages();
-  }, [isDoctor]);
+    loadConversations();
+  }, [isStaff, userRole, user?.id, user?.auth_user_id]);
 
-  // Set up Supabase Realtime subscription for live incoming student messages
+  // Active conversation record
+  const activeConversation = useMemo(() => {
+    return conversations.find((c) => c.id === activeConversationId) || null;
+  }, [conversations, activeConversationId]);
+
+  // 2. Load messages for active conversation
   useEffect(() => {
-    if (!isDoctor) return;
+    if (!activeConversationId) {
+      setMessages([]);
+      return;
+    }
+
+    let mounted = true;
+    const loadConversationMessages = async () => {
+      try {
+        setLoadingMessages(true);
+        let { data, error } = await supabase
+          .from('patient_messages')
+          .select('*')
+          .eq('conversation_id', activeConversationId)
+          .order('created_at', { ascending: true });
+
+        if ((!data || data.length === 0) && activeConversation?.isFallback) {
+          const { data: fallbackData } = await supabase
+            .from('patient_messages')
+            .select('*')
+            .eq('patient_id', activeConversation.patient_id)
+            .eq('concern_type', activeConversation.concern_type)
+            .order('created_at', { ascending: true });
+
+          data = fallbackData || [];
+        }
+
+        if (mounted && data) {
+          setMessages(data);
+          setTimeout(() => {
+            if (chatScrollRef.current) {
+              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+            }
+          }, 50);
+        }
+      } catch (err) {
+        console.warn('Staff load messages error:', err);
+      } finally {
+        if (mounted) setLoadingMessages(false);
+      }
+    };
+
+    loadConversationMessages();
+    return () => {
+      mounted = false;
+    };
+  }, [activeConversationId, activeConversation?.isFallback, activeConversation?.patient_id, activeConversation?.concern_type]);
+
+  // 3. Supabase Realtime for conversation updates and message streaming
+  useEffect(() => {
+    if (!isStaff) return;
 
     const channel = supabase
-      .channel('patient_messages_staff_stream')
+      .channel('patient_messages_staff_workspace')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'patient_message_conversations',
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === payload.new.id)) return prev;
+              return [payload.new, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setConversations((prev) => {
+              const updated = prev.map((c) => (c.id === payload.new.id ? payload.new : c));
+              return updated.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setConversations((prev) => prev.filter((c) => c.id !== payload.old.id));
+          }
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -148,24 +284,39 @@ const Help = () => {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === payload.new.id)) return prev;
-              return [payload.new, ...prev];
-            });
-            // If the incoming message belongs to active thread, scroll chat
-            if (payload.new.patient_id === activePatientId) {
+            const newMsg = payload.new;
+
+            const msgMatchesActive =
+              (newMsg.conversation_id && newMsg.conversation_id === activeConversationId) ||
+              (activeConversation?.isFallback &&
+                newMsg.patient_id === activeConversation.patient_id &&
+                newMsg.concern_type === activeConversation.concern_type);
+
+            // Only append to active message stream if conversation matches
+            if (msgMatchesActive) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
               setTimeout(() => {
                 if (chatScrollRef.current) {
                   chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
                 }
               }, 100);
             }
-          } else if (payload.eventType === 'UPDATE') {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === payload.new.id ? payload.new : m))
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setMessages((prev) => prev.filter((m) => m.id === payload.old.id));
+
+            // Move the messaged conversation to the top of the inbox
+            setConversations((prev) => {
+              const targetKey = newMsg.conversation_id || `${newMsg.patient_id}_${newMsg.recipient_name || 'Clinic'}_${newMsg.concern_type}`;
+              const exists = prev.find((c) => c.id === targetKey || c.id === newMsg.conversation_id);
+              if (exists) {
+                const updated = prev.map((c) =>
+                  (c.id === targetKey || c.id === newMsg.conversation_id) ? { ...c, updated_at: newMsg.created_at } : c
+                );
+                return updated.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+              }
+              return prev;
+            });
           }
         }
       )
@@ -174,77 +325,28 @@ const Help = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isDoctor, activePatientId]);
+  }, [isStaff, activeConversationId, activeConversation]);
 
-  // Group messages into distinct conversation threads
-  const threads = useMemo(() => {
-    const map = new Map();
-    for (const row of messages) {
-      if (!map.has(row.patient_id)) {
-        map.set(row.patient_id, []);
-      }
-      map.get(row.patient_id).push(row);
-    }
-
-    const threadList = Array.from(map.entries()).map(([patientId, rows]) => {
-      // rows are sorted newest first
-      const latestMsg = rows[0];
-      const patientName = rows.find((r) => r.patient_name)?.patient_name || patientId;
-      return {
-        patientId,
-        patientName,
-        count: rows.length,
-        latestMessage: latestMsg?.message_text || '',
-        latestDate: latestMsg?.created_at,
-        latestConcernType: latestMsg?.concern_type || 'General clinic inquiry',
-        latestSenderRole: latestMsg?.sender_role || 'patient',
-      };
-    });
-
-    // Sort threads so the most recent conversation is always at the top
-    threadList.sort((a, b) => new Date(b.latestDate) - new Date(a.latestDate));
-
-    return threadList;
-  }, [messages]);
-
-  // Filter threads by search query (student name or ID)
-  const filteredThreads = useMemo(() => {
-    if (!searchQuery.trim()) return threads;
+  // Filter conversations by search query
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
     const q = searchQuery.toLowerCase().trim();
-    return threads.filter(
-      (t) =>
-        t.patientName.toLowerCase().includes(q) ||
-        t.patientId.toLowerCase().includes(q) ||
-        t.latestMessage.toLowerCase().includes(q)
+    return conversations.filter(
+      (c) =>
+        (c.patient_name || '').toLowerCase().includes(q) ||
+        (c.patient_id || '').toLowerCase().includes(q) ||
+        (c.concern_type || '').toLowerCase().includes(q) ||
+        (c.recipient_name || '').toLowerCase().includes(q)
     );
-  }, [threads, searchQuery]);
+  }, [conversations, searchQuery]);
 
-  // Active conversation message stream, sorted chronologically (oldest to newest)
-  const activeThreadMessages = useMemo(() => {
-    return messages
-      .filter((m) => m.patient_id === activePatientId)
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  }, [messages, activePatientId]);
-
-  // Active conversation metadata
-  const activeThreadMeta = useMemo(() => {
-    return threads.find((t) => t.patientId === activePatientId) || null;
-  }, [threads, activePatientId]);
-
-  // Scroll to bottom when active conversation changes
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [activePatientId, activeThreadMessages.length]);
-
-  // Group messages by date for date dividers
+  // Group active conversation messages by date
   const groupedActiveMessages = useMemo(() => {
     const groups = [];
     let currentDate = null;
     let currentGroup = [];
 
-    activeThreadMessages.forEach((msg) => {
+    messages.forEach((msg) => {
       const dateLabel = getDateDividerLabel(msg.created_at);
       if (dateLabel !== currentDate) {
         if (currentGroup.length > 0) {
@@ -262,285 +364,130 @@ const Help = () => {
     }
 
     return groups;
-  }, [activeThreadMessages]);
+  }, [messages]);
 
-  // Send reply as clinician
-  const sendReply = async (e) => {
+  // Handle staff clinical reply
+  const handleSendReply = async (e) => {
     if (e) e.preventDefault();
-    if (!isDoctor) {
-      setMsgNotice('Only physicians can access and reply to patient messages.');
-      return;
-    }
-    if (!activePatientId || !reply.trim() || sending) {
-      return;
-    }
+    if (!reply.trim() || !activeConversationId || sending) return;
 
     setSending(true);
     setMsgNotice('');
     const textToSend = reply.trim();
-    const targetName = activeThreadMeta?.patientName || activePatientId;
-    const category = activeThreadMeta?.latestConcernType || 'General clinic inquiry';
 
     try {
-      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+      // 1. Try atomic send_patient_message RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc('send_patient_message', {
+        p_conversation_id: activeConversationId,
+        p_message_text: textToSend,
+      });
 
-      const { data, error } = await supabase
-        .from('patient_messages')
-        .insert([
-          {
-            patient_id: activePatientId,
-            auth_user_id: authUid,
-            patient_name: targetName,
-            sender_role: (user?.role || 'physician').toLowerCase(),
-            sender_name: user?.name || 'Dr. Rivera (Physician)',
-            recipient_name: targetName,
-            concern_type: category,
-            message_text: textToSend,
-            status: 'sent',
-          },
-        ])
-        .select();
+      if (rpcError) {
+        // Fallback: Direct insert
+        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+        const staffRole = userRole || 'physician';
+        const staffName = user?.name || (staffRole === 'physician' ? 'Dr. Rivera' : 'Nurse Santos');
 
-      if (error) throw error;
+        const insertPayload = {
+          patient_id: activeConversation?.patient_id,
+          auth_user_id: authUid,
+          patient_name: activeConversation?.patient_name || 'Student',
+          sender_role: staffRole,
+          sender_name: staffName,
+          recipient_name: activeConversation?.patient_name || 'Student',
+          concern_type: activeConversation?.concern_type || 'General clinic inquiry',
+          message_text: textToSend,
+          status: 'sent',
+        };
 
-      // Optimistic append if not received via realtime
-      if (data?.[0]) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === data[0].id)) return prev;
-          return [data[0], ...prev];
-        });
+        if (!activeConversation?.isFallback) {
+          insertPayload.conversation_id = activeConversationId;
+        }
+
+        const { data: directData, error: directError } = await supabase
+          .from('patient_messages')
+          .insert([insertPayload])
+          .select();
+
+        if (directError) throw directError;
+
+        if (directData?.[0]) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === directData[0].id)) return prev;
+            return [...prev, directData[0]];
+          });
+        }
       }
 
       setReply('');
-      setMsgNotice('Reply sent.');
-      setTimeout(() => setMsgNotice(''), 3000);
-
       setTimeout(() => {
         if (chatScrollRef.current) {
           chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
         }
       }, 50);
     } catch (err) {
-      console.error('Send clinical reply error:', err);
+      console.error('Send staff reply error:', err);
       setMsgNotice('Unable to send reply right now. Please try again.');
     } finally {
       setSending(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendReply();
-    }
-  };
-
   return (
     <main className="main">
-      <div className="page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
-        {/* 1. Page Header */}
-        <div className="page-header">
-          <div className="page-header-title-block">
-            <h1 className="page-header-title">Help, Support & Training</h1>
-            <div className="page-header-subtitle">
-              Staff knowledge base, clinical workflows, patient communication channel, and technical support.
-            </div>
+      <section className="page help-page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
+        {/* Page Header */}
+        <div className="page-header" style={{ marginBottom: 14 }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>
+            Help & Patient Communications
+          </h1>
+          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 13.5 }}>
+            Frequently asked questions, clinical guides, and real-time patient inquiry triage.
           </div>
         </div>
 
-        {/* 2. Main Content Grid */}
-        <div className="help-main-grid">
-          {/* FAQ Card */}
-          <div className="card" style={{ padding: '20px 22px' }}>
-            <div className="card-header" style={{ marginBottom: 14 }}>
+        {/* Patient Messages Workspace for Medical Staff */}
+        {isStaff && (
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Frequently Asked Questions</h3>
-                <span className="card-subtitle">Common questions regarding system usage</span>
-              </div>
-              <span className="badge badge-info">Knowledge Base</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {faqs.map((faq, index) => (
-                <div
-                  key={index}
-                  style={{
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <button
-                    onClick={() => toggleFaq(index)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      textAlign: 'left',
-                      border: 'none',
-                      background: expandedFaq === index ? 'var(--grey-100)' : 'transparent',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: 13.5,
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                    }}
-                  >
-                    <span>{faq.question}</span>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>
-                      {expandedFaq === index ? '−' : '+'}
-                    </span>
-                  </button>
-                  {expandedFaq === index && (
-                    <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, background: 'var(--panel)', borderTop: '1px solid var(--border-subtle)' }}>
-                      {faq.answer}
-                    </div>
-                  )}
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                  Patient Inquiries & Messaging Workspace
+                </h2>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+                  Direct incoming consultation threads and follow-ups from student patients.
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Guide Card */}
-          <div className="card" style={{ padding: '20px 22px' }}>
-            <div className="card-header" style={{ marginBottom: 14 }}>
-              <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Clinical User Guides</h3>
-                <span className="card-subtitle">Step-by-step procedures for clinic staff</span>
               </div>
-              <span className="badge badge-success">Procedures</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {guides.map((guide, index) => (
-                <div
-                  key={index}
-                  style={{
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <button
-                    onClick={() => toggleGuide(index)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      textAlign: 'left',
-                      border: 'none',
-                      background: expandedGuide === index ? 'var(--grey-100)' : 'transparent',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: 13.5,
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                    }}
-                  >
-                    <span>{guide.title}</span>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>
-                      {expandedGuide === index ? '−' : '+'}
-                    </span>
-                  </button>
-                  {expandedGuide === index && (
-                    <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, background: 'var(--panel)', borderTop: '1px solid var(--border-subtle)' }}>
-                      {guide.content}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Technical Support & Campus Clinic Helpdesk */}
-          <div className="card" style={{ gridColumn: '1 / -1', padding: '20px 22px' }}>
-            <div className="card-header" style={{ marginBottom: 14 }}>
-              <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Technical Support & Campus Clinic Helpdesk</h3>
-                <span className="card-subtitle">Official IT and clinic support channels</span>
-              </div>
-              <span className="badge badge-success">● Support Available</span>
-            </div>
-
-            <div className="help-support-grid">
-              <div style={{ padding: '12px 16px', background: 'var(--surface-raised)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Clinic Hotline</div>
-                <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--color-primary)', marginTop: 4 }}>(+63) 253 013 001</div>
-              </div>
-
-              <div style={{ padding: '12px 16px', background: 'var(--surface-raised)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Clinic Operational Hours</div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', marginTop: 4 }}>Monday – Friday • 8:00 AM – 5:00 PM</div>
-              </div>
-
-              <div style={{ padding: '12px 16px', background: 'var(--surface-raised)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Email Support</div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', marginTop: 4 }}>support@tupclinic.edu.ph</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Patient Portal Messages & Inquiries: MODERN TWO-PANEL WORKSPACE */}
-          <div className="card" style={{ gridColumn: '1 / -1', padding: '20px 22px' }}>
-            <div className="card-header" style={{ marginBottom: 14 }}>
-              <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Patient Portal Messages & Inquiries</h3>
-                <span className="card-subtitle">
-                  {isDoctor
-                    ? 'Realtime communication workspace for student inquiries and clinical follow-ups'
-                    : 'Physician-only communication triage'}
-                </span>
-              </div>
-              <span className="badge badge-neutral" style={{ fontWeight: 600 }}>
-                {threads.length} {threads.length === 1 ? 'Conversation' : 'Conversations'}
+              <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
+                ● Realtime Connected
               </span>
             </div>
 
-            {!isDoctor ? (
-              <div style={{ padding: '28px 20px', textAlign: 'center', background: 'var(--surface-raised)', borderRadius: 12, border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 13.5 }}>
-                Direct student message replies are restricted to licensed clinic physicians.
+            {loadingConversations ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13.5 }}>
+                Loading conversation workspace...
               </div>
-            ) : threads.length === 0 ? (
-              <div
-                style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  background: 'var(--surface-raised)',
-                  borderRadius: 12,
-                  border: '1px dashed var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-primary-tint)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                  <MessagesIcon size={22} />
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                  No active conversations
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 380, lineHeight: 1.5 }}>
-                  New patient inquiries submitted via the Student Portal will appear here in realtime.
-                </div>
+            ) : conversations.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13.5 }}>
+                <MessagesIcon size={32} style={{ opacity: 0.5, marginBottom: 8 }} />
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>No patient inquiries found</div>
+                <div style={{ fontSize: 12.5, marginTop: 2 }}>When patients submit inquiries addressed to you or general triage, they will appear here live.</div>
               </div>
             ) : (
               <div className="tup-staff-messenger">
-                {/* LEFT PANEL: Conversation List / Inbox */}
+                {/* Left Panel: Conversation Inbox List */}
                 <div className={`tup-staff-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
                   <div className="tup-staff-inbox-header">
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                      Conversations ({threads.length})
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                        Inquiries ({conversations.length})
+                      </span>
                     </div>
                     <div className="tup-staff-inbox-search">
                       <SearchIcon size={14} className="tup-staff-inbox-search-icon" />
                       <input
                         type="text"
-                        placeholder="Search student or ID..."
+                        placeholder="Search student or category..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
@@ -548,49 +495,42 @@ const Help = () => {
                   </div>
 
                   <div className="tup-staff-inbox-list">
-                    {filteredThreads.length === 0 ? (
+                    {filteredConversations.length === 0 ? (
                       <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5 }}>
-                        No matching conversations
+                        No matching inquiries
                       </div>
                     ) : (
-                      filteredThreads.map((t) => {
-                        const isActive = activePatientId === t.patientId;
+                      filteredConversations.map((c) => {
+                        const isActive = activeConversationId === c.id;
                         return (
                           <button
-                            key={t.patientId}
+                            key={c.id}
                             className={`tup-staff-inbox-item ${isActive ? 'active' : ''}`}
                             onClick={() => {
-                              setActivePatientId(t.patientId);
+                              setActiveConversationId(c.id);
                               setMobileViewingChat(true);
                             }}
                           >
                             <div className="tup-messenger-avatar tup-avatar-student" style={{ width: 36, height: 36, fontSize: 13 }}>
-                              {t.patientName.charAt(0).toUpperCase()}
+                              {(c.patient_name || 'P').charAt(0).toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
                                 <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {t.patientName}
+                                  {c.patient_name || 'Patient'}
                                 </div>
                                 <span style={{ fontSize: 10.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                  {formatInboxDate(t.latestDate).split(' · ')[0]}
+                                  {formatInboxDate(c.updated_at).split(' · ')[0]}
                                 </span>
                               </div>
-                              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
-                                {t.patientId}
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                {c.patient_id} · <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.concern_type}</span>
                               </div>
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  color: 'var(--text-secondary, var(--text))',
-                                  marginTop: 3,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  opacity: 0.88,
-                                }}
-                              >
-                                {t.latestSenderRole === 'physician' ? 'Dr. Rivera: ' : ''}{t.latestMessage}
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>To: {c.recipient_name}</span>
+                                <span className={`badge ${c.status === 'open' ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 9.5, padding: '1px 5px' }}>
+                                  {c.status}
+                                </span>
                               </div>
                             </div>
                           </button>
@@ -600,47 +540,51 @@ const Help = () => {
                   </div>
                 </div>
 
-                {/* RIGHT PANEL: Active Conversation */}
+                {/* Right Panel: Active Conversation Chat */}
                 <div className={`tup-staff-chat-panel ${!mobileViewingChat ? 'hidden-mobile' : ''}`}>
-                  {/* Header */}
+                  {/* Chat Header */}
                   <div className="tup-messenger-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
                         type="button"
                         className="tup-staff-mobile-back"
                         onClick={() => setMobileViewingChat(false)}
-                        aria-label="Back to conversations"
                       >
                         <ChevronLeftIcon size={16} />
                         <span>Inbox</span>
                       </button>
 
                       <div className="tup-messenger-avatar tup-avatar-student">
-                        {activeThreadMeta?.patientName?.charAt(0).toUpperCase() || 'P'}
+                        {(activeConversation?.patient_name || 'P').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {activeThreadMeta?.patientName || activePatientId}
-                          <span className="badge badge-info" style={{ fontSize: 10.5, fontWeight: 600 }}>
-                            Student / Patient
-                          </span>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                          {activeConversation?.patient_name || 'Patient'}
                         </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                          <span>ID: {activePatientId}</span>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>ID: {activeConversation?.patient_id}</span>
                           <span>•</span>
-                          <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                            {activeThreadMeta?.latestConcernType || 'General clinic inquiry'}
-                          </span>
+                          <span>Addressed: {activeConversation?.recipient_name}</span>
                         </div>
                       </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
+                        {activeConversation?.concern_type}
+                      </span>
                     </div>
                   </div>
 
                   {/* Messages Stream */}
                   <div ref={chatScrollRef} className="tup-chat-messages-area">
-                    {activeThreadMessages.length === 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: 13 }}>
-                        Select a patient thread on the left to view message history.
+                    {loadingMessages ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                        Loading message thread...
+                      </div>
+                    ) : messages.length === 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                        No messages in this conversation.
                       </div>
                     ) : (
                       groupedActiveMessages.map((group, gIdx) => (
@@ -649,31 +593,28 @@ const Help = () => {
                             <span>{group.date}</span>
                           </div>
 
-                          {group.messages.map((m) => {
-                            const isPatient = m.sender_role === 'patient';
-                            // STAFF VIEW:
-                            // Incoming Student message -> ALIGNED LEFT (incoming)
-                            // Outgoing Staff reply -> ALIGNED RIGHT (outgoing)
+                          {group.messages.map((msg) => {
+                            const isPatient = msg.sender_role === 'patient';
                             return (
                               <div
-                                key={m.id}
+                                key={msg.id}
                                 className={`tup-chat-message-row ${isPatient ? 'incoming' : 'outgoing'}`}
                               >
                                 <div className="tup-chat-sender-label">
-                                  <span>{isPatient ? (m.patient_name || m.sender_name || 'Student') : (m.sender_name || 'Dr. Rivera (Physician)')}</span>
-                                  <span style={{ fontSize: 10, opacity: 0.75 }}>
-                                    {isPatient ? '(Patient)' : '(Clinician)'}
+                                  <span>{msg.sender_name || (isPatient ? 'Student' : 'Clinician')}</span>
+                                  <span style={{ fontSize: 10, opacity: 0.75, textTransform: 'capitalize' }}>
+                                    ({msg.sender_role})
                                   </span>
                                 </div>
 
                                 <div className={`tup-chat-bubble ${isPatient ? 'incoming' : 'outgoing'}`}>
-                                  {m.message_text}
+                                  {msg.message_text}
                                 </div>
 
                                 <div className="tup-chat-time">
-                                  <span>{formatMessageTime(m.created_at)}</span>
+                                  <span>{formatMessageTime(msg.created_at)}</span>
                                   {!isPatient && (
-                                    <span style={{ fontSize: 10, opacity: 0.8 }}>• {m.status || 'sent'}</span>
+                                    <span style={{ fontSize: 10, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
                                   )}
                                 </div>
                               </div>
@@ -684,41 +625,177 @@ const Help = () => {
                     )}
                   </div>
 
-                  {/* Staff Composer */}
-                  <form className="tup-chat-composer" onSubmit={sendReply}>
+                  {/* Staff Reply Composer */}
+                  {msgNotice && (
+                    <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: 12 }}>
+                      {msgNotice}
+                    </div>
+                  )}
+                  <form className="tup-chat-composer" onSubmit={handleSendReply}>
                     <textarea
                       className="tup-chat-input"
                       rows={1}
-                      placeholder="Type clinical reply to patient... (Enter to send, Shift+Enter for newline)"
+                      placeholder="Type clinical reply... (Enter to send, Shift+Enter for newline)"
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={sending || !activePatientId}
-                      aria-label="Clinical reply input"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendReply();
+                        }
+                      }}
+                      disabled={sending || !activeConversationId}
                     />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {msgNotice && (
-                        <span style={{ fontSize: 12, fontWeight: 600, color: msgNotice.includes('Unable') ? 'var(--danger)' : '#059669' }}>
-                          {msgNotice}
-                        </span>
-                      )}
-                      <button
-                        type="submit"
-                        className="tup-chat-send-btn"
-                        disabled={sending || !activePatientId || !reply.trim()}
-                        aria-label="Send clinical reply"
-                      >
-                        <SendIcon size={16} />
-                        <span>{sending ? 'Sending...' : 'Send Clinical Reply'}</span>
-                      </button>
-                    </div>
+                    <button
+                      type="submit"
+                      className="tup-chat-send-btn"
+                      disabled={sending || !reply.trim() || !activeConversationId}
+                    >
+                      <SendIcon size={16} />
+                      <span>{sending ? 'Sending...' : 'Reply'}</span>
+                    </button>
                   </form>
                 </div>
               </div>
             )}
           </div>
+        )}
+
+        {/* Technical Architecture Notice */}
+        <div
+          style={{
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '16px 20px',
+            marginBottom: 24,
+            fontSize: 13,
+            lineHeight: 1.6,
+            color: 'var(--muted)'
+          }}
+        >
+          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4, fontSize: 14 }}>
+            System Architecture Overview
+          </div>
+          <div>
+            The TUP Manila Clinic Management System uses a partitioned conversation model with Supabase Realtime synchronization, PostgreSQL Row-Level Security, role-based access control (RBAC), and immutable audit trails for compliance with health records security standards.
+          </div>
         </div>
-      </div>
+
+        {/* User Guides */}
+        <div style={{ marginBottom: 28 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+            Quick User Guides
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {guides.map((g, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: 'var(--panel)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  overflow: 'hidden'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleGuide(idx)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 18px',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text)',
+                    fontWeight: 600,
+                    fontSize: 14
+                  }}
+                >
+                  <span>{g.title}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 16 }}>
+                    {expandedGuide === idx ? '−' : '+'}
+                  </span>
+                </button>
+                {expandedGuide === idx && (
+                  <div
+                    style={{
+                      padding: '0 18px 14px 18px',
+                      color: 'var(--muted)',
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                      borderTop: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    {g.content}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FAQ Section */}
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+            Frequently Asked Questions
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {faqs.map((f, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: 'var(--panel)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  overflow: 'hidden'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleFaq(idx)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 18px',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text)',
+                    fontWeight: 600,
+                    fontSize: 14
+                  }}
+                >
+                  <span>{f.question}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 16 }}>
+                    {expandedFaq === idx ? '−' : '+'}
+                  </span>
+                </button>
+                {expandedFaq === idx && (
+                  <div
+                    style={{
+                      padding: '0 18px 14px 18px',
+                      color: 'var(--muted)',
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                      borderTop: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    {f.answer}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 };

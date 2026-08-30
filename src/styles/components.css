@@ -1291,12 +1291,13 @@ textarea::placeholder {
   cursor: not-allowed;
 }
 
-/* Staff Two-Panel Messaging Workspace */
+/* Two-Panel Messaging Workspace (Used by both Student and Staff) */
+.tup-two-panel-messenger,
 .tup-staff-messenger {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  height: 600px;
-  max-height: calc(100vh - 200px);
+  grid-template-columns: 310px 1fr;
+  height: 640px;
+  max-height: calc(100vh - 190px);
   min-height: 480px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 16px);
@@ -1305,6 +1306,7 @@ textarea::placeholder {
   box-shadow: var(--shadow-card);
 }
 
+.tup-inbox-panel,
 .tup-staff-inbox-panel {
   border-right: 1px solid var(--border);
   background: var(--panel);
@@ -1313,6 +1315,7 @@ textarea::placeholder {
   overflow: hidden;
 }
 
+.tup-inbox-header,
 .tup-staff-inbox-header {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border-subtle);
@@ -1323,11 +1326,13 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
+.tup-inbox-search,
 .tup-staff-inbox-search {
   position: relative;
   width: 100%;
 }
 
+.tup-inbox-search input,
 .tup-staff-inbox-search input {
   width: 100%;
   padding: 7px 12px 7px 32px;
@@ -1340,10 +1345,12 @@ textarea::placeholder {
   transition: border-color 0.15s;
 }
 
+.tup-inbox-search input:focus,
 .tup-staff-inbox-search input:focus {
   border-color: var(--color-primary);
 }
 
+.tup-inbox-search-icon,
 .tup-staff-inbox-search-icon {
   position: absolute;
   left: 10px;
@@ -1353,6 +1360,7 @@ textarea::placeholder {
   pointer-events: none;
 }
 
+.tup-inbox-list,
 .tup-staff-inbox-list {
   flex: 1;
   overflow-y: auto;
@@ -1362,6 +1370,7 @@ textarea::placeholder {
   gap: 4px;
 }
 
+.tup-inbox-item,
 .tup-staff-inbox-item {
   display: flex;
   align-items: flex-start;
@@ -1376,20 +1385,24 @@ textarea::placeholder {
   width: 100%;
 }
 
+.tup-inbox-item:hover,
 .tup-staff-inbox-item:hover {
   background: var(--surface-raised);
 }
 
+.tup-inbox-item.active,
 .tup-staff-inbox-item.active {
   background: var(--color-primary-tint);
   border-color: var(--color-primary-border);
 }
 
+:root[data-theme="dark"] .tup-inbox-item.active,
 :root[data-theme="dark"] .tup-staff-inbox-item.active {
   background: rgba(180, 35, 42, 0.18);
   border-color: rgba(180, 35, 42, 0.35);
 }
 
+.tup-chat-panel,
 .tup-staff-chat-panel {
   display: flex;
   flex-direction: column;
@@ -1397,6 +1410,7 @@ textarea::placeholder {
   background: var(--bg);
 }
 
+.tup-mobile-back,
 .tup-staff-mobile-back {
   display: none;
   align-items: center;
@@ -1411,28 +1425,22 @@ textarea::placeholder {
   border-radius: 6px;
 }
 
+.tup-mobile-back:hover,
 .tup-staff-mobile-back:hover {
   background: var(--color-primary-tint);
 }
 
 /* Responsive Rules for Messaging */
 @media (max-width: 1023px) {
+  .tup-two-panel-messenger,
   .tup-staff-messenger {
     grid-template-columns: 260px 1fr;
-    height: 560px;
+    height: 580px;
   }
 }
 
 @media (max-width: 767px) {
-  .tup-messenger-container {
-    height: calc(100vh - 160px);
-    border-radius: 10px;
-  }
-
-  .tup-chat-bubble {
-    max-width: 90%;
-  }
-
+  .tup-two-panel-messenger,
   .tup-staff-messenger {
     display: flex;
     flex-direction: column;
@@ -1440,21 +1448,30 @@ textarea::placeholder {
     border-radius: 10px;
   }
 
+  .tup-inbox-panel.hidden-mobile,
   .tup-staff-inbox-panel.hidden-mobile {
     display: none !important;
   }
 
+  .tup-chat-panel.hidden-mobile,
   .tup-staff-chat-panel.hidden-mobile {
     display: none !important;
   }
 
+  .tup-chat-panel,
   .tup-staff-chat-panel {
     flex: 1;
     min-height: 0;
   }
 
+  .tup-mobile-back,
   .tup-staff-mobile-back {
     display: flex;
   }
+
+  .tup-chat-bubble {
+    max-width: 90%;
+  }
 }
+
 

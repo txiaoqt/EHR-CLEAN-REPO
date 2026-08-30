@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
-import { MessagesIcon, SendIcon, PlusIcon, CloseIcon } from '../../components/icons/Icons.jsx';
+import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon } from '../../components/icons/Icons.jsx';
 
 const CONCERN_TYPES = [
   'General clinic inquiry',
@@ -17,6 +17,24 @@ const formatMessageTime = (isoString) => {
   if (!isoString) return '';
   const d = new Date(isoString);
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const formatInboxDate = (isoString) => {
+  if (!isoString) return '';
+  const msgDate = new Date(isoString);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const timeStr = msgDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (msgDate.toDateString() === today.toDateString()) {
+    return `Today · ${timeStr}`;
+  }
+  if (msgDate.toDateString() === yesterday.toDateString()) {
+    return `Yesterday · ${timeStr}`;
+  }
+  return `${msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' })} · ${timeStr}`;
 };
 
 const getDateDividerLabel = (isoString) => {
@@ -37,16 +55,22 @@ const getDateDividerLabel = (isoString) => {
 
 const PatientMessages = () => {
   const { user } = useAuth();
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [physicians, setPhysicians] = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [composerText, setComposerText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mobileViewingChat, setMobileViewingChat] = useState(false);
 
   // New Inquiry Modal State
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
-    recipient_name: '',
+    recipient_staff_id: '',
+    recipient_name: 'Clinic Personnel (General)',
     concern_type: CONCERN_TYPES[0],
     message_text: '',
   });
@@ -64,68 +88,175 @@ const PatientMessages = () => {
     }
   };
 
-  // Load registered physicians from safe staff_directory view
+  // 1. Load registered staff from safe staff_directory view
   useEffect(() => {
     let mounted = true;
-    const loadPhysicians = async () => {
+    const loadStaff = async () => {
       try {
         const { data, error } = await supabase
           .from('staff_directory')
-          .select('id, name, role')
-          .in('role', ['physician', 'nurse'])
+          .select('id, auth_user_id, name, role')
+          .in('role', ['physician', 'nurse', 'admin'])
           .order('name');
 
-        if (!error && mounted) {
-          setPhysicians((data || []).map((s) => s.name));
+        if (!error && mounted && data) {
+          setStaffList(data);
         }
       } catch (err) {
-        console.warn('Load physicians error:', err);
+        console.warn('Load staff error:', err);
       }
     };
-    loadPhysicians();
+    loadStaff();
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Initial load of student messages
-  const loadMessages = async () => {
+  // 2. Load conversations for this student
+  const loadConversations = async () => {
     if (!user?.patient_id) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('patient_messages')
+        .from('patient_message_conversations')
         .select('*')
         .eq('patient_id', user.patient_id)
-        .order('created_at', { ascending: true });
+        .order('updated_at', { ascending: false });
 
-      if (!error) {
-        setMessages(data || []);
+      if (!error && data) {
+        setConversations(data);
+        if (!activeConversationId && data.length > 0) {
+          setActiveConversationId(data[0].id);
+        }
+      } else if (error?.code === 'PGRST205') {
+        // Fallback: Read from patient_messages if table not yet provisioned on cloud
+        const { data: rawMsgs } = await supabase
+          .from('patient_messages')
+          .select('*')
+          .eq('patient_id', user.patient_id)
+          .order('created_at', { ascending: false });
+
+        if (rawMsgs) {
+          const threadMap = new Map();
+          rawMsgs.forEach((msg) => {
+            const key = msg.conversation_id || `${msg.patient_id}_${msg.recipient_name || 'Clinic'}_${msg.concern_type}`;
+            if (!threadMap.has(key)) {
+              threadMap.set(key, {
+                id: key,
+                patient_id: msg.patient_id,
+                patient_name: msg.patient_name || user.name,
+                recipient_name: msg.recipient_name || 'Clinic Personnel (General)',
+                concern_type: msg.concern_type || 'General clinic inquiry',
+                status: 'open',
+                updated_at: msg.created_at,
+                isFallback: true,
+              });
+            }
+          });
+          const threadList = Array.from(threadMap.values());
+          setConversations(threadList);
+          if (!activeConversationId && threadList.length > 0) {
+            setActiveConversationId(threadList[0].id);
+          }
+        }
       }
     } catch (err) {
-      console.warn('Load messages error:', err);
+      console.warn('Load conversations error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadMessages();
+    loadConversations();
   }, [user?.patient_id]);
 
-  // Scroll to bottom when messages finish loading or update
-  useEffect(() => {
-    if (!loading && messages.length > 0) {
-      scrollToBottom('auto');
-    }
-  }, [loading]);
+  // Active conversation record
+  const activeConversation = useMemo(() => {
+    return conversations.find((c) => c.id === activeConversationId) || null;
+  }, [conversations, activeConversationId]);
 
-  // Set up Supabase Realtime subscription for live student messages
+  // 3. Load messages for the currently active conversation only
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([]);
+      return;
+    }
+
+    let mounted = true;
+    const loadConversationMessages = async () => {
+      try {
+        setMessagesLoading(true);
+        let { data, error } = await supabase
+          .from('patient_messages')
+          .select('*')
+          .eq('conversation_id', activeConversationId)
+          .order('created_at', { ascending: true });
+
+        if ((!data || data.length === 0) && activeConversation?.isFallback) {
+          const { data: fallbackData } = await supabase
+            .from('patient_messages')
+            .select('*')
+            .eq('patient_id', user.patient_id)
+            .eq('concern_type', activeConversation.concern_type)
+            .order('created_at', { ascending: true });
+
+          data = fallbackData || [];
+        }
+
+        if (mounted && data) {
+          setMessages(data);
+          setTimeout(() => scrollToBottom('auto'), 50);
+        }
+      } catch (err) {
+        console.warn('Load conversation messages error:', err);
+      } finally {
+        if (mounted) setMessagesLoading(false);
+      }
+    };
+
+    loadConversationMessages();
+    return () => {
+      mounted = false;
+    };
+  }, [activeConversationId, activeConversation?.isFallback, user?.patient_id, activeConversation?.concern_type]);
+
+  // 4. Set up Supabase Realtime subscription for conversation-isolated events
   useEffect(() => {
     if (!user?.patient_id) return;
 
-    const channel = supabase
-      .channel(`patient_messages_student_${user.patient_id}`)
+    // Realtime for Conversations (Inbox updates)
+    const convChannel = supabase
+      .channel(`patient_conversations_${user.patient_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'patient_message_conversations',
+          filter: `patient_id=eq.${user.patient_id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === payload.new.id)) return prev;
+              return [payload.new, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setConversations((prev) => {
+              const updated = prev.map((c) => (c.id === payload.new.id ? payload.new : c));
+              return updated.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setConversations((prev) => prev.filter((c) => c.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    // Realtime for Messages (Live conversation messaging)
+    const msgChannel = supabase
+      .channel(`patient_messages_${user.patient_id}`)
       .on(
         'postgres_changes',
         {
@@ -136,44 +267,65 @@ const PatientMessages = () => {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setMessages((prev) => {
-              // Deduplicate if already present locally
-              if (prev.some((m) => m.id === payload.new.id)) return prev;
-              return [...prev, payload.new];
+            const newMsg = payload.new;
+            // ONLY append into active message list if it belongs to the currently active conversation
+            const msgMatchesActive =
+              (newMsg.conversation_id && newMsg.conversation_id === activeConversationId) ||
+              (activeConversation?.isFallback &&
+                newMsg.concern_type === activeConversation.concern_type &&
+                newMsg.recipient_name === activeConversation.recipient_name);
+
+            if (msgMatchesActive) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
+              setTimeout(() => scrollToBottom('smooth'), 100);
+            }
+
+            // Update conversation list updated_at & order
+            setConversations((prev) => {
+              const targetKey = newMsg.conversation_id || `${newMsg.patient_id}_${newMsg.recipient_name || 'Clinic'}_${newMsg.concern_type}`;
+              const exists = prev.find((c) => c.id === targetKey || c.id === newMsg.conversation_id);
+              if (exists) {
+                const updated = prev.map((c) =>
+                  (c.id === targetKey || c.id === newMsg.conversation_id) ? { ...c, updated_at: newMsg.created_at } : c
+                );
+                return updated.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+              }
+              return prev;
             });
-            setTimeout(() => scrollToBottom('smooth'), 100);
           } else if (payload.eventType === 'UPDATE') {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === payload.new.id ? payload.new : m))
-            );
+            if (payload.new.conversation_id === activeConversationId) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === payload.new.id ? payload.new : m))
+              );
+            }
           } else if (payload.eventType === 'DELETE') {
-            setMessages((prev) => prev.filter((m) => m.id === payload.old.id));
+            setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
           }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(convChannel);
+      supabase.removeChannel(msgChannel);
     };
-  }, [user?.patient_id]);
+  }, [user?.patient_id, activeConversationId, activeConversation]);
 
-  // Derive conversation partner name and active category
-  const activePartner = useMemo(() => {
-    if (messages.length === 0) return 'Clinic Personnel (General)';
-    const staffMsg = [...messages].reverse().find((m) => m.sender_role !== 'patient');
-    if (staffMsg?.sender_name) return staffMsg.sender_name;
-    const latestMsg = messages[messages.length - 1];
-    return latestMsg?.recipient_name || 'Clinic Personnel (General)';
-  }, [messages]);
+  // Filter conversations by search query
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const q = searchQuery.toLowerCase().trim();
+    return conversations.filter(
+      (c) =>
+        (c.recipient_name || '').toLowerCase().includes(q) ||
+        (c.concern_type || '').toLowerCase().includes(q)
+    );
+  }, [conversations, searchQuery]);
 
-  const activeConcernType = useMemo(() => {
-    if (messages.length === 0) return 'General clinic inquiry';
-    const latest = messages[messages.length - 1];
-    return latest?.concern_type || 'General clinic inquiry';
-  }, [messages]);
-
-  // Group messages by date for date dividers
+  // Group active conversation messages by date
   const groupedMessages = useMemo(() => {
     const groups = [];
     let currentDate = null;
@@ -199,42 +351,53 @@ const PatientMessages = () => {
     return groups;
   }, [messages]);
 
-  // Send message from chat composer
+  // Send message in existing conversation
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
-    if (!composerText.trim() || !user?.patient_id || sending) return;
+    if (!composerText.trim() || !activeConversationId || sending) return;
 
     setSending(true);
     const textToSend = composerText.trim();
 
     try {
-      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+      // 1. Try atomic send_patient_message RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc('send_patient_message', {
+        p_conversation_id: activeConversationId,
+        p_message_text: textToSend,
+      });
 
-      const { data, error } = await supabase
-        .from('patient_messages')
-        .insert([
-          {
-            patient_id: user.patient_id,
-            auth_user_id: authUid,
-            patient_name: user?.name || null,
-            sender_role: 'patient',
-            sender_name: user?.name || 'Student',
-            recipient_name: activePartner,
-            concern_type: activeConcernType,
-            message_text: textToSend,
-            status: 'sent',
-          },
-        ])
-        .select();
+      if (rpcError) {
+        // Fallback to direct verified insert if RPC unavailable
+        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+        const insertPayload = {
+          patient_id: user.patient_id,
+          auth_user_id: authUid,
+          patient_name: user?.name || 'Student',
+          sender_role: 'patient',
+          sender_name: user?.name || 'Student',
+          recipient_name: activeConversation?.recipient_name || 'Clinic Personnel (General)',
+          concern_type: activeConversation?.concern_type || 'General clinic inquiry',
+          message_text: textToSend,
+          status: 'sent',
+        };
 
-      if (error) throw error;
+        if (!activeConversation?.isFallback) {
+          insertPayload.conversation_id = activeConversationId;
+        }
 
-      // Optimistic append if not already received by realtime
-      if (data?.[0]) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === data[0].id)) return prev;
-          return [...prev, data[0]];
-        });
+        const { data: directData, error: directError } = await supabase
+          .from('patient_messages')
+          .insert([insertPayload])
+          .select();
+
+        if (directError) throw directError;
+
+        if (directData?.[0]) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === directData[0].id)) return prev;
+            return [...prev, directData[0]];
+          });
+        }
       }
 
       setComposerText('');
@@ -248,53 +411,107 @@ const PatientMessages = () => {
     }
   };
 
-  // Send message from New Inquiry Modal
+  // Send message from Start New Inquiry Modal (Creates NEW conversation)
   const handleSendNewInquiry = async (e) => {
     e.preventDefault();
     if (!inquiryForm.message_text.trim() || !user?.patient_id || sending) return;
 
     setSending(true);
     try {
-      const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+      const staffTarget = staffList.find((s) => s.id === inquiryForm.recipient_staff_id);
+      const recipientName = staffTarget?.name || 'Clinic Personnel (General)';
+      const recipientStaffId = staffTarget?.id || null;
 
-      const { data, error } = await supabase
-        .from('patient_messages')
-        .insert([
-          {
-            patient_id: user.patient_id,
-            auth_user_id: authUid,
-            patient_name: user?.name || null,
-            sender_role: 'patient',
-            sender_name: user?.name || 'Student',
-            recipient_name: inquiryForm.recipient_name || 'Clinic Personnel (General)',
-            concern_type: inquiryForm.concern_type,
-            message_text: inquiryForm.message_text.trim(),
-            status: 'sent',
-          },
-        ])
-        .select();
+      // 1. Try atomic create_patient_inquiry RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc('create_patient_inquiry', {
+        p_recipient_staff_id: recipientStaffId,
+        p_concern_type: inquiryForm.concern_type,
+        p_message_text: inquiryForm.message_text.trim(),
+        p_recipient_name: recipientName,
+      });
 
-      if (error) throw error;
+      let newConvId = null;
 
-      if (data?.[0]) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === data[0].id)) return prev;
-          return [...prev, data[0]];
-        });
+      if (!rpcError && rpcData?.conversation_id) {
+        newConvId = rpcData.conversation_id;
+      } else {
+        // Fallback: Try insert into patient_message_conversations
+        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+
+        const { data: convData, error: convError } = await supabase
+          .from('patient_message_conversations')
+          .insert([
+            {
+              patient_id: user.patient_id,
+              patient_name: user?.name || 'Student',
+              recipient_staff_id: recipientStaffId,
+              recipient_auth_user_id: staffTarget?.auth_user_id || null,
+              recipient_name: recipientName,
+              recipient_role: staffTarget?.role || 'clinic',
+              concern_type: inquiryForm.concern_type,
+              status: 'open',
+            },
+          ])
+          .select();
+
+        if (!convError && convData?.[0]?.id) {
+          newConvId = convData[0].id;
+          await supabase.from('patient_messages').insert([
+            {
+              conversation_id: newConvId,
+              patient_id: user.patient_id,
+              auth_user_id: authUid,
+              patient_name: user?.name || 'Student',
+              sender_role: 'patient',
+              sender_name: user?.name || 'Student',
+              recipient_name: recipientName,
+              concern_type: inquiryForm.concern_type,
+              message_text: inquiryForm.message_text.trim(),
+              status: 'sent',
+            },
+          ]);
+        } else {
+          // Direct insert into patient_messages
+          const { data: msgData, error: msgError } = await supabase
+            .from('patient_messages')
+            .insert([
+              {
+                patient_id: user.patient_id,
+                auth_user_id: authUid,
+                patient_name: user?.name || 'Student',
+                sender_role: 'patient',
+                sender_name: user?.name || 'Student',
+                recipient_name: recipientName,
+                concern_type: inquiryForm.concern_type,
+                message_text: inquiryForm.message_text.trim(),
+                status: 'sent',
+              },
+            ])
+            .select();
+
+          if (msgError) throw msgError;
+          newConvId = `${user.patient_id}_${recipientName}_${inquiryForm.concern_type}`;
+        }
+      }
+
+      await loadConversations();
+      if (newConvId) {
+        setActiveConversationId(newConvId);
+        setMobileViewingChat(true);
       }
 
       setInquiryModalOpen(false);
       setInquiryForm({
-        recipient_name: '',
+        recipient_staff_id: '',
+        recipient_name: 'Clinic Personnel (General)',
         concern_type: CONCERN_TYPES[0],
         message_text: '',
       });
-      setNotice('Your inquiry has been sent to clinic personnel. You will receive advice or assistance shortly.');
+      setNotice('Your new inquiry has been initiated with clinic personnel.');
       setNoticeOpen(true);
-      setTimeout(() => scrollToBottom('smooth'), 100);
     } catch (err) {
       console.error('Send inquiry error:', err);
-      setNotice('Unable to send your inquiry right now. Please try again later.');
+      setNotice('Unable to start inquiry right now. Please try again later.');
       setNoticeOpen(true);
     } finally {
       setSending(false);
@@ -311,9 +528,9 @@ const PatientMessages = () => {
 
   return (
     <main className="main">
-      <section className="page patient-messages-page" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <section className="page patient-messages-page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
         {/* Page Header */}
-        <div className="page-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div className="page-header" style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>Messages</h1>
             <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 13.5 }}>
@@ -353,142 +570,244 @@ const PatientMessages = () => {
           </span>
         </div>
 
-        {/* Modern Messenger Interface Card */}
-        <div className="tup-messenger-container">
-          {/* Messenger Card Header */}
-          <div className="tup-messenger-header">
-            <div className="tup-messenger-recipient-info">
-              <div className="tup-messenger-avatar tup-avatar-clinic">
-                <MessagesIcon size={18} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {activePartner}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', marginTop: 1 }}>
-                  <span className="tup-status-dot" />
-                  Available / Clinic Staff
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
-                {activeConcernType}
-              </span>
-              <button
-                type="button"
-                className="btn small secondary"
-                onClick={() => setInquiryModalOpen(true)}
-                style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                title="Start a new inquiry thread"
-              >
-                <PlusIcon size={13} />
-                New Inquiry
-              </button>
-            </div>
+        {/* Two-Panel Messenger Workspace */}
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 14 }}>
+            Loading conversations...
           </div>
-
-          {/* Messages Stream Container */}
-          <div className="tup-chat-messages-area">
-            {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
-                Loading conversation history...
+        ) : conversations.length === 0 ? (
+          /* Empty State */
+          <div
+            style={{
+              padding: '60px 20px',
+              textAlign: 'center',
+              background: 'var(--panel)',
+              borderRadius: 14,
+              border: '1px dashed var(--border)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-primary-tint)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <MessagesIcon size={26} />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+              No conversations yet
+            </div>
+            <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 380, lineHeight: 1.5, marginBottom: 18 }}>
+              Send a new inquiry to clinic personnel to start a direct consultation thread.
+            </div>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => setInquiryModalOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <PlusIcon size={16} />
+              Start New Inquiry
+            </button>
+          </div>
+        ) : (
+          <div className="tup-two-panel-messenger">
+            {/* LEFT PANEL: Conversation List */}
+            <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
+              <div className="tup-inbox-header">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
+                    Conversations ({conversations.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInquiryModalOpen(true)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 4, display: 'flex' }}
+                    title="New Inquiry"
+                  >
+                    <PlusIcon size={16} />
+                  </button>
+                </div>
+                <div className="tup-inbox-search">
+                  <SearchIcon size={14} className="tup-inbox-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
-            ) : messages.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '40px 20px' }}>
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-primary-tint)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <MessagesIcon size={26} />
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                  No conversations yet
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 360, lineHeight: 1.5, marginBottom: 16 }}>
-                  Send a non-emergency inquiry or follow-up question to university clinic personnel to get started.
-                </div>
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => setInquiryModalOpen(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <PlusIcon size={16} />
-                  Start New Inquiry
-                </button>
-              </div>
-            ) : (
-              <>
-                {groupedMessages.map((group, gIdx) => (
-                  <React.Fragment key={group.date || gIdx}>
-                    {/* Date Divider */}
-                    <div className="tup-chat-date-divider">
-                      <span>{group.date}</span>
-                    </div>
 
-                    {/* Messages in this date group */}
-                    {group.messages.map((msg) => {
-                      const isStudent = msg.sender_role === 'patient';
-                      return (
-                        <div
-                          key={msg.id}
-                          className={`tup-chat-message-row ${isStudent ? 'outgoing' : 'incoming'}`}
-                        >
-                          {/* Sender Label for incoming staff messages */}
-                          {!isStudent && (
-                            <div className="tup-chat-sender-label">
-                              <span>{msg.sender_name || 'Clinic Personnel'}</span>
-                              <span style={{ fontSize: 10, opacity: 0.75, textTransform: 'capitalize' }}>
-                                ({msg.sender_role || 'Staff'})
-                              </span>
+              <div className="tup-inbox-list">
+                {filteredConversations.length === 0 ? (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5 }}>
+                    No matching conversations
+                  </div>
+                ) : (
+                  filteredConversations.map((c) => {
+                    const isActive = activeConversationId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        className={`tup-inbox-item ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveConversationId(c.id);
+                          setMobileViewingChat(true);
+                        }}
+                      >
+                        <div className="tup-messenger-avatar tup-avatar-clinic" style={{ width: 36, height: 36, fontSize: 13 }}>
+                          <MessagesIcon size={16} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.recipient_name}
                             </div>
-                          )}
-
-                          {/* Message Bubble */}
-                          <div className={`tup-chat-bubble ${isStudent ? 'outgoing' : 'incoming'}`}>
-                            {msg.message_text}
+                            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              {formatInboxDate(c.updated_at).split(' · ')[0]}
+                            </span>
                           </div>
-
-                          {/* Timestamp underneath */}
-                          <div className="tup-chat-time">
-                            <span>{formatMessageTime(msg.created_at)}</span>
-                            {isStudent && (
-                              <span style={{ fontSize: 10, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
-                            )}
+                          <div style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 1 }}>
+                            {c.concern_type}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                            <span className={`badge ${c.status === 'open' ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 10, padding: '1px 6px', textTransform: 'capitalize' }}>
+                              {c.status}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
-                <div ref={messagesEndRef} style={{ height: 1 }} />
-              </>
-            )}
-          </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
-          {/* Bottom Pinned Chat Composer */}
-          <form className="tup-chat-composer" onSubmit={handleSendMessage}>
-            <textarea
-              ref={textareaRef}
-              className="tup-chat-input"
-              rows={1}
-              placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
-              value={composerText}
-              onChange={(e) => setComposerText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={sending}
-              aria-label="Message content input"
-            />
-            <button
-              type="submit"
-              className="tup-chat-send-btn"
-              disabled={sending || !composerText.trim()}
-              aria-label="Send message"
-            >
-              <SendIcon size={16} />
-              <span>{sending ? 'Sending...' : 'Send'}</span>
-            </button>
-          </form>
-        </div>
+            {/* RIGHT PANEL: Active Conversation Stream */}
+            <div className={`tup-chat-panel ${!mobileViewingChat ? 'hidden-mobile' : ''}`}>
+              {/* Header */}
+              <div className="tup-messenger-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button
+                    type="button"
+                    className="tup-mobile-back"
+                    onClick={() => setMobileViewingChat(false)}
+                    aria-label="Back to conversations"
+                  >
+                    <ChevronLeftIcon size={16} />
+                    <span>Inbox</span>
+                  </button>
+
+                  <div className="tup-messenger-avatar tup-avatar-clinic">
+                    <MessagesIcon size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {activeConversation?.recipient_name || 'Clinic Personnel (General)'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', marginTop: 1, gap: 6 }}>
+                      <span className="tup-status-dot" />
+                      <span>Available / Clinic Staff</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
+                    {activeConversation?.concern_type || 'General clinic inquiry'}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn small secondary"
+                    onClick={() => setInquiryModalOpen(true)}
+                    style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <PlusIcon size={13} />
+                    New Inquiry
+                  </button>
+                </div>
+              </div>
+
+              {/* Message History for this specific conversation */}
+              <div className="tup-chat-messages-area">
+                {messagesLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                    Loading messages...
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                    No messages in this inquiry thread yet.
+                  </div>
+                ) : (
+                  <>
+                    {groupedMessages.map((group, gIdx) => (
+                      <React.Fragment key={group.date || gIdx}>
+                        <div className="tup-chat-date-divider">
+                          <span>{group.date}</span>
+                        </div>
+
+                        {group.messages.map((msg) => {
+                          const isStudent = msg.sender_role === 'patient';
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`tup-chat-message-row ${isStudent ? 'outgoing' : 'incoming'}`}
+                            >
+                              {!isStudent && (
+                                <div className="tup-chat-sender-label">
+                                  <span>{msg.sender_name || 'Clinic Personnel'}</span>
+                                  <span style={{ fontSize: 10, opacity: 0.75, textTransform: 'capitalize' }}>
+                                    ({msg.sender_role || 'Staff'})
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className={`tup-chat-bubble ${isStudent ? 'outgoing' : 'incoming'}`}>
+                                {msg.message_text}
+                              </div>
+
+                              <div className="tup-chat-time">
+                                <span>{formatMessageTime(msg.created_at)}</span>
+                                {isStudent && (
+                                  <span style={{ fontSize: 10, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                    <div ref={messagesEndRef} style={{ height: 1 }} />
+                  </>
+                )}
+              </div>
+
+              {/* Bottom Composer */}
+              <form className="tup-chat-composer" onSubmit={handleSendMessage}>
+                <textarea
+                  ref={textareaRef}
+                  className="tup-chat-input"
+                  rows={1}
+                  placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
+                  value={composerText}
+                  onChange={(e) => setComposerText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={sending || !activeConversationId}
+                  aria-label="Message content input"
+                />
+                <button
+                  type="submit"
+                  className="tup-chat-send-btn"
+                  disabled={sending || !composerText.trim() || !activeConversationId}
+                  aria-label="Send message"
+                >
+                  <SendIcon size={16} />
+                  <span>{sending ? 'Sending...' : 'Send'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Start New Inquiry Modal Dialog */}
         {inquiryModalOpen && (
@@ -534,7 +853,7 @@ const PatientMessages = () => {
                     Start New Inquiry
                   </h3>
                   <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
-                    Direct inquiry to university clinic personnel
+                    Creates an independent consultation thread with clinic personnel
                   </div>
                 </div>
                 <button
@@ -560,17 +879,19 @@ const PatientMessages = () => {
                 <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <label style={{ fontSize: 12.5, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                      Recipient
+                      Recipient Clinician / Staff *
                     </label>
                     <select
                       className="input"
                       style={{ width: '100%' }}
-                      value={inquiryForm.recipient_name}
-                      onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_name: e.target.value }))}
+                      value={inquiryForm.recipient_staff_id}
+                      onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }))}
                     >
                       <option value="">Clinic Personnel (General)</option>
-                      {physicians.map((name) => (
-                        <option key={name} value={name}>{name}</option>
+                      {staffList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)})
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -633,7 +954,7 @@ const PatientMessages = () => {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   >
                     <SendIcon size={15} />
-                    {sending ? 'Sending Inquiry...' : 'Send Inquiry'}
+                    {sending ? 'Initiating Inquiry...' : 'Send Inquiry'}
                   </button>
                 </div>
               </form>

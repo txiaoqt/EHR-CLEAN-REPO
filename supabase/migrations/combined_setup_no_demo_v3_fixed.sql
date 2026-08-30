@@ -2668,7 +2668,8 @@ alter table if exists public.inventory_transactions disable row level security;
 alter table if exists public.settings disable row level security;
 alter table if exists public.audit_logs disable row level security;
 alter table if exists public.profiles disable row level security;
-alter table if exists public.patient_messages disable row level security;
+alter table if exists public.patient_messages enable row level security;
+alter table if exists public.patient_message_conversations enable row level security;
 alter table if exists public.break_glass_audit_logs disable row level security;
 
 grant usage on schema public to anon, authenticated;
