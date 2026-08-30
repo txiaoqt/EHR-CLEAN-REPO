@@ -1550,6 +1550,35 @@ create trigger trg_check_one_active_appointment
 before insert or update on public.appointments
 for each row execute function public.check_one_active_appointment_per_student();
 
+create or replace function public.get_slot_occupancy(
+  p_start_date date default current_date,
+  p_end_date date default (current_date + 90)
+)
+returns table (
+  department text,
+  appointment_date text,
+  appointment_time text,
+  occupied_count bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select 
+    coalesce(a.department, 'Medical Clinic')::text as department,
+    a.appointment_date::text as appointment_date,
+    a.appointment_time::text as appointment_time,
+    count(*)::bigint as occupied_count
+  from public.appointments a
+  where a.appointment_date >= p_start_date
+    and a.appointment_date <= p_end_date
+    and a.status in ('Scheduled', 'Checked-in')
+  group by coalesce(a.department, 'Medical Clinic'), a.appointment_date, a.appointment_time;
+$$;
+
+grant execute on function public.get_slot_occupancy(date, date) to authenticated, anon;
+
 drop trigger if exists trg_set_encounters_clinician_auth_user_id on public.encounters;
 create trigger trg_set_encounters_clinician_auth_user_id
 before insert on public.encounters

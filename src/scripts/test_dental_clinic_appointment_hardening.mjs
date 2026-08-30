@@ -177,8 +177,8 @@ assert(
 console.log('\n[TEST GROUP 5] Dental Slot Capacity & Independent Availability');
 
 assert(
-  bookingCode.includes('a.department === form.department') &&
-  bookingCode.includes("a.status !== 'Cancelled'"),
+  bookingCode.includes("slotKey = `${form.department}|${form.appointment_date}|${time}`") &&
+  bookingCode.includes("slotOccupancy.get(slotKey)"),
   'TEST 16: Dental slot capacity filters correctly by department without mixing Medical and Dental quotas'
 );
 

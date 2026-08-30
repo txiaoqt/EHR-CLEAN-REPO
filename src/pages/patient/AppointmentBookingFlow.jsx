@@ -41,6 +41,9 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const { user } = useAuth();
   const today = toDateKey(new Date());
   const [appointments, setAppointments] = useState([]);
+  const [slotOccupancy, setSlotOccupancy] = useState(new Map());
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState(false);
   const [activeAppointment, setActiveAppointment] = useState(null);
   const [loadingActiveAppt, setLoadingActiveAppt] = useState(true);
   const [staffList, setStaffList] = useState([]);
@@ -92,19 +95,98 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   };
 
   const loadAppointments = async () => {
-    const { data } = await supabase
-      .from('appointments')
-      .select('*')
-      .gte('appointment_date', today)
-      .order('appointment_date', { ascending: true });
-    setAppointments(data || []);
-    if (form.patient_id) {
-      await loadActiveAppointment(form.patient_id);
+    setAvailabilityLoading(true);
+    try {
+      // 1. Fetch global slot occupancy across all students via secure RPC (privacy-preserving, works with RLS)
+      const maxDate = toDateKey(addMonths(new Date(), 3));
+      const { data: occupancyRows, error: rpcErr } = await supabase.rpc('get_slot_occupancy', {
+        p_start_date: today,
+        p_end_date: maxDate,
+      });
+
+      const map = new Map();
+      if (!rpcErr && Array.isArray(occupancyRows)) {
+        occupancyRows.forEach((row) => {
+          const dept = row.department || 'Medical Clinic';
+          const key = `${dept}|${row.appointment_date}|${row.appointment_time}`;
+          map.set(key, Number(row.occupied_count || 0));
+        });
+        setSlotOccupancy(map);
+        setAvailabilityError(false);
+      } else {
+        // Fallback: direct select if RPC is unavailable or user has staff clearance
+        const { data: directRows, error: directErr } = await supabase
+          .from('appointments')
+          .select('department, appointment_date, appointment_time, status')
+          .gte('appointment_date', today)
+          .in('status', ['Scheduled', 'Checked-in']);
+
+        if (!directErr && directRows) {
+          directRows.forEach((row) => {
+            const dept = row.department || 'Medical Clinic';
+            const key = `${dept}|${row.appointment_date}|${row.appointment_time}`;
+            map.set(key, (map.get(key) || 0) + 1);
+          });
+          setSlotOccupancy(map);
+          setAvailabilityError(false);
+        } else {
+          console.warn('Slot availability query failed:', rpcErr || directErr);
+          setAvailabilityError(true);
+        }
+      }
+
+      // 2. Fetch student's own appointments
+      const { data: userAppts } = await supabase
+        .from('appointments')
+        .select('*')
+        .gte('appointment_date', today)
+        .order('appointment_date', { ascending: true });
+      setAppointments(userAppts || []);
+
+      if (form.patient_id) {
+        await loadActiveAppointment(form.patient_id);
+      }
+    } catch (err) {
+      console.warn('loadAppointments error:', err);
+      setAvailabilityError(true);
+    } finally {
+      setAvailabilityLoading(false);
     }
   };
 
+  // Lifecycle synchronization triggers: initial load, focus, visibility, and Realtime subscription
   useEffect(() => {
     loadAppointments();
+
+    const handleFocus = () => {
+      loadAppointments();
+    };
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        loadAppointments();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Supabase Realtime channel subscription for instant multi-student updates
+    const channel = supabase
+      .channel('public:appointments:slot-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          loadAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      supabase.removeChannel(channel);
+    };
   }, [today]);
 
   useEffect(() => {
@@ -151,6 +233,17 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     }));
   }, [form.department, form.appointment_type, today]);
 
+  // Deselect currently selected time slot if it becomes occupied by another student
+  useEffect(() => {
+    if (form.appointment_time && form.appointment_date && form.department) {
+      const key = `${form.department}|${form.appointment_date}|${form.appointment_time}`;
+      const occupied = slotOccupancy.get(key) || 0;
+      if (occupied >= SLOT_CAPACITY) {
+        setForm((p) => ({ ...p, appointment_time: '' }));
+      }
+    }
+  }, [slotOccupancy, form.department, form.appointment_date, form.appointment_time]);
+
   const visibleStaff = useMemo(() => {
     if (form.department === 'Dental Clinic') {
       return staffList.filter((s) => /dent/i.test(s.name || ''));
@@ -187,63 +280,69 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       const d = new Date(first.getFullYear(), first.getMonth(), day);
       const key = toDateKey(d);
       if (!isDateSelectable(key)) continue;
-      const booked = appointments.filter((a) =>
-        a.appointment_date === key &&
-        a.department === form.department &&
-        a.status !== 'Cancelled',
-      ).length;
+
+      if (availabilityError) {
+        map.set(key, 0);
+        continue;
+      }
+
+      let dayBooked = 0;
+      SLOT_TIMES.forEach((time) => {
+        const slotKey = `${form.department}|${key}|${time}`;
+        dayBooked += (slotOccupancy.get(slotKey) || 0);
+      });
+
       const dayCapacity = DAILY_PATIENT_LIMIT;
-      const available = Math.max(dayCapacity - booked, 0);
+      const available = Math.max(dayCapacity - dayBooked, 0);
       const pct = dayCapacity ? Math.round((available / dayCapacity) * 100) : 0;
       map.set(key, pct);
     }
     return map;
-  }, [appointments, form.department, form.appointment_type, today, viewMonth]);
+  }, [slotOccupancy, availabilityError, form.department, form.appointment_type, today, viewMonth]);
 
   const availableSlots = useMemo(() => {
-    return SLOT_TIMES.filter((time) => {
-      const slotBookedCount = appointments.filter((a) =>
-        a.appointment_date === form.appointment_date &&
-        a.department === form.department &&
-        (a.appointment_time || '') === time &&
-        a.status !== 'Cancelled',
-      ).length;
-      const dailyBookedCount = appointments.filter((a) =>
-        a.appointment_date === form.appointment_date &&
-        a.department === form.department &&
-        a.status !== 'Cancelled',
-      ).length;
-      return dailyBookedCount < DAILY_PATIENT_LIMIT && slotBookedCount < SLOT_CAPACITY;
+    if (availabilityError) return [];
+
+    let dailyBooked = 0;
+    SLOT_TIMES.forEach((time) => {
+      const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+      dailyBooked += (slotOccupancy.get(slotKey) || 0);
     });
-  }, [appointments, form.appointment_date, form.department]);
+
+    return SLOT_TIMES.filter((time) => {
+      const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+      const slotBooked = slotOccupancy.get(slotKey) || 0;
+      return dailyBooked < DAILY_PATIENT_LIMIT && slotBooked < SLOT_CAPACITY;
+    });
+  }, [slotOccupancy, availabilityError, form.appointment_date, form.department]);
 
   const sameDayHasAvailableSlot = useMemo(() => {
+    if (availabilityError) return false;
+
     return SLOT_TIMES.some((time) => {
-      const slotBookedCount = appointments.filter((a) =>
-        a.appointment_date === today &&
-        a.department === form.department &&
-        (a.appointment_time || '') === time &&
-        a.status !== 'Cancelled',
-      ).length;
-      return slotBookedCount < SLOT_CAPACITY;
+      const slotKey = `${form.department}|${today}|${time}`;
+      const slotBooked = slotOccupancy.get(slotKey) || 0;
+      return slotBooked < SLOT_CAPACITY;
     });
-  }, [appointments, form.department, today]);
+  }, [slotOccupancy, availabilityError, form.department, today]);
 
   const nextAvailableFutureDate = useMemo(() => {
+    if (availabilityError) return '';
+
     for (let i = 1; i <= 30; i += 1) {
       const dateKey = toDateKey(addDays(new Date(), i));
-      const dayBookedCount = appointments.filter((a) =>
-        a.appointment_date === dateKey &&
-        a.department === form.department &&
-        a.status !== 'Cancelled',
-      ).length;
-      if (dayBookedCount < DAILY_PATIENT_LIMIT) return dateKey;
+      let dayBooked = 0;
+      SLOT_TIMES.forEach((time) => {
+        const slotKey = `${form.department}|${dateKey}|${time}`;
+        dayBooked += (slotOccupancy.get(slotKey) || 0);
+      });
+      if (dayBooked < DAILY_PATIENT_LIMIT) return dateKey;
     }
     return '';
-  }, [appointments, form.department]);
+  }, [slotOccupancy, availabilityError, form.department]);
 
   useEffect(() => {
-    if (form.appointment_type === 'Same-day Appointment' && !sameDayHasAvailableSlot) {
+    if (form.appointment_type === 'Same-day Appointment' && !sameDayHasAvailableSlot && !availabilityLoading) {
       setForm((p) => ({
         ...p,
         appointment_type: 'Future Appointment',
@@ -254,28 +353,30 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         ? `Same-day slots are full. Switched to next available date (${nextAvailableFutureDate}).`
         : 'Same-day slots are full. Please choose a future appointment date.');
     }
-  }, [form.appointment_type, sameDayHasAvailableSlot, nextAvailableFutureDate]);
+  }, [form.appointment_type, sameDayHasAvailableSlot, nextAvailableFutureDate, availabilityLoading]);
 
   const slotRows = useMemo(() => {
-    const dailyBookedCount = appointments.filter((a) =>
-      a.appointment_date === form.appointment_date &&
-      a.department === form.department &&
-      a.status !== 'Cancelled',
-    ).length;
-    const dailyRemaining = Math.max(DAILY_PATIENT_LIMIT - dailyBookedCount, 0);
+    let dailyBooked = 0;
+    SLOT_TIMES.forEach((time) => {
+      const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+      dailyBooked += (slotOccupancy.get(slotKey) || 0);
+    });
+    const dailyRemaining = Math.max(DAILY_PATIENT_LIMIT - dailyBooked, 0);
 
     return SLOT_TIMES.map((time) => {
-      const windowBookedCount = appointments.filter((a) =>
-        a.appointment_date === form.appointment_date &&
-        a.department === form.department &&
-        (a.appointment_time || '') === time &&
-        a.status !== 'Cancelled',
-      ).length;
+      const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+      const windowBookedCount = availabilityError ? SLOT_CAPACITY : (slotOccupancy.get(slotKey) || 0);
       const availableCount = Math.max(SLOT_CAPACITY - windowBookedCount, 0);
       const pct = SLOT_CAPACITY ? Math.round((availableCount / SLOT_CAPACITY) * 100) : 0;
-      return { time, availableCount, pct, disabled: dailyRemaining <= 0 || availableCount <= 0, windowBookedCount };
+      return {
+        time,
+        availableCount,
+        pct,
+        disabled: availabilityError || dailyRemaining <= 0 || availableCount <= 0,
+        windowBookedCount,
+      };
     });
-  }, [appointments, form.appointment_date, form.department]);
+  }, [slotOccupancy, availabilityError, form.appointment_date, form.department]);
 
   const submit = async () => {
     if (!form.patient_id || !form.patient_name || !form.appointment_date || !form.appointment_time || !form.service_type) {
@@ -309,28 +410,52 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       }
 
       // Level 2b: Re-verify slot capacity from server to guard against stale local client state
-      const { data: slotOccupants, error: slotErr } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('department', form.department)
-        .eq('appointment_date', form.appointment_date)
-        .eq('appointment_time', form.appointment_time)
-        .in('status', ['Scheduled', 'Checked-in'])
-        .limit(1);
+      const { data: latestOccupancy } = await supabase.rpc('get_slot_occupancy', {
+        p_start_date: form.appointment_date,
+        p_end_date: form.appointment_date,
+      });
 
-      if (!slotErr && slotOccupants && slotOccupants.length >= SLOT_CAPACITY) {
-        setNotice('This time slot is no longer available. Please select another available slot.');
+      let currentSlotOccupied = false;
+      if (Array.isArray(latestOccupancy)) {
+        const match = latestOccupancy.find(
+          (r) =>
+            (r.department || 'Medical Clinic') === form.department &&
+            r.appointment_date === form.appointment_date &&
+            r.appointment_time === form.appointment_time
+        );
+        if (match && Number(match.occupied_count || 0) >= SLOT_CAPACITY) {
+          currentSlotOccupied = true;
+        }
+      } else {
+        // Fallback check if RPC returned null
+        const { data: slotOccupants } = await supabase
+          .from('appointments')
+          .select('id')
+          .eq('department', form.department)
+          .eq('appointment_date', form.appointment_date)
+          .eq('appointment_time', form.appointment_time)
+          .in('status', ['Scheduled', 'Checked-in'])
+          .limit(1);
+        if (slotOccupants && slotOccupants.length >= SLOT_CAPACITY) {
+          currentSlotOccupied = true;
+        }
+      }
+
+      if (currentSlotOccupied) {
+        setForm((p) => ({ ...p, appointment_time: '' }));
         await loadAppointments();
+        setNotice('This time slot is no longer available. Please select another available slot.');
         setSaving(false);
         return;
       }
 
-      // Verify overall day capacity from local appointments
-      const dayBookedCount = appointments.filter((a) =>
-        a.appointment_date === form.appointment_date &&
-        a.department === form.department &&
-        a.status !== 'Cancelled',
-      ).length;
+      // Verify overall day capacity from slotOccupancy
+      let dayBookedCount = 0;
+      SLOT_TIMES.forEach((time) => {
+        const slotKey = `${form.department}|${form.appointment_date}|${time}`;
+        dayBookedCount += (slotOccupancy.get(slotKey) || 0);
+      });
+
       if (dayBookedCount >= DAILY_PATIENT_LIMIT) {
         setNotice(`Selected date is fully booked (${DAILY_PATIENT_LIMIT}/${DAILY_PATIENT_LIMIT} patients). Please choose another date.`);
         setSaving(false);
@@ -378,6 +503,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
           error.code === '23505' &&
           (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))
         ) {
+          setForm((p) => ({ ...p, appointment_time: '' }));
           await loadAppointments();
           setNotice('This time slot is no longer available. Please select another available slot.');
           return;
@@ -430,6 +556,35 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
         <div className="card booking-flow-card" style={{ padding: 24, border: '1px solid var(--border)', borderRadius: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Availability Error Banner (if offline or query fails) */}
+            {availabilityError && (
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 10,
+                  padding: '12px 16px',
+                  color: 'var(--danger, #dc2626)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
+                <span>Unable to retrieve real-time slot availability. Please check your connection and try again.</span>
+                <button
+                  type="button"
+                  className="btn small secondary"
+                  onClick={() => loadAppointments()}
+                  style={{ flexShrink: 0 }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {/* Active Appointment Notice Card (if student already has Scheduled or Checked-in appointment) */}
             {activeAppointment && (
               <div

@@ -202,9 +202,8 @@ assert(futureSlots[0].available === 1, 'TEST 11: Completed historical encounter 
 
 // TEST 12 & 13: Same-day and Future appointments share identical slot capacity
 assert(
-  bookingCode.includes("a.department === form.department") &&
-  bookingCode.includes("a.appointment_date === form.appointment_date") &&
-  bookingCode.includes("(a.appointment_time || '') === time"),
+  bookingCode.includes("slotKey = `${form.department}|${form.appointment_date}|${time}`") &&
+  bookingCode.includes("slotOccupancy.get(slotKey)"),
   'TEST 12 & 13: Same-day and Future appointments consume the exact same underlying slot quota'
 );
 
