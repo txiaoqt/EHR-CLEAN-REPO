@@ -1,6 +1,6 @@
 // src/pages/Patients.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { getSensitivityLevel, isPhysician } from '../accessControl.js';
@@ -9,6 +9,7 @@ import { SearchIcon, CloseIcon, ChevronDownIcon, ArrowUpIcon, ArrowDownIcon } fr
 
 const Patients = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   // data
@@ -107,6 +108,23 @@ const Patients = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle auto-open register from Appointments or external routes with pre-filled student
+  useEffect(() => {
+    if (location.state?.autoOpenRegister) {
+      const student = location.state.registerStudent;
+      if (student && student.id) {
+        setSelectedStudent(student);
+        setStudentSearch(student.name ? `${student.name} (${student.id})` : student.id);
+        setShowRegisterModal(true);
+        setRegisterTab('search');
+      } else if (location.state.studentId) {
+        setStudentSearch(location.state.studentId);
+        setShowRegisterModal(true);
+        setRegisterTab('search');
+      }
+    }
+  }, [location.state]);
 
   // student suggestions for search tab
   useEffect(() => {

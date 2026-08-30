@@ -198,13 +198,17 @@ textarea::placeholder {
 }
 
 .search-pill input,
+.search-pill input[type="search"],
+.dashboard-search-wrapper input,
+.dashboard-search-input,
 .appointments-search-wrapper input {
   border: none !important;
   background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
   padding: 8px 10px !important;
   width: 100%;
-  outline: none;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text);
   min-height: auto !important;
 }

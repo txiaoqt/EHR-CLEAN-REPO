@@ -45,6 +45,17 @@ const Appointments = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // Open action state & toast
+  const [openingApptId, setOpeningApptId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const showToast = (text, type = 'error') => {
+    setToast({ text, type });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  };
+
   // Close date picker on click outside or Escape
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -407,17 +418,114 @@ const Appointments = () => {
     }
   };
 
-  // action button only reads current status and redirects accordingly
-  const handleAction = (appt) => {
-    if (!appt) return;
-    if (appt.status === 'Checked-in') {
-      navigate(`/patient-profile?id=${appt.patient_id}`);
-    } else if (appt.status === 'Scheduled') {
-      navigate('/encounter', { state: { patientId: appt.patient_id } });
-    } else if (appt.status === 'Cancelled') {
-      navigate('/reports');
-    } else {
-      navigate('/encounter', { state: { patientId: appt.patient_id } });
+  // Open action: Resolve patient by canonical patient_id (student ID) and route to Profile or Registration
+  const handleAction = async (appt) => {
+    if (!appt || appt.status === 'Cancelled' || openingApptId) return;
+
+    const patientId = (appt.patient_id || '').trim();
+    if (!patientId) {
+      showToast('Unable to open patient profile. The appointment has no patient ID.', 'error');
+      return;
+    }
+
+    setOpeningApptId(appt.id);
+    try {
+      // 1. Check if patient clinical profile exists in patients table
+      const { data: existingPatient, error: patientErr } = await supabase
+        .from('patients')
+        .select('id, name, year')
+        .eq('id', patientId)
+        .maybeSingle();
+
+      if (patientErr) {
+        console.warn('Error querying patients table for ID:', patientId, patientErr);
+      }
+
+      if (existingPatient && existingPatient.id) {
+        // Clinical profile exists -> navigate to existing Patient Profile page
+        navigate(`/patient-profile?id=${encodeURIComponent(existingPatient.id)}`);
+        return;
+      }
+
+      // 2. Student exists in student directory but does not yet have a clinical patient profile
+      const { data: studentRecord, error: studentErr } = await supabase
+        .from('students')
+        .select('id, name, year')
+        .eq('id', patientId)
+        .maybeSingle();
+
+      if (studentErr) {
+        console.warn('Error querying students table for ID:', patientId, studentErr);
+      }
+
+      // Auxiliary query for email / profile details from patient_profiles or users
+      let auxEmail = '';
+      let auxYear = studentRecord?.year || 1;
+
+      try {
+        const { data: ppData } = await supabase
+          .from('patient_profiles')
+          .select('email, year_level')
+          .eq('patient_id', patientId)
+          .maybeSingle();
+        if (ppData?.email) auxEmail = ppData.email;
+        if (ppData?.year_level) auxYear = ppData.year_level;
+      } catch (e) {
+        console.warn('Auxiliary patient_profiles query failed:', e);
+      }
+
+      if (!auxEmail) {
+        try {
+          const { data: uData } = await supabase
+            .from('users')
+            .select('email')
+            .eq('patient_id', patientId)
+            .maybeSingle();
+          if (uData?.email) auxEmail = uData.email;
+        } catch (e) {
+          console.warn('Auxiliary users query failed:', e);
+        }
+      }
+
+      if (studentRecord && studentRecord.id) {
+        // Route to Register Patient flow with pre-filled verified info
+        navigate('/patients', {
+          state: {
+            autoOpenRegister: true,
+            registerStudent: {
+              id: studentRecord.id,
+              name: studentRecord.name || appt.patient_name || '',
+              year: studentRecord.year || auxYear || 1,
+              email: auxEmail || ''
+            }
+          }
+        });
+        return;
+      }
+
+      // 3. Fallback check: Check users or patient_profiles in case student is registered there
+      if (auxEmail) {
+        navigate('/patients', {
+          state: {
+            autoOpenRegister: true,
+            registerStudent: {
+              id: patientId,
+              name: appt.patient_name || '',
+              year: auxYear || 1,
+              email: auxEmail || ''
+            }
+          }
+        });
+        return;
+      }
+
+      // 4. Student record cannot be found anywhere
+      showToast('Unable to open patient profile. The associated student record could not be found.', 'error');
+    } catch (err) {
+      console.error('Error resolving patient for appointment:', err);
+      showToast('Unable to open patient profile. An unexpected error occurred.', 'error');
+    } finally {
+      setOpeningApptId(null);
     }
   };
 
@@ -593,6 +701,29 @@ const Appointments = () => {
   return (
     <main className="main">
       <div className="page">
+        {/* Toast Alert Notice */}
+        {toast && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 5000,
+              padding: '10px 18px',
+              borderRadius: 8,
+              color: 'white',
+              fontWeight: 600,
+              fontSize: 13.5,
+              backgroundColor: toast.type === 'error' ? 'var(--danger, #dc2626)' : 'var(--color-emerald-text, #16a34a)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            }}
+            role="alert"
+          >
+            {toast.text}
+          </div>
+        )}
+
         {/* 1. PAGE HEADER: Clean & focused with primary action only */}
         <div className="page-header">
           <div className="page-header-title-block">
@@ -837,12 +968,30 @@ const Appointments = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                          <button className="btn secondary small" onClick={() => handleAction(appt)}>
-                            Open
-                          </button>
+                          {appt.status === 'Cancelled' ? (
+                            <button
+                              type="button"
+                              className="btn secondary small"
+                              disabled
+                              style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                              title="Cannot open cancelled appointment profile"
+                            >
+                              Open
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn secondary small"
+                              onClick={() => handleAction(appt)}
+                              disabled={openingApptId === appt.id}
+                            >
+                              {openingApptId === appt.id ? 'Opening…' : 'Open'}
+                            </button>
+                          )}
 
                           {canDeleteRecord(user) && (
                             <button
+                              type="button"
                               className="btn danger small"
                               onClick={() => openDeleteModal(appt)}
                               title="Delete this appointment"

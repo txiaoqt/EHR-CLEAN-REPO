@@ -537,16 +537,25 @@ const Dashboard = () => {
           </div>
           <div className="dashboard-header-actions">
             <div className="dashboard-search-container">
-              <div className="search-pill" style={{ height: 42, width: '100%' }}>
-                <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center', marginRight: 8 }}>
-                  <SearchIcon size={16} />
-                </span>
-                <input type="search" placeholder="Search patient, appointment, or ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ fontSize: 13.5, width: '100%' }} />
+              <div className="dashboard-search-wrapper">
+                <SearchIcon size={16} className="dashboard-search-icon" />
+                <input
+                  type="search"
+                  className="dashboard-search-input"
+                  placeholder="Search patient, appointment, or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search patient, appointment, or ID"
+                />
               </div>
               {searchSuggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', maxHeight: '220px', overflowY: 'auto', zIndex: 50, borderRadius: 12, marginTop: 6, boxShadow: 'var(--shadow-lg)' }}>
-                  {searchSuggestions.map(s => (
-                    <div key={s.id} onClick={() => navigate(`/patient-profile?id=${s.id}`)} style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 13.5 }}>
+                <div className="dashboard-search-dropdown">
+                  {searchSuggestions.map((s) => (
+                    <div
+                      key={s.id}
+                      className="dashboard-search-result-item"
+                      onClick={() => navigate(`/patient-profile?id=${s.id}`)}
+                    >
                       <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
                     </div>
                   ))}
@@ -739,18 +748,39 @@ const Dashboard = () => {
             </div>
 
             <div className="card" style={{ padding: '18px 20px' }}>
-              <div className="card-header" style={{ marginBottom: 10 }}>
-                <h3 className="card-title" style={{ fontSize: 17.5 }}>Recent Encounters</h3>
-                <span className="card-subtitle" style={{ fontSize: 13 }}>Latest Consults</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 className="card-title" style={{ fontSize: 17.5, margin: 0 }}>Recent Encounters</h3>
+                <button
+                  type="button"
+                  onClick={() => navigate('/encounters')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--color-primary, #c92a2a)',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'opacity 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                  aria-label="View all encounters"
+                >
+                  View All →
+                </button>
               </div>
               {recentEncounters.length === 0 ? (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>No recent encounters</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {recentEncounters.map((enc, idx) => {
+                  {recentEncounters.slice(0, 4).map((enc, idx) => {
                     const timeStr = enc.encounter_date ? new Date(enc.encounter_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
                     return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: idx < recentEncounters.length - 1 ? '1px solid var(--border-subtle)' : 'none', minWidth: 0, gap: 8 }}>
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: idx < Math.min(recentEncounters.length, 4) - 1 ? '1px solid var(--border-subtle)' : 'none', minWidth: 0, gap: 8 }}>
                         <span style={{ fontWeight: 700, color: 'var(--text)', width: 90, flexShrink: 0 }}>{enc.patient_id || 'Unknown'}</span>
                         <span style={{ color: 'var(--text-muted)', flex: 1, padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{enc.chief_complaint || 'General Checkup'}</span>
                         <span style={{ color: 'var(--text-light)', fontSize: 11.5, flexShrink: 0 }}>{timeStr}</span>
