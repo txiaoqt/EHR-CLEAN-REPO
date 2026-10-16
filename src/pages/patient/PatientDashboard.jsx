@@ -74,8 +74,8 @@ const PatientDashboard = () => {
         {/* Page Header & Welcome */}
         <div className="page-header patient-page-header" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12, boxSizing: 'border-box' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Home</h2>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+            <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Home</h2>
+            <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
               Welcome back, <strong>{studentName}</strong>. Manage your clinic appointments, communications, and health records.
             </div>
           </div>
@@ -92,7 +92,7 @@ const PatientDashboard = () => {
         <div className="patient-kpi-grid" style={{ width: '100%', boxSizing: 'border-box', marginBottom: 18 }}>
           <div className="card patient-kpi-card" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
             <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>Next Clinic Visit</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: nextAppointment ? 'var(--primary, #8b0000)' : 'var(--text)', marginTop: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: nextAppointment ? 'var(--color-rose-text, #fda4af)' : 'var(--text)', marginTop: 4 }}>
               {loading ? '...' : nextAppointment ? nextAppointment.appointment_date : 'None'}
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -157,7 +157,7 @@ const PatientDashboard = () => {
               Loading schedule details...
             </div>
           ) : nextAppointment ? (
-            <div style={{ background: 'var(--bg, #f8fafc)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
+            <div style={{ background: 'var(--surface-raised, #f8fafc)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>
@@ -188,7 +188,7 @@ const PatientDashboard = () => {
                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {nextAppointment.queue_number ? 'Queue Number:' : 'Booking Reference:'}
                   </span>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary, #8b0000)', marginTop: 2 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-rose-text, #fda4af)', marginTop: 2 }}>
                     {nextAppointment.queue_number ? `#${nextAppointment.queue_number}` : nextAppointment.reference_code || 'Confirmed'}
                   </div>
                 </div>
@@ -212,7 +212,7 @@ const PatientDashboard = () => {
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '24px 16px', background: 'var(--bg, #f8fafc)', borderRadius: 10, border: '1px dashed var(--border)' }}>
+            <div style={{ textAlign: 'center', padding: '24px 16px', background: 'var(--surface-raised, #f8fafc)', borderRadius: 10, border: '1px dashed var(--border)' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
                 No upcoming appointments
               </div>

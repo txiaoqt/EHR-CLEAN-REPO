@@ -17,6 +17,17 @@
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --font-size-5xl: 36px;
 
   /* Primary Brand (TUP Red) */
   --color-primary: #c92a2a;
@@ -85,4 +96,53 @@
   --sidebar-width: 256px;
   --topbar-height: 64px;
 }
- 
+
+/* ==========================================================================
+   Text & Layout Density Variables (TASK-027)
+   ========================================================================== */
+
+/* Compact Mode Density Tokens */
+html[data-density="compact"],
+:root[data-density="compact"] {
+  --font-size-2xs: 11px;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 17px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 22px;
+  --font-size-3xl: 24px;
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 12px;
+  --space-lg: 18px;
+}
+
+html[data-density="compact"] body {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Comfortable Mode Density Tokens */
+html[data-density="comfortable"],
+:root[data-density="comfortable"] {
+  --font-size-2xs: 12px;
+  --font-size-xs: 13px;
+  --font-size-sm: 14px;
+  --font-size-base: 15px;
+  --font-size-md: 17px;
+  --font-size-lg: 20px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 26px;
+  --font-size-3xl: 30px;
+  --space-xs: 10px;
+  --space-sm: 14px;
+  --space-md: 20px;
+  --space-lg: 28px;
+}
+
+html[data-density="comfortable"] body {
+  font-size: 15px;
+  line-height: 1.65;
+}

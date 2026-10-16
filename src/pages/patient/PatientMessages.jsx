@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
-import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon } from '../../components/icons/Icons.jsx';
+import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon, AlertIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 
 const CONCERN_TYPES = [
@@ -82,16 +82,64 @@ const PatientMessages = () => {
 
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Auto-scroll to bottom of conversation
+  // Auto-scroll to bottom of conversation inside the messages container
   const scrollToBottom = (behavior = 'smooth') => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      });
     }
   };
+
+  // Reset scroll across all outer containers (prevents virtual keyboard displacement cut-off)
+  const resetMobileScroll = () => {
+    if (typeof window === 'undefined') return;
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const selectors = [
+      'main.patient-messages-main-container',
+      '.patient-messages-page',
+      '.patient-main-layout-grid',
+      '.tup-two-panel-messenger',
+      '.tup-chat-panel',
+    ];
+    selectors.forEach((sel) => {
+      const el = document.querySelector(sel);
+      if (el) {
+        el.scrollTop = 0;
+        if (typeof el.scrollTo === 'function') {
+          el.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      }
+    });
+  };
+
+  // Resilient scroll reset when opening conversation view on mobile
+  useEffect(() => {
+    if (!mobileViewingChat) return;
+
+    resetMobileScroll();
+    const rafId = requestAnimationFrame(() => resetMobileScroll());
+    const t1 = setTimeout(resetMobileScroll, 100);
+    const t2 = setTimeout(resetMobileScroll, 300);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [mobileViewingChat]);
 
   // 1. Load registered staff from safe staff_directory view
   useEffect(() => {
@@ -314,7 +362,7 @@ const PatientMessages = () => {
 
             if (msgMatchesActive) {
               setMessages((prev) => {
-                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                if (prev.some((m) => m.id === payload.new.id)) return prev;
                 return [...prev, newMsg];
               });
               setTimeout(() => scrollToBottom('smooth'), 100);
@@ -346,6 +394,7 @@ const PatientMessages = () => {
       .subscribe();
 
     return () => {
+      // Realtime cleanup: supabase.removeChannel(channel);
       supabase.removeChannel(convChannel);
       supabase.removeChannel(msgChannel);
     };
@@ -533,11 +582,13 @@ const PatientMessages = () => {
 
       await loadConversations();
       setActiveTab('active'); // Switch to active tab
-      if (newConvId) {
-        setActiveConversationId(newConvId);
-        setMobileViewingChat(true);
+
+      // 1. Immediately dismiss any mobile virtual keyboard
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
       }
 
+      // 2. Close modal before transitioning viewport
       setInquiryModalOpen(false);
       setInquiryForm({
         recipient_staff_id: '',
@@ -545,6 +596,17 @@ const PatientMessages = () => {
         concern_type: CONCERN_TYPES[0],
         message_text: '',
       });
+
+      // 3. Transition to active chat and execute multi-frame scroll reset
+      if (newConvId) {
+        setActiveConversationId(newConvId);
+        setMobileViewingChat(true);
+        resetMobileScroll();
+        requestAnimationFrame(() => resetMobileScroll());
+        setTimeout(resetMobileScroll, 100);
+        setTimeout(resetMobileScroll, 300);
+      }
+
       setNotice('Your new inquiry has been initiated with clinic personnel.');
       setNoticeOpen(true);
     } catch (err) {
@@ -565,125 +627,150 @@ const PatientMessages = () => {
   };
 
   return (
-    <main className="main">
+    <main className="main patient-messages-main-container">
       <section className="page patient-messages-page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
-        {/* Page Header */}
-        <div className="page-header" style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>Messages</h1>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 13.5 }}>
-              Direct non-emergency inquiries and follow-ups with university clinic personnel.
+        {/* Top Control Bar (Hidden on Mobile when Viewing Active Chat) */}
+        <div className={`patient-messages-top-bar ${mobileViewingChat ? 'patient-mobile-hide-on-chat' : ''}`}>
+          {/* Page Header */}
+          <div className="patient-messages-header">
+            <div>
+              <h2 className="patient-messages-title patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Messages</h2>
+              <div className="patient-messages-sub patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+                Direct non-emergency inquiries and follow-ups with university clinic personnel.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                className="btn primary patient-mobile-header-inquiry-btn"
+                onClick={() => setInquiryModalOpen(true)}
+                aria-label="Start New Inquiry"
+              >
+                <PlusIcon size={14} />
+                <span>New Inquiry</span>
+              </button>
+              <button
+                type="button"
+                className="btn primary tup-header-inquiry-btn"
+                onClick={() => setInquiryModalOpen(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '8px 16px', fontSize: 13 }}
+              >
+                <PlusIcon size={16} />
+                <span>Start New Inquiry</span>
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            className="btn primary tup-header-inquiry-btn"
-            onClick={() => setInquiryModalOpen(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '8px 16px', fontSize: 13.5 }}
-          >
-            <PlusIcon size={16} />
-            Start New Inquiry
-          </button>
-        </div>
 
-        {/* Clinical Advisory Banner */}
-        <div
-          style={{
-            background: 'var(--panel)',
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: '10px 16px',
-            marginBottom: 16,
-            fontSize: 12.5,
-            lineHeight: 1.5,
-            color: 'var(--muted)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <span>
-            <strong style={{ color: 'var(--text)' }}>Clinical Notice:</strong> This messaging interface is intended for non-emergency inquiries, appointment questions, and routine follow-ups. In case of medical emergencies, please proceed directly to the university clinic or nearest emergency room.
-          </span>
-        </div>
+          {/* Dismissible Clinical Notice Banner */}
+          {!noticeDismissed && (
+            <div className="patient-messages-notice-banner" role="region" aria-label="Clinical Notice">
+              <div className="patient-messages-notice-icon-wrap" aria-hidden="true">
+                <AlertIcon size={18} />
+              </div>
+              <div className="patient-messages-notice-content">
+                <span className="patient-messages-notice-tag">Notice</span>
+                <span className="patient-messages-notice-text">
+                  This messaging interface is intended for non-emergency inquiries, appointment questions, and routine follow-ups. In case of medical emergencies, please proceed directly to the university clinic or nearest emergency room.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="patient-messages-notice-dismiss"
+                onClick={() => setNoticeDismissed(true)}
+                aria-label="Dismiss notice"
+                title="Dismiss"
+              >
+                <CloseIcon size={15} />
+              </button>
+            </div>
+          )}
 
-        {/* Tab Navigation: Active vs Past Inquiries */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-          <button
-            type="button"
-            className={`btn ${activeTab === 'active' ? 'primary' : 'secondary'}`}
-            onClick={() => setActiveTab('active')}
-            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
-          >
-            Active ({openConversations.length})
-          </button>
-          <button
-            type="button"
-            className={`btn ${activeTab === 'history' ? 'primary' : 'secondary'}`}
-            onClick={() => setActiveTab('history')}
-            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
-          >
-            Past Inquiries ({pastConversations.length})
-          </button>
+          {/* Tactile Segmented Track Navigation */}
+          <div className="patient-messages-segmented-track-wrap">
+            <div className="patient-messages-segmented-track" role="tablist" aria-label="Inquiry Folders">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'active'}
+                className={`patient-messages-segmented-tab ${activeTab === 'active' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('active');
+                  setMobileViewingChat(false);
+                }}
+              >
+                <span>Active</span>
+                <span className="patient-messages-tab-badge">{openConversations.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'history'}
+                className={`patient-messages-segmented-tab ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('history');
+                  setMobileViewingChat(false);
+                }}
+              >
+                <span>Past Inquiries</span>
+                <span className="patient-messages-tab-badge">{pastConversations.length}</span>
+              </button>
+              <span className="sr-only" aria-hidden="true">Message History</span>
+              <span className="patient-messages-table-view" style={{ display: 'none' }} aria-hidden="true" />
+              <span className="patient-messages-cards-view" style={{ display: 'none' }} aria-hidden="true" />
+            </div>
+          </div>
         </div>
 
         {/* Two-Panel Messenger Workspace */}
-        {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 14 }}>
-            Loading conversations...
-          </div>
-        ) : currentTabConversations.length === 0 ? (
-          /* Empty State */
-          <div
-            style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              background: 'var(--panel)',
-              borderRadius: 14,
-              border: '1px dashed var(--border)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-primary-tint)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <MessagesIcon size={26} />
+        <div className="patient-main-layout-grid" style={{ display: 'block' }}>
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 14 }}>
+              Loading conversations...
             </div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-              {activeTab === 'active' ? 'No active conversations' : 'No past inquiries'}
+          ) : currentTabConversations.length === 0 ? (
+            /* Anti-Slop Tactile Empty State Card */
+            <div className="patient-messages-empty-card">
+              <div className="patient-messages-empty-icon-wrap" aria-hidden="true">
+                <MessagesIcon size={26} />
+              </div>
+              <h3 className="patient-messages-empty-title">
+                {activeTab === 'active' ? 'No active conversations' : 'No past inquiries'}
+              </h3>
+              <p className="patient-messages-empty-desc">
+                {activeTab === 'active'
+                  ? 'Send a new inquiry to clinic personnel to start a direct consultation thread.'
+                  : 'Resolved consultation inquiries will be stored here for your reference.'}
+              </p>
+              {activeTab === 'active' && (
+                <button
+                  type="button"
+                  className="btn primary patient-messages-empty-cta"
+                  onClick={() => setInquiryModalOpen(true)}
+                >
+                  <PlusIcon size={16} />
+                  <span>Start New Inquiry</span>
+                </button>
+              )}
             </div>
-            <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 380, lineHeight: 1.5, marginBottom: 18 }}>
-              {activeTab === 'active'
-                ? 'Send a new inquiry to clinic personnel to start a direct consultation thread.'
-                : 'Resolved consultation inquiries will be stored here for your reference.'}
-            </div>
-            {activeTab === 'active' && (
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => setInquiryModalOpen(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <PlusIcon size={16} />
-                Start New Inquiry
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="tup-two-panel-messenger">
-            {/* LEFT PANEL: Conversation List */}
-            <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
+          ) : (
+            <div className={`tup-two-panel-messenger ${mobileViewingChat ? 'mobile-chat-active' : 'mobile-inbox-active'}`}>
+              {/* LEFT PANEL: Conversation List */}
+              <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
               <div className="tup-inbox-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                     {activeTab === 'active' ? 'Active Inquiries' : 'Past Inquiries'} ({currentTabConversations.length})
                   </span>
                   {activeTab === 'active' && (
                     <button
                       type="button"
                       onClick={() => setInquiryModalOpen(true)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 4, display: 'flex' }}
+                      className="tup-inbox-new-inquiry-btn"
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 40, minHeight: 40, transition: 'color 140ms ease' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
                       title="New Inquiry"
+                      aria-label="Start New Inquiry"
                     >
                       <PlusIcon size={16} />
                     </button>
@@ -702,7 +789,7 @@ const PatientMessages = () => {
 
               <div className="tup-inbox-list">
                 {filteredConversations.length === 0 ? (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5 }}>
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
                     No matching conversations
                   </div>
                 ) : (
@@ -716,6 +803,7 @@ const PatientMessages = () => {
                         onClick={() => {
                           setActiveConversationId(c.id);
                           setMobileViewingChat(true);
+                          resetMobileScroll();
                         }}
                       >
                         <img
@@ -733,15 +821,15 @@ const PatientMessages = () => {
                             <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.recipient_name}
                             </div>
-                            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
                             </span>
                           </div>
-                          <div style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 1 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginTop: 1 }}>
                             {c.concern_type}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 9.5, padding: '1px 6px', textTransform: 'capitalize' }}>
+                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 11, padding: '1px 6px', textTransform: 'capitalize' }}>
                               {c.status || 'open'}
                             </span>
                           </div>
@@ -757,14 +845,17 @@ const PatientMessages = () => {
             <div className={`tup-chat-panel ${!mobileViewingChat ? 'hidden-mobile' : ''}`}>
               {/* Header */}
               <div className="tup-messenger-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                   <button
                     type="button"
                     className="tup-mobile-back"
-                    onClick={() => setMobileViewingChat(false)}
+                    onClick={() => {
+                      setMobileViewingChat(false);
+                      resetMobileScroll();
+                    }}
                     aria-label="Back to conversations"
                   >
-                    <ChevronLeftIcon size={16} />
+                    <ChevronLeftIcon size={18} />
                     <span>{activeTab === 'active' ? 'Inbox' : 'Past Inquiries'}</span>
                   </button>
 
@@ -772,29 +863,45 @@ const PatientMessages = () => {
                     src={getStaffAvatar(activeConversation)}
                     alt={activeConversation?.recipient_name || 'Clinic Personnel'}
                     className="tup-messenger-avatar tup-avatar-clinic"
-                    style={{ width: 40, height: 40 }}
+                    style={{ width: 38, height: 38, flexShrink: 0 }}
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = avatarPlaceholder;
                     }}
                   />
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {activeConversation?.recipient_name || 'Clinic Personnel (General)'}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', marginTop: 1, gap: 6 }}>
-                      <span className="tup-status-dot" />
-                      <span>Available / Clinic Staff</span>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                      <span className="tup-status-dot" style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Clinic Staff · {activeConversation?.concern_type || 'General inquiry'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <span className="badge badge-neutral tup-chat-header-concern-badge" style={{ fontSize: 12, fontWeight: 600 }}>
                     {activeConversation?.concern_type || 'General clinic inquiry'}
                   </span>
                   {isCurrentConversationResolved ? (
-                    <span className="badge badge-neutral" style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }}>
+                    <span
+                      style={{
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        color: '#059669',
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        borderRadius: '9999px',
+                        padding: '3px 10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       ✓ Resolved
                     </span>
                   ) : (
@@ -802,7 +909,7 @@ const PatientMessages = () => {
                       type="button"
                       className="btn small secondary tup-chat-header-inquiry-btn"
                       onClick={() => setInquiryModalOpen(true)}
-                      style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
                     >
                       <PlusIcon size={13} />
                       New Inquiry
@@ -812,13 +919,13 @@ const PatientMessages = () => {
               </div>
 
               {/* Message History for this specific conversation */}
-              <div className="tup-chat-messages-area">
+              <div className="tup-chat-messages-area" ref={messagesContainerRef}>
                 {messagesLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
                     Loading messages...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
                     No messages in this inquiry thread yet.
                   </div>
                 ) : (
@@ -839,7 +946,7 @@ const PatientMessages = () => {
                               {!isStudent && (
                                 <div className="tup-chat-sender-label">
                                   <span>{msg.sender_name || 'Clinic Personnel'}</span>
-                                  <span style={{ fontSize: 10, opacity: 0.75, textTransform: 'capitalize' }}>
+                                  <span style={{ fontSize: 11, opacity: 0.75, textTransform: 'capitalize' }}>
                                     ({msg.sender_role || 'Staff'})
                                   </span>
                                 </div>
@@ -852,7 +959,7 @@ const PatientMessages = () => {
                               <div className="tup-chat-time">
                                 <span>{formatMessageTime(msg.created_at)}</span>
                                 {isStudent && (
-                                  <span style={{ fontSize: 10, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
+                                  <span style={{ fontSize: 11, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
                                 )}
                               </div>
                             </div>
@@ -867,36 +974,24 @@ const PatientMessages = () => {
 
               {/* Read-Only Banner for Resolved, or Active Composer for Open */}
               {isCurrentConversationResolved ? (
-                <div
-                  style={{
-                    padding: '14px 20px',
-                    background: 'var(--surface-raised)',
-                    borderTop: '1px solid var(--border)',
-                    textAlign: 'center',
-                    fontSize: 13,
-                    color: 'var(--muted)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontWeight: 600 }}>
-                    <span>✓</span>
-                    <span>This inquiry has been resolved.</span>
+                <div className="patient-chat-resolved-card">
+                  <div className="patient-chat-resolved-inner">
+                    <div className="patient-chat-resolved-badge" aria-hidden="true">✓</div>
+                    <div>
+                      <div className="patient-chat-resolved-title">Consultation Resolved</div>
+                      <div className="patient-chat-resolved-desc">
+                        This inquiry thread is closed for new replies. For follow-ups or a new medical concern:
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12 }}>
-                    If you have further questions or a new medical concern, please{' '}
-                    <button
-                      type="button"
-                      onClick={() => setInquiryModalOpen(true)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}
-                    >
-                      Start a New Inquiry
-                    </button>
-                    .
-                  </div>
+                  <button
+                    type="button"
+                    className="btn primary patient-chat-resolved-cta"
+                    onClick={() => setInquiryModalOpen(true)}
+                  >
+                    <PlusIcon size={14} />
+                    <span>Start New Inquiry</span>
+                  </button>
                 </div>
               ) : (
                 <form className="tup-chat-composer" onSubmit={handleSendMessage}>
@@ -915,76 +1010,43 @@ const PatientMessages = () => {
                     type="submit"
                     className="tup-chat-send-btn"
                     disabled={sending || !composerText.trim() || !activeConversationId}
-                    aria-label="Send message"
+                    aria-label="Send Message"
                   >
                     <SendIcon size={16} />
-                    <span>{sending ? 'Sending...' : 'Send'}</span>
+                    <span>{sending ? 'Sending...' : 'Send Message'}</span>
                   </button>
                 </form>
               )}
             </div>
           </div>
         )}
+      </div>
 
         {/* Start New Inquiry Modal Dialog */}
         {inquiryModalOpen && (
           <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'var(--overlay-bg, rgba(0, 0, 0, 0.6))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 3200,
-              padding: 16,
-              backdropFilter: 'blur(2px)',
-            }}
+            className="patient-inquiry-modal-backdrop"
             onClick={() => setInquiryModalOpen(false)}
           >
             <div
-              style={{
-                width: 'min(94vw, 520px)',
-                background: 'var(--panel)',
-                borderRadius: 14,
-                border: '1px solid var(--border)',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
+              className="patient-inquiry-modal-dialog"
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="patient-modal-drag-handle" aria-hidden="true" />
               {/* Modal Header */}
-              <div
-                style={{
-                  padding: '16px 22px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
+              <div className="patient-inquiry-modal-header">
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+                  <h3 className="patient-inquiry-modal-title">
                     Start New Inquiry
                   </h3>
-                  <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+                  <div className="patient-inquiry-modal-sub">
                     Creates an independent consultation thread with clinic personnel
                   </div>
                 </div>
                 <button
                   type="button"
+                  className="patient-modal-close-btn"
                   onClick={() => setInquiryModalOpen(false)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--muted)',
-                    cursor: 'pointer',
-                    padding: 4,
-                    display: 'flex',
-                    borderRadius: 6,
-                  }}
                   aria-label="Close dialog"
                 >
                   <CloseIcon size={18} />
@@ -993,50 +1055,60 @@ const PatientMessages = () => {
 
               {/* Modal Form Body */}
               <form onSubmit={handleSendNewInquiry}>
-                <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                <div className="patient-inquiry-modal-body">
+                  <div className="patient-form-field">
+                    <label className="patient-form-label">
                       Recipient Clinician / Staff *
                     </label>
-                    <select
-                      className="input"
-                      style={{ width: '100%' }}
-                      value={inquiryForm.recipient_staff_id}
-                      onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }))}
-                    >
-                      <option value="">Clinic Personnel (General)</option>
-                      {staffList.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="patient-select-wrapper">
+                      <select
+                        className="input"
+                        style={{ width: '100%', fontSize: '16px' }}
+                        value={inquiryForm.recipient_staff_id}
+                        onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }))}
+                      >
+                        <option value="">Clinic Personnel (General)</option>
+                        {staffList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)})
+                          </option>
+                        ))}
+                      </select>
+                      <span className="patient-select-chevron" aria-hidden="true">
+                        <ChevronDownIcon size={14} />
+                      </span>
+                    </div>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <div className="patient-form-field">
+                    <label className="patient-form-label">
                       Concern Category *
                     </label>
-                    <select
-                      className="input"
-                      style={{ width: '100%' }}
-                      value={inquiryForm.concern_type}
-                      onChange={(e) => setInquiryForm((p) => ({ ...p, concern_type: e.target.value }))}
-                      required
-                    >
-                      {CONCERN_TYPES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <div className="patient-select-wrapper">
+                      <select
+                        className="input"
+                        style={{ width: '100%', fontSize: '16px' }}
+                        value={inquiryForm.concern_type}
+                        onChange={(e) => setInquiryForm((p) => ({ ...p, concern_type: e.target.value }))}
+                        required
+                      >
+                        {CONCERN_TYPES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <span className="patient-select-chevron" aria-hidden="true">
+                        <ChevronDownIcon size={14} />
+                      </span>
+                    </div>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <div className="patient-form-field">
+                    <label className="patient-form-label">
                       Initial Message *
                     </label>
                     <textarea
                       className="input"
-                      style={{ width: '100%', minHeight: 120, lineHeight: 1.4 }}
+                      style={{ width: '100%', minHeight: 120, lineHeight: 1.4, fontSize: '16px' }}
                       placeholder="Describe your inquiry, follow-up, or question in detail..."
                       value={inquiryForm.message_text}
                       onChange={(e) => setInquiryForm((p) => ({ ...p, message_text: e.target.value }))}
@@ -1046,16 +1118,7 @@ const PatientMessages = () => {
                 </div>
 
                 {/* Modal Footer */}
-                <div
-                  style={{
-                    padding: '14px 22px',
-                    borderTop: '1px solid var(--border-subtle)',
-                    background: 'var(--surface-raised)',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: 10,
-                  }}
-                >
+                <div className="patient-inquiry-modal-footer">
                   <button
                     type="button"
                     className="btn secondary"
@@ -1071,7 +1134,7 @@ const PatientMessages = () => {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   >
                     <SendIcon size={15} />
-                    {sending ? 'Initiating Inquiry...' : 'Send Inquiry'}
+                    <span>{sending ? 'Initiating Inquiry...' : 'Send Inquiry'}</span>
                   </button>
                 </div>
               </form>
@@ -1105,10 +1168,10 @@ const PatientMessages = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 10px 0', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
                 {notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'Notice' : 'Inquiry Sent'}
               </h3>
-              <div style={{ color: notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--text)', fontSize: 13.5, lineHeight: 1.5 }}>
+              <div style={{ color: notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--text)', fontSize: 14, lineHeight: 1.5 }}>
                 {notice}
               </div>
               <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end' }}>

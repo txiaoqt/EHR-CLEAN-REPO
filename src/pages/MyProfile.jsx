@@ -448,19 +448,19 @@ const MyProfile = () => {
             {!isEditing ? (
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{user.name}</h3>
-                <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 600, color: 'var(--color-primary)' }}>{user.role}</div>
+                <div style={{ marginTop: 2, fontSize: 14, fontWeight: 600, color: 'var(--color-primary)' }}>{user.role}</div>
                 <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-muted)' }}>{user.email}</div>
 
                 {/* Structured Metadata Panel */}
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
                     <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Account Status</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontWeight: 700 }}>
                       <span className="status-dot" style={{ width: 7, height: 7 }}></span> Active
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
                     <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Access Level</span>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{user.role || 'Staff'}</span>
                   </div>
@@ -531,7 +531,7 @@ const MyProfile = () => {
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       {/* Primary readable action description */}
-                      <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {act.detail || act.action || 'Activity'}
                       </div>
                     </div>
@@ -552,7 +552,7 @@ const MyProfile = () => {
                 color: 'var(--text-muted)'
               }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>No recent activity</div>
-                <div style={{ fontSize: 12.5 }}>Recent staff actions and consultations will appear here.</div>
+                <div style={{ fontSize: 12 }}>Recent staff actions and consultations will appear here.</div>
               </div>
             )}
           </div>

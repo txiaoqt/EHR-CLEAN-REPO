@@ -551,7 +551,7 @@ const Appointments = () => {
           >
             ←
           </button>
-          <strong style={{ fontSize: 13.5, color: 'var(--text)', fontWeight: 700 }}>
+          <strong style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700 }}>
             {viewDate.toLocaleString(undefined, { month: 'short', year: 'numeric' })}
           </strong>
           <button
@@ -614,7 +614,7 @@ const Appointments = () => {
           })}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', fontSize: 11.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', fontSize: 12 }}>
           <button
             type="button"
             className="btn secondary small"
@@ -688,8 +688,8 @@ const Appointments = () => {
           <div style={{ fontSize: 11, fontWeight: 600, opacity: isToday ? 0.9 : 0.7 }}>
             {d.toLocaleDateString(undefined, { weekday: 'short' })}
           </div>
-          <div style={{ fontWeight: 800, fontSize: 17, margin: '2px 0' }}>{d.getDate()}</div>
-          <div style={{ fontSize: 10, fontWeight: 700, opacity: isToday ? 0.95 : 0.8 }}>
+          <div style={{ fontWeight: 800, fontSize: 16, margin: '2px 0' }}>{d.getDate()}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, opacity: isToday ? 0.95 : 0.8 }}>
             {count} {count === 1 ? 'visit' : 'visits'}
           </div>
         </button>
@@ -714,7 +714,7 @@ const Appointments = () => {
               borderRadius: 8,
               color: 'white',
               fontWeight: 600,
-              fontSize: 13.5,
+              fontSize: 14,
               backgroundColor: toast.type === 'error' ? 'var(--danger, #dc2626)' : 'var(--color-emerald-text, #16a34a)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             }}
@@ -764,8 +764,8 @@ const Appointments = () => {
         <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
           <div className="card-header" style={{ marginBottom: 10 }}>
             <div>
-              <h3 className="card-title" style={{ fontSize: 14.5 }}>Weekly Schedule</h3>
-              <span className="card-subtitle" style={{ fontSize: 11.5 }}>Current week volume & day quick-jump</span>
+              <h3 className="card-title" style={{ fontSize: 14 }}>Weekly Schedule</h3>
+              <span className="card-subtitle" style={{ fontSize: 12 }}>Current week volume & day quick-jump</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span className="badge badge-neutral" style={{ fontSize: 11 }}>
@@ -794,7 +794,7 @@ const Appointments = () => {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Appointments Schedule
               </h2>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 Live clinical queue and scheduled patient appointments
               </div>
             </div>
@@ -954,7 +954,7 @@ const Appointments = () => {
                             minWidth: 130,
                             minHeight: 34,
                             padding: '4px 8px',
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: 600,
                             background: appt.status === 'Checked-in' ? 'var(--color-emerald-bg)' : (appt.status === 'Cancelled' ? 'rgba(220, 38, 38, 0.08)' : 'var(--color-blue-bg)'),
                             color: appt.status === 'Checked-in' ? 'var(--color-emerald-text)' : (appt.status === 'Cancelled' ? 'var(--danger)' : 'var(--color-blue-text)'),

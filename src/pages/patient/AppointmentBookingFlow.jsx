@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
-import { ChevronLeftIcon, ChevronRightIcon } from '../../components/icons/Icons.jsx';
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 
 const SLOT_TIMES = ['09:00-12:00', '13:00-16:00', '16:00-19:00'];
 const SLOT_CAPACITY = 1;
@@ -106,6 +106,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showSlotModal, setShowSlotModal] = useState(false);
   const [viewMonth, setViewMonth] = useState(startOfMonth(new Date()));
   const [form, setForm] = useState(() => {
     const initialToday = getManilaToday();
@@ -686,6 +687,32 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       setForm((p) => ({ ...p, appointment_time: '' }));
       await loadAppointments();
       await loadActiveAppointment(form.patient_id);
+
+      // Asynchronously trigger appointment reminder/confirmation notification (evaluates patient_settings preferences)
+      try {
+        supabase.functions.invoke('send-patient-notification', {
+          body: {
+            type: 'appointment_confirmation',
+            patient_id: form.patient_id.trim(),
+            recipient_email: user?.email || '',
+            appointment_data: {
+              patient_name: form.patient_name.trim(),
+              appointment_date: form.appointment_date,
+              appointment_time: form.appointment_time,
+              department: form.department,
+              service_type: form.service_type,
+              appointment_type: form.appointment_type,
+              queue_number: queueNumber,
+              reference_code: referenceCode,
+              clinician_name: form.clinician_name || 'To be assigned',
+            },
+          },
+        }).catch((fnErr) => {
+          console.warn('Edge function notification error (non-blocking):', fnErr);
+        });
+      } catch (invokeErr) {
+        console.warn('Error initiating appointment notification:', invokeErr);
+      }
     } catch (e) {
       console.error(e);
       setNotice(`Booking failed: ${e.message || 'Unknown error'}`);
@@ -702,16 +729,18 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     <main className="main">
       <section className="page patient-schedule-page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
         {/* Page Header */}
-        <div className="page-header" style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
-            {kioskMode ? 'Clinic Kiosk Booking' : 'Schedule'}
-          </h2>
-          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
-            Manage your appointments and available clinic schedules.
+        <div className="page-header" style={{ marginBottom: 24 }}>
+          <div className="page-header-title-block">
+            <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
+              {kioskMode ? 'Clinic Kiosk Booking' : 'Schedule'}
+            </h2>
+            <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+              Manage your appointments and available clinic schedules.
+            </div>
           </div>
         </div>
 
-        <div className="card booking-flow-card" style={{ padding: 24, border: '1px solid var(--border)', borderRadius: 12 }}>
+        <div className="card booking-flow-card" style={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Availability Error Banner (if offline or query fails) */}
             {availabilityError && (
@@ -759,7 +788,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <strong style={{ fontSize: 15, color: 'var(--text)' }}>
+                    <strong style={{ fontSize: 16, color: 'var(--text)' }}>
                       Active Appointment in Progress
                     </strong>
                     <span
@@ -786,7 +815,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
                   Schedule: <strong>{activeAppointment.appointment_date}</strong> at <strong>{activeAppointment.appointment_time}</strong> • Department: <strong>{activeAppointment.department}</strong> ({activeAppointment.service_type || 'Consultation'})
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginTop: 2 }}>
@@ -795,384 +824,686 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               </div>
             )}
 
-            {/* Department & Appointment Mode Segmented Controls */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 16 }}>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
-                  Select Clinic Department
-                </label>
-                <div style={{ display: 'flex', background: 'var(--bg, #f1f5f9)', padding: 4, borderRadius: 10, gap: 4, flexWrap: 'wrap' }}>
-                  {['Medical Clinic', 'Dental Clinic'].map((dept) => {
-                    const active = form.department === dept;
-                    return (
-                      <button
-                        key={dept}
-                        type="button"
-                        onClick={() => setForm((p) => ({ ...p, department: dept }))}
-                        style={{
-                          flex: 1,
-                          minWidth: 120,
-                          padding: '10px 14px',
-                          borderRadius: 8,
-                          border: active ? '1px solid var(--border)' : '1px solid transparent',
-                          background: active ? '#ffffff' : 'transparent',
-                          color: active ? 'var(--primary, #8b0000)' : 'var(--muted)',
-                          fontWeight: active ? 700 : 500,
-                          fontSize: 14,
-                          boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {dept}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
-                  Appointment Mode
-                </label>
-                <div style={{ display: 'flex', background: 'var(--bg, #f1f5f9)', padding: 4, borderRadius: 10, gap: 4, flexWrap: 'wrap' }}>
-                  {['Same-day Appointment', 'Future Appointment'].map((kind) => {
-                    const active = form.appointment_type === kind;
-                    const disabled = kind === 'Same-day Appointment' && !sameDayHasAvailableSlot;
-                    return (
-                      <button
-                        key={kind}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => setForm((p) => ({ ...p, appointment_type: kind }))}
-                        style={{
-                          flex: 1,
-                          minWidth: 130,
-                          padding: '10px 14px',
-                          borderRadius: 8,
-                          border: active ? '1px solid var(--border)' : '1px solid transparent',
-                          background: active ? '#ffffff' : 'transparent',
-                          color: active ? 'var(--primary, #8b0000)' : 'var(--muted)',
-                          fontWeight: active ? 700 : 500,
-                          fontSize: 14,
-                          boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                          cursor: disabled ? 'not-allowed' : 'pointer',
-                          opacity: disabled ? 0.45 : 1,
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {kind}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {!sameDayHasAvailableSlot && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: 13 }}>
-                Same-day slots are currently unavailable for {form.department}. Please select a date for a Future Appointment below.
-              </div>
-            )}
-
-            {/* Calendar & Available Time Slots Grid */}
-            <div className="booking-two-col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 20 }}>
-              {/* Calendar Card */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 16, background: 'var(--panel)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <button
-                    className="btn secondary small"
-                    type="button"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => setViewMonth((m) => addMonths(m, -1))}
-                  >
-                    <ChevronLeftIcon size={14} />
-                  </button>
-                  <strong style={{ fontSize: 16, color: 'var(--text)' }}>
-                    {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
-                  </strong>
-                  <button
-                    className="btn secondary small"
-                    type="button"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                  >
-                    <ChevronRightIcon size={14} />
-                  </button>
+            {/* TWO-COLUMN BOOKING WORKSPACE */}
+            <div
+              className="booking-two-col"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
+                gap: 28,
+                alignItems: 'start',
+              }}
+            >
+              {/* LEFT COLUMN: Select Clinic Department & Preferred Date */}
+              <div
+                className="booking-col-card booking-col-left"
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 16,
+                  padding: 26,
+                  background: 'var(--panel, #ffffff)',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 20,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                    Select Clinic Department &amp; Preferred Date
+                  </h3>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>
+                    Choose your clinic department, appointment type, and schedule date
+                  </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
-                  {DAYS_SHORT.map((day, i) => (
-                    <div
-                      key={day}
-                      style={{
-                        textAlign: 'center',
-                        padding: '4px 0',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        color: i === selectedWeekDay ? 'var(--primary, #8b0000)' : 'var(--muted)',
-                      }}
-                    >
-                      {day}
+                {/* Segmented Controls for Department & Mode */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 16 }}>
+                  {/* Clinic Department */}
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
+                      Clinic Department
+                    </label>
+                    <div className="segmented-control-container">
+                      {['Medical Clinic', 'Dental Clinic'].map((dept) => {
+                        const active = form.department === dept;
+                        return (
+                          <button
+                            key={dept}
+                            type="button"
+                            className={`segmented-tab-btn ${active ? 'active' : ''}`}
+                            onClick={() => setForm((p) => ({ ...p, department: dept }))}
+                          >
+                            {dept}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-                  {calendarCells.map((cell, idx) => {
-                    if (!cell) {
-                      return <div key={`empty-${idx}`} style={{ height: 50, borderRadius: 6, background: 'var(--bg, #f8fafc)' }} />;
-                    }
-                    const key = toDateKey(cell);
-                    const selected = key === form.appointment_date;
-                    const selectable = isDateSelectable(key) && !activeAppointment;
-                    const pct = dayAvailability.get(key);
-
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        disabled={!selectable}
-                        onClick={() => {
-                          setForm((p) => ({ ...p, appointment_date: key, appointment_time: '' }));
-                          setNotice('');
-                        }}
-                        style={{
-                          height: 50,
-                          borderRadius: 6,
-                          border: selected
-                            ? '2px solid var(--primary, #8b0000)'
-                            : '1px solid var(--border)',
-                          background: selected
-                            ? 'rgba(140,21,21,0.08)'
-                            : selectable
-                              ? '#ffffff'
-                              : 'var(--bg, #f8fafc)',
-                          color: selected
-                            ? 'var(--primary, #8b0000)'
-                            : selectable
-                              ? 'var(--text)'
-                              : 'var(--muted)',
-                          opacity: selectable ? 1 : 0.4,
-                          cursor: selectable ? 'pointer' : 'not-allowed',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 2,
-                          transition: 'border-color 0.15s ease',
-                        }}
-                      >
-                        <div style={{ fontWeight: selected ? 800 : 600, fontSize: 13 }}>{cell.getDate()}</div>
-                        {typeof pct === 'number' && (
-                          <div style={{ fontSize: 10, color: pct === 0 ? 'var(--danger)' : 'var(--muted)', fontWeight: 500 }}>
-                            {pct}% free
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Time Slots Container */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--panel)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '12px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
-                  Selected Date: {formatLongDate(form.appointment_date)}
-                </div>
-
-                {/* Desktop/Tablet Table View (>= 768px) */}
-                <div className="patient-slots-table-view" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    <div style={{ padding: '10px 14px' }}>Time Slot</div>
-                    <div style={{ padding: '10px 14px' }}>Capacity</div>
-                    <div style={{ padding: '10px 14px' }}>Availability</div>
                   </div>
 
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    {slotRows.map((row) => {
-                      const selected = form.appointment_time === row.time;
-                      const isAvailable = availableSlots.includes(row.time) && !row.disabled && !activeAppointment;
+                  {/* Appointment Mode */}
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
+                      Appointment Mode
+                    </label>
+                    <div className="segmented-control-container">
+                      {[
+                        { id: 'Same-day Appointment', label: 'Same-day' },
+                        { id: 'Future Appointment', label: 'Future' },
+                      ].map((kind) => {
+                        const active = form.appointment_type === kind.id;
+                        const disabled = kind.id === 'Same-day Appointment' && !sameDayHasAvailableSlot;
+                        return (
+                          <button
+                            key={kind.id}
+                            type="button"
+                            disabled={disabled}
+                            className={`segmented-tab-btn ${active ? 'active' : ''}`}
+                            onClick={() => setForm((p) => ({ ...p, appointment_type: kind.id }))}
+                            style={{
+                              opacity: disabled ? 0.45 : 1,
+                              cursor: disabled ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {kind.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {!sameDayHasAvailableSlot && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 10, padding: '12px 16px', color: 'var(--danger)', fontSize: 13, fontWeight: 500 }}>
+                    Same-day slots are currently unavailable for {form.department}. Switched to Future Appointment.
+                  </div>
+                )}
+
+                {/* Calendar View Container */}
+                <div className="booking-calendar-card" style={{ border: '1px solid var(--border)', borderRadius: 14, padding: 18, background: 'var(--panel, #ffffff)' }}>
+                  {/* Month Navigator */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <button
+                      className="calendar-nav-btn"
+                      type="button"
+                      aria-label="Previous Month"
+                      onClick={() => setViewMonth((m) => addMonths(m, -1))}
+                    >
+                      <ChevronLeftIcon size={14} />
+                    </button>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                      {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
+                    </div>
+                    <button
+                      className="calendar-nav-btn"
+                      type="button"
+                      aria-label="Next Month"
+                      onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                    >
+                      <ChevronRightIcon size={14} />
+                    </button>
+                  </div>
+
+                  {/* Weekday headers */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+                    {DAYS_SHORT.map((day) => (
+                      <div
+                        key={day}
+                        className="calendar-weekday-header"
+                        style={{
+                          textAlign: 'center',
+                          padding: '4px 0',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          letterSpacing: '0.6px',
+                          textTransform: 'uppercase',
+                          color: 'var(--muted)',
+                        }}
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar Cells */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                    {calendarCells.map((cell, idx) => {
+                      if (!cell) {
+                        return <div key={`empty-${idx}`} className="calendar-empty-cell" style={{ height: 54, borderRadius: 10, background: 'var(--surface-raised, #f8fafc)' }} />;
+                      }
+                      const key = toDateKey(cell);
+                      const selected = key === form.appointment_date;
+                      const isToday = key === today;
+                      const selectable = isDateSelectable(key) && !activeAppointment;
+                      const pct = dayAvailability.get(key);
 
                       return (
-                        <div
-                          key={row.time}
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={!selectable}
+                          className={`calendar-cell-btn ${selected ? 'selected' : ''}`}
+                          onClick={() => {
+                            // On date click (initial or re-click), update date and immediately show time slot availability modal
+                            setForm((p) => ({ ...p, appointment_date: key }));
+                            setNotice('');
+                            setShowSlotModal(true);
+                          }}
                           style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1.4fr 1fr 1fr',
-                            borderBottom: '1px solid var(--border)',
-                            alignItems: 'center',
-                            background: selected ? 'var(--primary-light, rgba(140,21,21,0.08))' : 'var(--panel)',
+                            border: selected
+                              ? '1px solid var(--primary, #8b0000)'
+                              : '1px solid var(--border)',
+                            background: selected
+                              ? 'var(--primary, #8b0000)'
+                              : selectable
+                                ? 'var(--panel, #ffffff)'
+                                : 'var(--surface-raised, #f8fafc)',
+                            color: selected
+                              ? '#ffffff'
+                              : selectable
+                                ? 'var(--text)'
+                                : 'var(--muted)',
+                            opacity: selectable ? 1 : 0.38,
+                            cursor: selectable ? 'pointer' : 'not-allowed',
                           }}
                         >
-                          <div style={{ padding: '8px 12px' }}>
-                            <button
-                              type="button"
-                              disabled={!isAvailable}
-                              className={`btn small ${selected ? 'primary' : 'secondary'}`}
-                              onClick={() => setForm((p) => ({ ...p, appointment_time: row.time }))}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontWeight: selected ? 800 : isToday ? 800 : 600, fontSize: 13 }}>
+                              {cell.getDate()}
+                            </span>
+                            {isToday && (
+                              <span
+                                style={{
+                                  width: 5,
+                                  height: 5,
+                                  borderRadius: 9999,
+                                  background: selected ? '#ffffff' : 'var(--primary, #8b0000)',
+                                }}
+                                title="Today"
+                              />
+                            )}
+                          </div>
+                          {typeof pct === 'number' && (
+                            <div
+                              className="calendar-cell-pct"
                               style={{
-                                width: '100%',
-                                justifyContent: 'center',
-                                fontWeight: selected ? 700 : 500,
-                                fontSize: 13,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                marginTop: 2,
+                                padding: '1px 6px',
+                                borderRadius: 6,
+                                background: selected
+                                  ? 'rgba(255, 255, 255, 0.2)'
+                                  : pct === 0
+                                    ? 'rgba(220, 38, 38, 0.08)'
+                                    : 'rgba(22, 163, 74, 0.08)',
+                                color: selected
+                                  ? '#ffffff'
+                                  : pct === 0
+                                    ? 'var(--danger, #dc2626)'
+                                    : '#16a34a',
+                                whiteSpace: 'nowrap',
                               }}
                             >
-                              {row.time}
-                            </button>
-                          </div>
-                          <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text)' }}>
-                            {row.isExpired ? '0 of 1 slot (Ended)' : `${row.availableCount} of ${SLOT_CAPACITY} slot`}
-                          </div>
-                          <div style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: row.pct > 0 ? '#16a34a' : 'var(--danger)' }}>
-                            {row.isExpired ? '0% Free (Ended)' : `${row.pct}% Free`}
-                          </div>
-                        </div>
+                              {pct === 0 ? 'Full' : (
+                                <>
+                                  {pct}%<span className="desktop-free-word"> free</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Mobile Cards View (< 768px) */}
-                <div className="patient-slots-cards-view" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {slotRows.map((row) => {
-                    const selected = form.appointment_time === row.time;
-                    const isAvailable = availableSlots.includes(row.time) && !row.disabled && !activeAppointment;
-
-                    return (
-                      <div
-                        key={row.time}
-                        style={{
-                          background: selected ? 'rgba(140,21,21,0.04)' : 'var(--bg, #f8fafc)',
-                          border: selected ? '2px solid var(--primary, #8b0000)' : '1px solid var(--border)',
-                          borderRadius: 8,
-                          padding: 12,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong style={{ fontSize: 14, color: 'var(--text)' }}>{row.time}</strong>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: row.pct > 0 ? '#16a34a' : 'var(--danger)' }}>
-                            {row.isExpired ? '0% Free (Ended)' : `${row.pct}% Free`}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {row.isExpired ? 'Slot ended' : `${row.availableCount} of ${SLOT_CAPACITY} slot available`}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={!isAvailable}
-                          className={`btn small ${selected ? 'primary' : 'secondary'}`}
-                          onClick={() => setForm((p) => ({ ...p, appointment_time: row.time }))}
-                          style={{
-                            width: '100%',
-                            justifyContent: 'center',
-                            fontWeight: selected ? 700 : 500,
-                            fontSize: 13,
-                          }}
-                        >
-                          {selected ? 'Selected Slot' : row.isExpired ? 'Slot Ended' : isAvailable ? 'Select Slot' : 'Slot Full'}
-                        </button>
+                {/* Time Slot Selection State: Prompt Hint or Selected Slot Pill */}
+                {form.appointment_time ? (
+                  <div
+                    className="booking-hint-banner"
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: 12,
+                      background: 'var(--surface-raised, #f8fafc)',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)' }}>
+                        Selected Time Slot
                       </div>
-                    );
-                  })}
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                        {form.appointment_time}{' '}
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>
+                          ({formatLongDate(form.appointment_date)})
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn small secondary"
+                      onClick={() => setShowSlotModal(true)}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '6px 14px',
+                        borderRadius: 8,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Change Slot
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="booking-hint-banner"
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: 12,
+                      background: 'var(--surface-raised, #f8fafc)',
+                      border: '1px dashed var(--border)',
+                      color: 'var(--muted)',
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong style={{ color: 'var(--text)', display: 'block', fontSize: 13, marginBottom: 2 }}>
+                      Click any date on the calendar above
+                    </strong>
+                    Choose a date to open the real-time time slot availability picker.
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT COLUMN: Additional Information & Booking Summary */}
+              <div
+                className="booking-col-card booking-col-right"
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 16,
+                  padding: 26,
+                  background: 'var(--panel, #ffffff)',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 20,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                    Additional Information
+                  </h3>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>
+                    Appointment details and institutional record confirmation
+                  </div>
+                </div>
+
+                {/* Form Fields: Service Type & Student Identity Records */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Service Type */}
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6, color: 'var(--text)' }}>
+                      Service Type
+                    </label>
+                    <div className="patient-select-wrapper" style={{ position: 'relative' }}>
+                      <select
+                        className="patient-input-accessible"
+                        style={{
+                          width: '100%',
+                          fontSize: 14,
+                          padding: '10px 36px 10px 14px',
+                          borderRadius: 10,
+                          background: 'var(--panel, #ffffff)',
+                          border: '1px solid var(--border)',
+                          fontWeight: 500,
+                        }}
+                        value={form.service_type}
+                        onChange={(e) => setForm((p) => ({ ...p, service_type: e.target.value }))}
+                      >
+                        {SERVICES[form.department].map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <span className="patient-select-chevron" aria-hidden="true">
+                        <ChevronDownIcon size={14} />
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Institutional Student Record Verification Block */}
+                  <div
+                    className="booking-student-card"
+                    style={{
+                      background: 'var(--surface-raised, #f8fafc)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 12,
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 14,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                        Institutional Record
+                      </div>
+                      <span className="immutable-record-badge" style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: 'var(--panel, #ffffff)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                        Immutable • Student Record
+                      </span>
+                    </div>
+
+                    {/* Student ID Number */}
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Student ID Number
+                      </label>
+                      <input
+                        className="patient-input-accessible"
+                        style={{
+                          width: '100%',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          background: 'var(--panel, #ffffff)',
+                          cursor: 'not-allowed',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                        }}
+                        placeholder="Student ID"
+                        value={form.patient_id}
+                        readOnly
+                        disabled={true}
+                      />
+                    </div>
+
+                    {/* Patient Full Name */}
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Patient Full Name
+                      </label>
+                      <input
+                        className="patient-input-accessible"
+                        style={{
+                          width: '100%',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          background: 'var(--panel, #ffffff)',
+                          cursor: 'not-allowed',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                        }}
+                        placeholder="Full Name"
+                        value={form.patient_name}
+                        readOnly
+                        disabled={true}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking Summary: Removed per user request to streamline confirmation */}
+
+                {/* Confirmation Action Button */}
+                <div>
+                  <button
+                    type="button"
+                    disabled={saving || availabilityLoading || !form.appointment_date || !form.appointment_time || !isDateSelectable(form.appointment_date) || Boolean(activeAppointment)}
+                    className="btn primary booking-submit-btn"
+                    onClick={submit}
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      padding: '14px 20px',
+                      fontSize: 15,
+                      fontWeight: 700,
+                      borderRadius: 10,
+                      background: (!form.appointment_time || activeAppointment)
+                        ? 'var(--surface-raised, #f1f5f9)'
+                        : 'var(--primary, #8b0000)',
+                      color: (!form.appointment_time || activeAppointment)
+                        ? 'var(--muted, #94a3b8)'
+                        : '#ffffff',
+                      border: (!form.appointment_time || activeAppointment)
+                        ? '1px solid var(--border)'
+                        : 'none',
+                      boxShadow: 'none',
+                      transition: 'all 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+                      cursor: (!form.appointment_time || activeAppointment) ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {saving
+                      ? 'Confirming Appointment...'
+                      : form.appointment_type === 'Same-day Appointment'
+                        ? 'Reserve Same-day Appointment'
+                        : 'Confirm & Book Appointment'}
+                  </button>
+                  {!form.appointment_time && (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 10, fontWeight: 500 }}>
+                      Select an available time slot on the calendar to activate confirmation.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Clinician & Service Inputs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                  Preferred Attending Clinician
-                </label>
-                <select
-                  className="input"
-                  style={{ width: '100%' }}
-                  value={form.clinician_name}
-                  onChange={(e) => setForm((p) => ({ ...p, clinician_name: e.target.value }))}
-                >
-                  <option value="">Any available medical personnel</option>
-                  {visibleStaff.map((s) => (
-                    <option key={s.name} value={s.name}>
-                      {s.name} ({s.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                  Service Type
-                </label>
-                <select
-                  className="input"
-                  style={{ width: '100%' }}
-                  value={form.service_type}
-                  onChange={(e) => setForm((p) => ({ ...p, service_type: e.target.value }))}
-                >
-                  {SERVICES[form.department].map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                  Student ID
-                </label>
-                <input
-                  className="input"
-                  style={{ width: '100%' }}
-                  placeholder="Student ID"
-                  value={form.patient_id}
-                  onChange={(e) => setForm((p) => ({ ...p, patient_id: e.target.value }))}
-                  disabled={!kioskMode}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                  Patient Full Name
-                </label>
-                <input
-                  className="input"
-                  style={{ width: '100%' }}
-                  placeholder="Full Name"
-                  value={form.patient_name}
-                  onChange={(e) => setForm((p) => ({ ...p, patient_name: e.target.value }))}
-                  disabled={!kioskMode && !!user?.name}
-                />
-              </div>
-            </div>
-
-            {/* Review Summary Card */}
-            <div style={{ background: 'var(--bg, #f8fafc)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                Booking Summary: {form.department} • {form.appointment_type}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-                Schedule: <strong>{form.appointment_date}</strong> {form.appointment_time ? `at ${form.appointment_time}` : '(Please select a time slot above)'} • Service: {form.service_type || 'Consultation'} • Clinician: {form.clinician_name || 'Any available'}
-              </div>
-            </div>
-
-            {/* Submit Action */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6 }}>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={submit}
-                disabled={saving || !form.appointment_time || !isDateSelectable(form.appointment_date) || !!activeAppointment}
-                style={{ padding: '10px 24px', fontSize: 15, opacity: (saving || !form.appointment_time || !isDateSelectable(form.appointment_date) || !!activeAppointment) ? 0.6 : 1 }}
-                title={activeAppointment ? 'You already have an active appointment' : !isDateSelectable(form.appointment_date) ? 'Selected date is not valid for this appointment mode' : undefined}
-              >
-                {saving ? 'Submitting...' : activeAppointment ? 'Active Appointment Exists' : 'Confirm & Book Appointment'}
-              </button>
-            </div>
           </div>
         </div>
+
+        {/* Universal Time Slot Availability Modal (Desktop Centered Dialog & Mobile Bottom-Sheet) */}
+        {showSlotModal && (
+          <div
+            className="patient-slots-modal-backdrop"
+            onClick={() => setShowSlotModal(false)}
+          >
+            <div
+              className="patient-slots-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Mobile Tactile Grab Handle */}
+              <div className="patient-slots-drag-handle" />
+
+              {/* Modal Header */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '16px 20px 14px',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.6px',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      marginBottom: 2,
+                    }}
+                  >
+                    APPOINTMENT TIME AVAILABILITY
+                  </div>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: 'var(--text)',
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {formatLongDate(form.appointment_date)}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSlotModal(false)}
+                  aria-label="Close"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--surface-raised, rgba(0, 0, 0, 0.05))',
+                    border: 'none',
+                    fontSize: 16,
+                    cursor: 'pointer',
+                    color: 'var(--text)',
+                    padding: 0,
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Embedded Table View for Desktop / Hidden Table for Compatibility */}
+              <div className="patient-slots-table-view" style={{ display: 'none' }} />
+
+              {/* Scrollable Slot Cards List */}
+              <div
+                className="patient-slots-cards-view"
+                style={{
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  overflowY: 'auto',
+                  flex: 1,
+                }}
+              >
+                {slotRows.map((row) => {
+                  const selected = form.appointment_time === row.time;
+                  const isAvailable = availableSlots.includes(row.time) && !row.disabled && !activeAppointment;
+
+                  return (
+                    <button
+                      key={row.time}
+                      type="button"
+                      disabled={!isAvailable}
+                      className={`patient-slot-tile-btn ${selected ? 'selected' : ''}`}
+                      onClick={() => {
+                        setForm((p) => ({ ...p, appointment_time: row.time }));
+                        setShowSlotModal(false);
+                      }}
+                      style={{
+                        background: selected
+                          ? 'var(--primary-light, rgba(140,21,21,0.06))'
+                          : !isAvailable
+                            ? 'var(--bg, #f8fafc)'
+                            : 'var(--panel, #ffffff)',
+                        border: selected
+                          ? '2px solid var(--primary, #8b0000)'
+                          : '1px solid var(--border)',
+                        borderRadius: 12,
+                        padding: '14px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: isAvailable ? 'pointer' : 'not-allowed',
+                        opacity: isAvailable ? 1 : 0.5,
+                        transition: 'all 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                    >
+                      {/* Left: Time & Remaining Capacity */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, textAlign: 'left' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                            {row.time}
+                          </span>
+                          {selected && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: 'var(--primary, #8b0000)',
+                                background: 'rgba(140, 21, 21, 0.12)',
+                                padding: '2px 8px',
+                                borderRadius: 9999,
+                              }}
+                            >
+                              ✓ Selected
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {row.isExpired
+                            ? 'Slot ended'
+                            : !isAvailable
+                              ? 'Slot full'
+                              : `${row.availableCount} of ${SLOT_CAPACITY} slot available`}
+                        </div>
+                      </div>
+
+                      {/* Right: Availability Badge */}
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            borderRadius: 9999,
+                            padding: '4px 10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: row.isExpired
+                              ? 'rgba(100, 116, 139, 0.12)'
+                              : row.pct > 0
+                                ? 'rgba(22, 163, 74, 0.1)'
+                                : 'rgba(239, 68, 68, 0.1)',
+                            color: row.isExpired
+                              ? 'var(--muted)'
+                              : row.pct > 0
+                                ? '#16a34a'
+                                : 'var(--danger, #dc2626)',
+                          }}
+                        >
+                          {row.isExpired ? 'Ended' : `${row.pct}% Free`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Modal Action Footer */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  padding: '12px 20px',
+                  borderTop: '1px solid var(--border)',
+                  background: 'var(--panel, #ffffff)',
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setShowSlotModal(false)}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: '8px 18px',
+                    borderRadius: 8,
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Notice Dialog Modal */}
         {noticeOpen && (

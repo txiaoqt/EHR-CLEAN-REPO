@@ -536,7 +536,7 @@ const Encounters = () => {
                   <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                     Encounter History & Archived Visits
                   </h2>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     Comprehensive clinical records log
                   </div>
                 </div>

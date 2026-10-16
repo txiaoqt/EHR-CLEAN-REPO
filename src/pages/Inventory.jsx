@@ -541,7 +541,7 @@ const Inventory = () => {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Stock Levels & Inventory Directory
               </h2>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 Clinic medicine catalog and consumable supply status
               </div>
             </div>
@@ -701,7 +701,7 @@ const Inventory = () => {
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>
                     Inventory Transactions & Consumables Log
                   </h3>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     Total Logs: <strong>{transactions.length}</strong>
                   </div>
                 </div>

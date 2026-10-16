@@ -82,7 +82,8 @@ assert(fs.existsSync(eventsPath), 'PatientEvents.jsx exists');
 
 const eventsCode = fs.readFileSync(eventsPath, 'utf8');
 assert(eventsCode.includes('Events</h2>') || eventsCode.includes('Events & Announcements</h2>'), 'PatientEvents has standardized Page Title');
-assert(eventsCode.includes('SearchIcon') && (eventsCode.includes('CATEGORY_OPTIONS') || eventsCode.includes('CATEGORIES')), 'PatientEvents includes search input and category filter dropdown');
+assert((eventsCode.includes('CATEGORY_OPTIONS') || eventsCode.includes('CATEGORIES')) && eventsCode.includes('patient-events-pills-strip'), 'PatientEvents includes streamlined category filter pills strip');
+
 assert(eventsCode.includes('patient-events-grid'), 'PatientEvents uses responsive events grid');
 assert(eventsCode.includes('downloadIcs'), 'PatientEvents includes Add to Calendar (.ics) export');
 assert(!eventsCode.includes('copyDetails'), 'PatientEvents removed redundant Copy action');

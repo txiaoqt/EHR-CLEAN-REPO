@@ -507,7 +507,7 @@ const Patients = () => {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Registered Patients
               </h2>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 Student directory and clinical patient registry
               </div>
             </div>

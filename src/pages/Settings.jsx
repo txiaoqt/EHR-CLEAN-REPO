@@ -351,7 +351,7 @@ const Settings = () => {
               <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', marginTop: 2 }}>
                 {authUser?.name || authUser?.email || 'Logged In Staff'}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Role: <strong style={{ color: 'var(--text)' }}>{authUser?.role}</strong> • Email: <strong style={{ color: 'var(--text)' }}>{authUser?.email || 'N/A'}</strong>
               </div>
             </div>
@@ -406,7 +406,7 @@ const Settings = () => {
                 {/* Auto-Save Drafts */}
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Auto-Save Drafts</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Auto-Save Drafts</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Automatically preserve encounter SOAP drafts</div>
                   </div>
                   <div className="settings-switch">
@@ -424,7 +424,7 @@ const Settings = () => {
                 {/* Email Notifications */}
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Email Notifications</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Email Notifications</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Receive emergency triage and appointment alerts</div>
                   </div>
                   <div className="settings-switch">
@@ -442,7 +442,7 @@ const Settings = () => {
                 {/* Low Stock Warning Banners */}
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)' }}>Low Stock Warning Banners</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Low Stock Warning Banners</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Show inventory reorder alerts in dashboard header</div>
                   </div>
                   <div className="settings-switch">

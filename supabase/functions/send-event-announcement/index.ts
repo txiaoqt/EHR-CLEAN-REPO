@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
     // 5. Query active registered student emails from public.users (authoritative source)
     let userQuery = supabase
       .from("users")
-      .select("id, email, name, student_id")
+      .select("id, auth_user_id, email, name, student_id, patient_id")
       .eq("role", "patient")
       .eq("active", true)
       .not("email", "is", null);
@@ -134,7 +134,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 5b. Honor patient preferences: exclude students where clinic_announcements = false OR email_notifications = false
+    const { data: optOutSettings } = await supabase
+      .from("patient_settings")
+      .select("patient_id, user_id, email_notifications, clinic_announcements")
+      .or("email_notifications.eq.false,clinic_announcements.eq.false");
+
+    const optedOutPatientIds = new Set<string>();
+    const optedOutUserIds = new Set<string>();
+
+    if (Array.isArray(optOutSettings)) {
+      for (const row of optOutSettings) {
+        if (row.email_notifications === false || row.clinic_announcements === false) {
+          if (row.patient_id) optedOutPatientIds.add(String(row.patient_id).trim());
+          if (row.user_id) optedOutUserIds.add(String(row.user_id).trim());
+        }
+      }
+    }
+
     const recipients = (studentUsers || [])
+      .filter((s: { id: string; auth_user_id?: string; patient_id?: string }) => {
+        const isOptedOutByPatientId = s.patient_id && optedOutPatientIds.has(String(s.patient_id).trim());
+        const isOptedOutByUserId =
+          (s.auth_user_id && optedOutUserIds.has(String(s.auth_user_id).trim())) ||
+          (s.id && optedOutUserIds.has(String(s.id).trim()));
+        return !isOptedOutByPatientId && !isOptedOutByUserId;
+      })
       .map((s: { id: string; email: string; name?: string }) => ({
         id: s.id,
         email: s.email.trim().toLowerCase(),

@@ -23,6 +23,7 @@ import PatientSchedule from './pages/patient/PatientSchedule.jsx';
 import PatientMessages from './pages/patient/PatientMessages.jsx';
 import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
+import PatientSettings from './pages/patient/PatientSettings.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
@@ -116,6 +117,24 @@ function AppShell() {
     return () => {
       delete window.exportCsv;
     };
+  }, []);
+
+  // Initialize and synchronize text density preference (TASK-027)
+  useEffect(() => {
+    try {
+      const savedDensity = localStorage.getItem('tup-clinic-density') || 'normal';
+      const normalized = savedDensity === 'compact' || savedDensity === 'comfortable' ? savedDensity : 'normal';
+      document.documentElement.setAttribute('data-density', normalized);
+    } catch (_) {}
+
+    const onDensityChange = (e) => {
+      const density = e?.detail?.density;
+      if (density) {
+        document.documentElement.setAttribute('data-density', density);
+      }
+    };
+    window.addEventListener('tupDensityChanged', onDensityChange);
+    return () => window.removeEventListener('tupDensityChanged', onDensityChange);
   }, []);
 
   useEffect(() => {
@@ -259,6 +278,7 @@ function AppShell() {
             <Route path="/patient/messages" element={guard(<PatientMessages />, ['patient'])} />
             <Route path="/patient/records" element={guard(<PatientRecords />, ['patient'])} />
             <Route path="/patient/profile" element={guard(<PatientProfilePortal />, ['patient'])} />
+            <Route path="/patient/settings" element={guard(<PatientSettings />, ['patient'])} />
           </>
         )}
 

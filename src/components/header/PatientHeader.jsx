@@ -5,7 +5,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import { useTheme } from '../../ThemeContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
-import { UserIcon, LogoutIcon, SunIcon, MoonIcon } from '../icons/Icons.jsx';
+import { UserIcon, SettingsIcon, LogoutIcon, SunIcon, MoonIcon } from '../icons/Icons.jsx';
 
 const PatientHeader = ({ onToggleNav }) => {
   const navigate = useNavigate();
@@ -178,7 +178,7 @@ const PatientHeader = ({ onToggleNav }) => {
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                     {displayRole}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--primary, #8b0000)', fontWeight: 600, marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {studentId}
                   </div>
                 </div>
@@ -211,6 +211,30 @@ const PatientHeader = ({ onToggleNav }) => {
 
                   <button
                     type="button"
+                    onClick={() => { setMenuOpen(false); navigate('/patient/settings'); }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg, #f1f5f9)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <SettingsIcon size={16} />
+                    <span>Settings</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => { setMenuOpen(false); setShowLogoutConfirm(true); }}
                     style={{
                       width: '100%',
@@ -222,11 +246,11 @@ const PatientHeader = ({ onToggleNav }) => {
                       border: 'none',
                       fontSize: 14,
                       fontWeight: 600,
-                      color: 'var(--danger, #dc2626)',
+                      color: 'var(--danger, #f87171)',
                       textAlign: 'left',
                       cursor: 'pointer',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-rose-bg, rgba(248, 113, 113, 0.12))'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <LogoutIcon size={16} />

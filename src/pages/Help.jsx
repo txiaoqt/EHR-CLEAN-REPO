@@ -64,7 +64,7 @@ const Help = () => {
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>
             Help & Campus Clinic Support
           </h1>
-          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 13.5 }}>
+          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
             Frequently asked questions, clinical guides, technical specifications, and campus clinic helpdesk resources.
           </div>
         </div>
@@ -108,7 +108,7 @@ const Help = () => {
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Clinic Hotline</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>(02) 8301-3001 loc. 605</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 2 }}>Direct line for urgent clinic inquiries</div>
+              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Direct line for urgent clinic inquiries</div>
             </div>
           </div>
 
@@ -142,7 +142,7 @@ const Help = () => {
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Support Email</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>clinic@tup.edu.ph</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 2 }}>Medical & portal technical support</div>
+              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Medical & portal technical support</div>
             </div>
           </div>
 
@@ -176,7 +176,7 @@ const Help = () => {
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Clinic Operating Hours</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Monday – Friday · 7:00 AM – 7:00 PM</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 2 }}>Ayala Blvd, Ermita, Manila</div>
+              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Ayala Blvd, Ermita, Manila</div>
             </div>
           </div>
         </div>
@@ -195,7 +195,7 @@ const Help = () => {
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 6, fontSize: 14.5 }}>
+          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 6, fontSize: 14 }}>
             Electronic Health Records & Compliance Overview
           </div>
           <div>
@@ -248,7 +248,7 @@ const Help = () => {
                     style={{
                       padding: '0 18px 14px 18px',
                       color: 'var(--muted)',
-                      fontSize: 13.5,
+                      fontSize: 14,
                       lineHeight: 1.5,
                       borderTop: '1px solid var(--border-subtle)'
                     }}
@@ -306,7 +306,7 @@ const Help = () => {
                     style={{
                       padding: '0 18px 14px 18px',
                       color: 'var(--muted)',
-                      fontSize: 13.5,
+                      fontSize: 14,
                       lineHeight: 1.5,
                       borderTop: '1px solid var(--border-subtle)'
                     }}

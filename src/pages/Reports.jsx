@@ -577,7 +577,7 @@ const Reports = () => {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Report Overview
               </h2>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 Configure date range, analytical view, and generate official clinical records
               </div>
             </div>
@@ -764,11 +764,11 @@ const Reports = () => {
 
           {/* Side Guide Card */}
           <div className="card" style={{ padding: '18px 20px' }}>
-            <h3 className="card-title" style={{ fontSize: 15, marginBottom: 12 }}>
+            <h3 className="card-title" style={{ fontSize: 16, marginBottom: 12 }}>
               Clinical Intelligence Guide
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>
               <div>
                 <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 2 }}>Auto 30-Day Lookback</strong>
                 By default, queries the last {DEFAULT_LOOKBACK_DAYS} days of clinic operations to ensure responsive analysis.

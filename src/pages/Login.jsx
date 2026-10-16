@@ -688,7 +688,7 @@ const Login = () => {
                 marginTop: 20,
                 fontStyle: 'italic',
                 color: '#444',
-                fontSize: 14.5,
+                fontSize: 14,
                 textAlign: 'left',
                 width: '100%',
               }}
@@ -811,7 +811,7 @@ const Login = () => {
                       onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
                     />
                     {showStudentIdError && (
-                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
                         Format must be TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).
                       </div>
                     )}
@@ -891,12 +891,12 @@ const Login = () => {
                       </button>
                     </div>
                     {showSignupEmailError && (
-                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2, lineHeight: 1.35 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2, lineHeight: 1.35 }}>
                         Please use your official TUP email address ending in @tup.edu.ph.
                       </div>
                     )}
                     {otpSent && (
-                      <div style={{ color: '#c6f6d5', fontSize: 11.5, marginTop: 2, fontWeight: 600 }}>
+                      <div style={{ color: '#c6f6d5', fontSize: 12, marginTop: 2, fontWeight: 600 }}>
                         If the provided information is eligible for registration, you will receive a verification code by email.
                       </div>
                     )}
@@ -992,7 +992,7 @@ const Login = () => {
                       </button>
                     </div>
                     {signupData.password && signupData.confirmPassword && !passwordsMatch && (
-                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
                         Passwords do not match.
                       </div>
                     )}
@@ -1057,7 +1057,7 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 12px 0',
-                      fontSize: isMobile ? 21 : 24,
+                      fontSize: isMobile ? 20 : 24,
                       fontWeight: 800,
                       fontFamily: `"Merriweather", serif`,
                     }}
@@ -1080,7 +1080,7 @@ const Login = () => {
                       onChange={(e) => setForgotEmail(e.target.value)}
                     />
                     {forgotEmail.length > 0 && !isValidTupEmail(forgotEmail) && (
-                      <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
                         Please use your official TUP email address ending in @tup.edu.ph.
                       </div>
                     )}
@@ -1344,7 +1344,7 @@ const Login = () => {
                   color: '#172033',
                   border: '1px solid var(--border, #cbd5e1)',
                   fontWeight: 600,
-                  fontSize: 13.5,
+                  fontSize: 13,
                   padding: '8px 18px',
                   borderRadius: 8,
                   cursor: 'pointer',

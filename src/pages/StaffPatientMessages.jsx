@@ -323,7 +323,7 @@ const StaffPatientMessages = () => {
             // Only append to active message stream if conversation matches
             if (msgMatchesActive) {
               setMessages((prev) => {
-                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                if (prev.some((m) => m.id === payload.new.id)) return prev;
                 return [...prev, newMsg];
               });
               setTimeout(() => {
@@ -447,6 +447,30 @@ const StaffPatientMessages = () => {
         }
       }
 
+      // Asynchronously trigger direct inquiry / message alert notification (evaluates patient_settings preferences)
+      try {
+        const staffRole = userRole || 'physician';
+        const staffName = user?.name || (staffRole === 'physician' ? 'Dr. Rivera' : 'Nurse Santos');
+        supabase.functions.invoke('send-patient-notification', {
+          body: {
+            type: 'message_reply',
+            patient_id: activeConversation?.patient_id,
+            message_data: {
+              patient_name: activeConversation?.patient_name || 'Student',
+              sender_name: staffName,
+              sender_role: staffRole.charAt(0).toUpperCase() + staffRole.slice(1),
+              concern_type: activeConversation?.concern_type || 'General clinic inquiry',
+              message_preview: textToSend.length > 200 ? `${textToSend.slice(0, 200)}...` : textToSend,
+              conversation_id: activeConversationId,
+            },
+          },
+        }).catch((fnErr) => {
+          console.warn('Edge function message notification error (non-blocking):', fnErr);
+        });
+      } catch (invokeErr) {
+        console.warn('Error initiating message alert notification:', invokeErr);
+      }
+
       setReply('');
       setTimeout(() => {
         if (chatScrollRef.current) {
@@ -501,7 +525,7 @@ const StaffPatientMessages = () => {
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>
               Patient Messages
             </h1>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 13.5 }}>
+            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
               Manage incoming student inquiries, clinical follow-ups, and consultation threads.
             </div>
           </div>
@@ -517,7 +541,7 @@ const StaffPatientMessages = () => {
             type="button"
             className={`btn ${activeTab === 'active' ? 'primary' : 'secondary'}`}
             onClick={() => setActiveTab('active')}
-            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
+            style={{ fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 8 }}
           >
             Active Inquiries ({openConversations.length})
           </button>
@@ -525,7 +549,7 @@ const StaffPatientMessages = () => {
             type="button"
             className={`btn ${activeTab === 'history' ? 'primary' : 'secondary'}`}
             onClick={() => setActiveTab('history')}
-            style={{ fontWeight: 600, fontSize: 13.5, padding: '7px 16px', borderRadius: 8 }}
+            style={{ fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 8 }}
           >
             History / Resolved ({historyConversations.length})
           </button>
@@ -533,11 +557,11 @@ const StaffPatientMessages = () => {
 
         {/* Messaging Workspace */}
         {loadingConversations ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '360px', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13.5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '360px', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 14 }}>
             Loading conversations...
           </div>
         ) : currentTabConversations.length === 0 ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: 14, border: '1px dashed var(--border)', color: 'var(--muted)', fontSize: 13.5 }}>
+          <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: 14, border: '1px dashed var(--border)', color: 'var(--muted)', fontSize: 14 }}>
             <MessagesIcon size={36} style={{ opacity: 0.5, marginBottom: 10 }} />
             <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
               {activeTab === 'active' ? 'No active inquiries' : 'No resolved inquiry history'}
@@ -554,7 +578,7 @@ const StaffPatientMessages = () => {
             <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
               <div className="tup-inbox-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                     {activeTab === 'active' ? 'Active Inquiries' : 'Resolved Inquiries'} ({currentTabConversations.length})
                   </span>
                 </div>
@@ -571,7 +595,7 @@ const StaffPatientMessages = () => {
 
               <div className="tup-inbox-list">
                 {filteredConversations.length === 0 ? (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5 }}>
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
                     No matching inquiries
                   </div>
                 ) : (
@@ -602,7 +626,7 @@ const StaffPatientMessages = () => {
                             <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.patient_name || 'Patient'}
                             </div>
-                            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
                             </span>
                           </div>
@@ -611,7 +635,7 @@ const StaffPatientMessages = () => {
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>To: {c.recipient_name}</span>
-                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 9.5, padding: '1px 6px', textTransform: 'capitalize' }}>
+                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 11, padding: '1px 6px', textTransform: 'capitalize' }}>
                               {c.status || 'open'}
                             </span>
                           </div>
@@ -630,7 +654,7 @@ const StaffPatientMessages = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     type="button"
-                    className="tup-mobile-back"
+                    className="tup-mobile-back tup-staff-mobile-back"
                     onClick={() => setMobileViewingChat(false)}
                   >
                     <ChevronLeftIcon size={16} />
@@ -648,7 +672,7 @@ const StaffPatientMessages = () => {
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                       {activeConversation?.patient_name || 'Patient'}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -660,7 +684,7 @@ const StaffPatientMessages = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="badge badge-neutral" style={{ fontSize: 11.5, fontWeight: 600 }}>
+                  <span className="badge badge-neutral" style={{ fontSize: 12, fontWeight: 600 }}>
                     {activeConversation?.concern_type}
                   </span>
 
@@ -687,11 +711,11 @@ const StaffPatientMessages = () => {
               {/* Messages Stream */}
               <div ref={chatScrollRef} className="tup-chat-messages-area">
                 {loadingMessages ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
                     Loading message thread...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 13.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
                     No messages in this conversation.
                   </div>
                 ) : (
@@ -710,7 +734,7 @@ const StaffPatientMessages = () => {
                           >
                             <div className="tup-chat-sender-label">
                               <span>{msg.sender_name || (isPatient ? 'Student' : 'Clinician')}</span>
-                              <span style={{ fontSize: 10, opacity: 0.75, textTransform: 'capitalize' }}>
+                              <span style={{ fontSize: 11, opacity: 0.75, textTransform: 'capitalize' }}>
                                 ({msg.sender_role})
                               </span>
                             </div>
@@ -722,7 +746,7 @@ const StaffPatientMessages = () => {
                             <div className="tup-chat-time">
                               <span>{formatMessageTime(msg.created_at)}</span>
                               {!isPatient && (
-                                <span style={{ fontSize: 10, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
+                                <span style={{ fontSize: 11, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
                               )}
                             </div>
                           </div>
@@ -831,7 +855,7 @@ const StaffPatientMessages = () => {
                 </button>
               </div>
 
-              <p style={{ margin: '0 0 20px 0', fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 20px 0', fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
                 Once resolved, this consultation thread with <strong>{activeConversation?.patient_name}</strong> will be moved to <strong>History</strong> and will no longer appear in your active inquiries. All message records remain safely preserved.
               </p>
 

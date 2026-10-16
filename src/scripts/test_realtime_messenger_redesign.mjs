@@ -131,7 +131,10 @@ async function runTests() {
     // -------------------------------------------------------------------------
     // TEST 5: Correct sender alignment on Staff screen (Student LEFT, Staff RIGHT)
     // -------------------------------------------------------------------------
-    const helpFile = fs.readFileSync(path.join(projectRoot, 'src/pages/Help.jsx'), 'utf8');
+    const staffFilePath = fs.existsSync(path.join(projectRoot, 'src/pages/StaffPatientMessages.jsx'))
+      ? path.join(projectRoot, 'src/pages/StaffPatientMessages.jsx')
+      : path.join(projectRoot, 'src/pages/Help.jsx');
+    const helpFile = fs.readFileSync(staffFilePath, 'utf8');
     const staffAlignmentCorrect = helpFile.includes("className={`tup-chat-message-row ${isPatient ? 'incoming' : 'outgoing'}`}") ||
       helpFile.includes("isPatient ? 'incoming' : 'outgoing'");
     assert(staffAlignmentCorrect, 'TEST 5: Staff screen aligns Student messages to LEFT (incoming) and Staff to RIGHT (outgoing)');

@@ -123,21 +123,24 @@ main.login-page-main,
   min-width: 0;
 }
 
-.page-header-title {
+.page-header-title,
+.page-header h2,
+.patient-page-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
-.page-header-subtitle {
+.page-header-subtitle,
+.patient-page-subtitle {
   margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.4;
+  color: var(--muted, #64748b);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 .page-header-actions {
@@ -249,7 +252,7 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-family: inherit !important;
   color: var(--text) !important;
   width: 100% !important;
@@ -270,7 +273,7 @@ main.login-page-main,
 .dashboard-search-input::placeholder,
 .dashboard-search-wrapper input[type="search"]::placeholder {
   color: var(--text-muted) !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   opacity: 0.85;
 }
 
@@ -293,7 +296,7 @@ main.login-page-main,
   padding: 11px 14px;
   cursor: pointer;
   border-bottom: 1px solid var(--border-subtle, var(--border));
-  font-size: 13.5px;
+  font-size: 14px;
   transition: background-color 0.12s ease;
 }
 
@@ -1438,7 +1441,7 @@ main.login-page-main,
 
   .nav-group-label {
     padding: 0 10px !important;
-    font-size: 10.5px !important;
+    font-size: 11px !important;
   }
 
   .menu-item {
@@ -1716,6 +1719,80 @@ main.login-page-main,
   }
 }
 
+/* Records, Messages & Time-Slots Desktop / Tablet Display (>= 768px) */
+@media (min-width: 768px) {
+  .patient-records-table-view,
+  .patient-messages-table-view,
+  .patient-slots-table-view {
+    display: block;
+  }
+
+  .patient-slots-table-view {
+    display: flex;
+  }
+
+  .patient-records-cards-view,
+  .patient-messages-cards-view,
+  .patient-slots-mobile-summary {
+    display: none !important;
+  }
+
+  /* Desktop Universal Modal Presentation */
+  .patient-slots-modal-backdrop {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 3500 !important;
+    animation: modalFadeIn 180ms ease-out forwards;
+  }
+
+  .patient-slots-modal-content {
+    background: var(--panel, #ffffff) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    width: min(92vw, 520px) !important;
+    max-height: 85vh !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.22) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    animation: modalScaleIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .patient-slots-modal-content .patient-slots-cards-view {
+    display: flex !important;
+  }
+
+  .patient-slots-drag-handle {
+    display: none !important;
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Mobile Breakpoint (<= 767px) */
 @media (max-width: 767px) {
   main,
@@ -1776,21 +1853,10 @@ main.login-page-main,
     grid-template-columns: 1fr !important;
   }
 
-  .patient-events-filter-controls {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-  }
-
-  .patient-events-search-wrapper,
-  .patient-events-select-wrapper {
-    width: 100% !important;
-    flex: 1 1 100% !important;
-  }
 
   /* Profile Page Mobile Refinement */
   .patient-profile-header {
-    margin-bottom: 14px !important;
+    margin-bottom: 16px !important;
   }
 
   .patient-identity-card {
@@ -1821,13 +1887,45 @@ main.login-page-main,
     border-radius: 10px !important;
   }
 
-  .page-header {
+  .page-header,
+  .patient-page-header,
+  .patient-messages-header,
+  .patient-profile-header {
     margin-bottom: 16px !important;
     gap: 10px !important;
   }
 
-  .page-header h2 {
-    font-size: 22px !important;
+  /* Prevent double margin on Home where .patient-dashboard-page already has gap: 16px */
+  .patient-dashboard-page .patient-page-header {
+    margin-bottom: 0 !important;
+  }
+
+  .page-header h2,
+  .patient-page-title,
+  .patient-messages-title,
+  .page-header-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    color: var(--text) !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .page-header-subtitle,
+  .patient-page-subtitle,
+  .patient-messages-sub,
+  .page-header > div > div,
+  .page-header > div:nth-child(2) {
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    color: var(--muted, #64748b) !important;
+    line-height: 1.45 !important;
+    margin-top: 4px !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
   }
 
   /* Table responsiveness on mobile */
@@ -1837,8 +1935,128 @@ main.login-page-main,
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Mobile Schedule De-cramping & Refinement (TASK-032) */
   .booking-two-col {
     grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .booking-col-card {
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+    gap: 14px !important;
+  }
+
+  .booking-col-card h3 {
+    font-size: 16px !important;
+  }
+
+  /* De-cramp Segmented Controls on Mobile */
+  .booking-col-card .segmented-control-container {
+    padding: 3px !important;
+    gap: 3px !important;
+    border-radius: 10px !important;
+  }
+
+  .booking-col-card .segmented-tab-btn {
+    padding: 8px 10px !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    border-radius: 7px !important;
+  }
+
+  /* De-cramp Calendar View Container on Mobile */
+  .booking-calendar-card {
+    padding: 10px 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .booking-calendar-card .calendar-nav-btn {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Calendar cells: compact height on mobile */
+  .calendar-cell-btn {
+    height: 42px !important;
+    border-radius: 8px !important;
+    padding: 2px !important;
+  }
+
+  .calendar-cell-btn:active:not(:disabled) {
+    transform: scale(0.94) !important;
+  }
+
+  .booking-calendar-card .calendar-empty-cell {
+    height: 42px !important;
+    border-radius: 8px !important;
+  }
+
+  .booking-calendar-card .calendar-weekday-header {
+    font-size: 11px !important;
+    padding: 2px 0 !important;
+  }
+
+  /* Availability pill inside calendar cell on mobile: single line, no multi-line wrap */
+  .calendar-cell-pct {
+    font-size: 11px !important;
+    padding: 1px 4px !important;
+    white-space: nowrap !important;
+    margin-top: 1px !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.3px !important;
+  }
+
+  .calendar-cell-pct .desktop-free-word {
+    display: none !important;
+  }
+
+  /* Selected Time Slot Status / Prompt Banner on Mobile */
+  .booking-hint-banner {
+    padding: 12px 14px !important;
+    border-radius: 10px !important;
+    gap: 8px !important;
+  }
+
+  /* Student Record Card on Mobile */
+  .booking-student-card {
+    padding: 12px 14px !important;
+    gap: 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .booking-student-card .immutable-record-badge {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .booking-student-card .patient-input-accessible {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 6px 10px !important;
+  }
+
+  /* Booking Summary Card on Mobile */
+  .booking-summary-card {
+    padding: 14px 14px !important;
+    gap: 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .booking-summary-card .booking-summary-grid {
+    gap: 8px !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Full-width CTA button on mobile */
+  .booking-submit-btn {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+    min-height: 44px !important;
+    border-radius: 10px !important;
   }
 
   /* Responsive Table to Cards Transformation */
@@ -1853,19 +2071,375 @@ main.login-page-main,
   .patient-slots-cards-view {
     display: flex !important;
   }
+
+  .patient-slots-mobile-summary {
+    display: block !important;
+  }
+
+  /* Mobile Bottom-Sheet Presentation */
+  .patient-slots-modal-backdrop {
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 3500 !important;
+    animation: bottomSheetFadeIn 200ms ease-out forwards;
+  }
+
+  .patient-slots-modal-content {
+    background: var(--panel, #ffffff) !important;
+    border-radius: 24px 24px 0 0 !important;
+    width: 100% !important;
+    max-width: 540px !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.2), 0 -4px 6px -2px rgba(0, 0, 0, 0.1) !important;
+    overflow: hidden !important;
+    animation: bottomSheetSlideUp 260ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+
+  .patient-slots-cards-view {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .booking-submit-btn {
+    width: 100% !important;
+  }
+
+  /* Mobile Patient Settings Refinements (TASK-034: Emil, Impeccable, Mobile-Native) */
+  .patient-settings-list {
+    gap: 12px !important;
+  }
+
+  .patient-settings-card {
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+    gap: 14px !important;
+  }
+
+  .patient-settings-card h3 {
+    font-size: 16px !important;
+  }
+
+  .patient-settings-card .card-header-block {
+    margin-bottom: 12px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .patient-setting-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .patient-settings-segmented {
+    width: 100% !important;
+    display: flex !important;
+  }
+
+  .patient-settings-segmented button {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 8px 6px !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, box-shadow 150ms ease !important;
+  }
+
+  .patient-settings-segmented button:active {
+    transform: scale(0.97) !important;
+  }
+
+  .patient-setting-toggle-row {
+    gap: 12px !important;
+    padding-top: 12px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .patient-account-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .patient-account-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  .patient-account-id-item {
+    order: 1 !important;
+  }
+
+  .patient-account-role-item {
+    order: 2 !important;
+  }
+
+  .patient-account-email-item {
+    order: 3 !important;
+    grid-column: 1 / -1 !important;
+    word-break: break-all !important;
+  }
+
+  .patient-account-security-item {
+    order: 4 !important;
+    grid-column: 1 / -1 !important;
+  }
+
+  .patient-change-password-desktop {
+    display: none !important;
+  }
+
+  .patient-change-password-mobile {
+    display: flex !important;
+  }
+
+  .patient-change-password-btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    margin-top: 14px !important;
+    justify-content: center !important;
+    align-items: center !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .patient-change-password-btn:active {
+    transform: scale(0.98) !important;
+  }
 }
 
-/* Records, Messages & Time-Slots Default Desktop / Tablet Display */
-.patient-records-table-view,
-.patient-messages-table-view,
-.patient-slots-table-view {
-  display: block;
-}
-
-.patient-records-cards-view,
-.patient-messages-cards-view,
-.patient-slots-cards-view {
+/* Patient Settings Desktop Rules */
+.patient-change-password-mobile {
   display: none !important;
+}
+
+.patient-change-password-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.patient-change-password-btn:active {
+  transform: scale(0.98);
+}
+
+/* Mobile Bottom-Sheet Keyframes & Interaction Utilities */
+@keyframes bottomSheetFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bottomSheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.patient-slots-drag-handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--border, #cbd5e1);
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.patient-slot-tile-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms, border-color 120ms;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.patient-slot-tile-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Schedule Page Enhanced Touch, Accessible Inputs & Segmented Controls */
+.page-header-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  gap: 28px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .booking-two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.booking-flow-card {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.segmented-control-container {
+  display: flex;
+  background: var(--surface-raised, #f1f5f9);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  gap: 4px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+.segmented-tab-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  outline: none;
+  border: 1px solid transparent;
+}
+
+.segmented-tab-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.segmented-tab-btn.active {
+  background: var(--panel, #ffffff);
+  color: var(--text, #0f172a);
+  font-weight: 700;
+  border-color: var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.segmented-tab-btn:not(.active) {
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-weight: 600;
+}
+
+.calendar-cell-btn {
+  height: 54px;
+  border-radius: 10px;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  outline: none;
+  position: relative;
+}
+
+.calendar-cell-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.calendar-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: var(--surface-raised, #f8fafc);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease, background-color 150ms ease;
+  color: var(--text);
+  padding: 0;
+}
+
+.calendar-nav-btn:active {
+  transform: scale(0.92);
+}
+
+.patient-input-accessible {
+  font-size: 16px !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--panel, #ffffff) !important;
+  color: var(--text) !important;
+  padding: 8px 12px !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease !important;
+  box-sizing: border-box !important;
+}
+
+.patient-input-accessible:focus {
+  border-color: var(--primary, #8b0000) !important;
+  box-shadow: 0 0 0 3px rgba(140, 21, 21, 0.12) !important;
+  outline: none !important;
+}
+
+.booking-submit-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease, background-color 150ms ease;
+  border-radius: 12px !important;
+  padding: 13px 28px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.booking-submit-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 /* Extra Small Mobile Screen (<= 360px) */
@@ -1881,58 +2455,61 @@ main.login-page-main,
   }
 }
 
-/* Patient Events Filter Controls */
-.patient-events-select-wrapper {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-  min-width: 180px;
-  box-sizing: border-box;
+/* Patient Events Category Filter Pills Strip (Streamlined & Anti-Slop) */
+.patient-events-pills-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding: 4px 2px 14px 2px;
+  margin-bottom: 20px;
+  scrollbar-width: none;
 }
 
-.patient-events-filter-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  width: 100%;
-  min-height: 40px;
-  height: 40px;
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 36px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  line-height: 1.4;
-  box-sizing: border-box;
+.patient-events-pills-strip::-webkit-scrollbar {
+  display: none;
 }
 
-.patient-events-filter-select:hover {
-  border-color: var(--border-hover, #94a3b8);
-  background: var(--surface-raised);
-}
-
-.patient-events-filter-select:focus {
-  border-color: var(--color-primary, #c92a2a);
-  box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
-  outline: none;
-  background: var(--input-bg);
-}
-
-.patient-events-filter-chevron {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--text-muted, #64748b);
+.patient-event-pill-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  background: var(--bg, #f8fafc);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .patient-event-pill-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover, #cbd5e1);
+    background: var(--surface-raised, #f1f5f9);
+  }
+}
+
+.patient-event-pill-btn:active {
+  transform: scale(0.96);
+}
+
+.patient-event-pill-btn.active {
+  background: var(--color-primary, #c92a2a);
+  color: #ffffff;
+  border-color: var(--color-primary, #c92a2a);
+  box-shadow: 0 2px 6px rgba(201, 42, 42, 0.25);
+}
+
 
 /* Events & Patient Portal Layout Styles */
 .events-kpi-grid {
@@ -1945,17 +2522,435 @@ main.login-page-main,
 .patient-events-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .patient-event-card {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  box-sizing: border-box;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, border-color 180ms ease;
 }
 
-.patient-event-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .patient-event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+    border-color: var(--border-hover, #cbd5e1);
+  }
 }
+
+/* Card Top & Visual Date Block */
+.patient-event-card-top {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.patient-event-date-block {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 56px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #f8fafc);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.patient-event-date-month {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-primary, #c92a2a);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.patient-event-date-day {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.patient-event-header-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.patient-event-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.patient-event-org-label {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.patient-event-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* Refined Category Badges */
+.patient-badge-blood {
+  background: rgba(225, 29, 72, 0.1) !important;
+  color: #be123c !important;
+  border: 1px solid rgba(225, 29, 72, 0.2) !important;
+}
+
+.patient-badge-vaccine {
+  background: rgba(14, 165, 233, 0.1) !important;
+  color: #0284c7 !important;
+  border: 1px solid rgba(14, 165, 233, 0.2) !important;
+}
+
+.patient-badge-seminar {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #4338ca !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+}
+
+.patient-badge-mission {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+
+.patient-badge-general {
+  background: rgba(100, 116, 139, 0.1) !important;
+  color: #475569 !important;
+  border: 1px solid rgba(100, 116, 139, 0.2) !important;
+}
+
+/* Event Meta Box (Time & Location) */
+.patient-event-meta-card {
+  background: var(--bg, #f8fafc);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.patient-event-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.patient-event-meta-icon {
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.patient-event-meta-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Event Description */
+.patient-event-description {
+  color: var(--text-muted, #64748b);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 14px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Event CTA Action & Calendar Popover */
+.patient-event-card-action {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  position: relative;
+}
+
+.patient-event-calendar-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.patient-calendar-chevron {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.patient-calendar-chevron.open {
+  transform: rotate(180deg);
+}
+
+.patient-calendar-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: popoverFadeIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.patient-calendar-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  box-sizing: border-box;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .patient-calendar-popover-item:hover {
+    background: var(--bg, #f8fafc);
+  }
+}
+
+.patient-calendar-popover-item:active {
+  background: var(--surface-raised, #f1f5f9);
+}
+
+.patient-calendar-popover-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.patient-calendar-popover-icon.google {
+  background: rgba(66, 133, 244, 0.1);
+  color: #4285f4;
+}
+
+.patient-calendar-popover-icon.ics {
+  background: var(--bg, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  border: 1px solid var(--border);
+}
+
+.patient-calendar-popover-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.patient-calendar-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.patient-calendar-popover-sub {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.patient-event-calendar-btn {
+  width: 100%;
+  justify-content: center;
+  min-height: 38px;
+  font-size: 14px;
+  font-weight: 600;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.patient-event-calendar-btn:active {
+  transform: scale(0.98);
+}
+
+
+/* Empty State */
+.patient-events-empty-card {
+  text-align: center;
+  padding: 48px 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface, #ffffff);
+}
+
+.patient-events-empty-icon-wrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--bg, #f8fafc);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 14px;
+}
+
+.patient-events-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.patient-events-empty-desc {
+  font-size: 14px;
+  color: var(--text-muted, #64748b);
+  max-width: 400px;
+  margin: 0 auto 16px;
+  line-height: 1.5;
+}
+
+.patient-events-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Loading Skeleton */
+.patient-event-skeleton-card {
+  pointer-events: none;
+}
+
+@keyframes eventShimmer {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+.patient-event-skeleton-date {
+  width: 52px;
+  height: 56px;
+  border-radius: 10px;
+  background: var(--border);
+  flex-shrink: 0;
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
+.patient-event-skeleton-pill {
+  width: 80px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--border);
+  margin-bottom: 8px;
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
+.patient-event-skeleton-title {
+  width: 140px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--border);
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
+.patient-event-skeleton-block {
+  width: 100%;
+  height: 52px;
+  border-radius: 8px;
+  background: var(--border);
+  margin-bottom: 12px;
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
+.patient-event-skeleton-line {
+  width: 100%;
+  height: 13px;
+  border-radius: 4px;
+  background: var(--border);
+  margin-bottom: 6px;
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
+.patient-event-skeleton-line.short {
+  width: 65%;
+  margin-bottom: 14px;
+}
+
+.patient-event-skeleton-btn {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--border);
+  margin-top: auto;
+  animation: eventShimmer 1.5s ease-in-out infinite;
+}
+
 
 .patient-sidebar .menu-item.active {
   background: rgba(140, 21, 21, 0.08);
@@ -1965,3 +2960,33 @@ main.login-page-main,
 .patient-sidebar .menu-item.active .nav-icon {
   color: var(--primary, #8b0000);
 }
+
+:root[data-theme="dark"] .patient-sidebar .menu-item.active,
+:root[data-theme="dark"] .menu-item.active {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+}
+:root[data-theme="dark"] .patient-sidebar .menu-item.active .nav-icon,
+:root[data-theme="dark"] .menu-item.active .nav-icon {
+  color: #fda4af !important;
+}
+:root[data-theme="dark"] .patient-sidebar .menu-item.active .nav-label,
+:root[data-theme="dark"] .menu-item.active .nav-label {
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+}
+
+/* Dark Mode Calendar Cell & Availability Softening (TASK-036) */
+:root[data-theme="dark"] .calendar-cell-btn.selected {
+  background: #881318 !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+:root[data-theme="dark"] .calendar-cell-pct {
+  background: rgba(52, 211, 153, 0.1) !important;
+  color: #34d399 !important;
+  font-weight: 600 !important;
+}
+

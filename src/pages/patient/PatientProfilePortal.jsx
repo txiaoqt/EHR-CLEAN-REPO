@@ -394,8 +394,8 @@ const PatientProfilePortal = () => {
       <section className="page patient-profile-page" style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', boxSizing: 'border-box' }}>
         {/* Page Header */}
         <div className="page-header patient-profile-header" style={{ marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Profile</h2>
-          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Profile</h2>
+          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
             Manage your student details, emergency contacts, and personal health information.
           </div>
         </div>

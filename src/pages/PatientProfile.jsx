@@ -390,7 +390,7 @@ const PatientProfile = () => {
                   type="button"
                   className="btn secondary"
                   onClick={() => navigate('/patients')}
-                  style={{ height: 38, padding: '0 16px', fontSize: 13.5, fontWeight: 600 }}
+                  style={{ height: 38, padding: '0 16px', fontSize: 13, fontWeight: 600 }}
                 >
                   ← Back
                 </button>
@@ -547,7 +547,7 @@ const PatientProfile = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Encounters</h3>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Clinical visit history</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Clinical visit history</div>
                   </div>
                   <button type="button" className="btn" onClick={goToNewEncounter} style={{ fontSize: 13, padding: '7px 14px' }}>
                     + New Encounter
@@ -574,7 +574,7 @@ const PatientProfile = () => {
                             {new Date(enc.encounter_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                           </span>
                           {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
-                            <span className="badge badge-warning" style={{ fontSize: 10, padding: '1px 6px' }}>
+                            <span className="badge badge-warning" style={{ fontSize: 11, padding: '1px 6px' }}>
                               Sensitivity: {getSensitivityLevel(enc)}
                             </span>
                           )}
@@ -602,7 +602,7 @@ const PatientProfile = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Medications / Allergies</h3>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Active prescriptions & sensitivities</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Active prescriptions & sensitivities</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
@@ -634,7 +634,7 @@ const PatientProfile = () => {
                         value={newMedications}
                         onChange={(e) => setNewMedications(e.target.value)}
                         placeholder="List active medications..."
-                        style={{ width: '100%', minHeight: 80, fontSize: 13.5 }}
+                        style={{ width: '100%', minHeight: 80, fontSize: 14 }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -669,7 +669,7 @@ const PatientProfile = () => {
                         background: 'var(--surface-raised, rgba(0,0,0,0.02))',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
-                        fontSize: 13.5,
+                        fontSize: 14,
                         lineHeight: 1.5,
                       }}
                     >
@@ -692,7 +692,7 @@ const PatientProfile = () => {
                         value={newAllergies}
                         onChange={(e) => setNewAllergies(e.target.value)}
                         placeholder="List known allergies..."
-                        style={{ width: '100%', minHeight: 80, fontSize: 13.5 }}
+                        style={{ width: '100%', minHeight: 80, fontSize: 14 }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -727,7 +727,7 @@ const PatientProfile = () => {
                         background: 'var(--surface-raised, rgba(0,0,0,0.02))',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
-                        fontSize: 13.5,
+                        fontSize: 14,
                         lineHeight: 1.5,
                       }}
                     >
@@ -747,7 +747,7 @@ const PatientProfile = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Vitals</h3>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Recorded physiological indicators</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Recorded physiological indicators</div>
                   </div>
                 </div>
 
@@ -814,10 +814,10 @@ const PatientProfile = () => {
                             gap: 6,
                           }}
                         >
-                          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
                             {new Date(vital.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                             {i === 0 && (
-                              <span className="badge badge-neutral" style={{ fontSize: 9.5, padding: '1px 5px', marginLeft: 6 }}>
+                              <span className="badge badge-neutral" style={{ fontSize: 11, padding: '1px 5px', marginLeft: 6 }}>
                                 Latest
                               </span>
                             )}
@@ -837,7 +837,7 @@ const PatientProfile = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Notes</h3>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Clinical notes and observations</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Clinical notes and observations</div>
                   </div>
                   <button
                     type="button"
@@ -856,7 +856,7 @@ const PatientProfile = () => {
                         value={newNotes}
                         onChange={(e) => setNewNotes(e.target.value)}
                         placeholder="Add clinical observation notes..."
-                        style={{ width: '100%', minHeight: 120, fontSize: 13.5 }}
+                        style={{ width: '100%', minHeight: 120, fontSize: 14 }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -892,7 +892,7 @@ const PatientProfile = () => {
                         border: '1px solid var(--border)',
                         minHeight: 100,
                         color: 'var(--text)',
-                        fontSize: 13.5,
+                        fontSize: 14,
                         lineHeight: 1.6,
                       }}
                     >
@@ -1042,7 +1042,7 @@ const PatientProfile = () => {
                 </div>
 
                 {deleteMessage && (
-                  <div style={{ color: 'var(--danger)', fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+                  <div style={{ color: 'var(--danger)', fontSize: 12, fontWeight: 600, marginBottom: 14 }}>
                     {deleteMessage}
                   </div>
                 )}

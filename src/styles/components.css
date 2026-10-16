@@ -21,7 +21,7 @@
 
 .card-title {
   margin: 0;
-  font-size: 17.5px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.015em;
@@ -45,7 +45,7 @@
   border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 14px;
   font-family: inherit;
   min-height: 42px;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
@@ -77,6 +77,17 @@ button.btn:focus-visible {
 .btn:active:not(:disabled) {
   background: var(--color-primary-active);
   transform: scale(0.98);
+}
+
+:root[data-theme="dark"] .btn:not(.secondary):not(.danger):not(:disabled) {
+  background: #991b1b;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+:root[data-theme="dark"] .btn:not(.secondary):not(.danger):hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .btn.secondary {
@@ -141,7 +152,7 @@ select {
   background: var(--input-bg);
   color: var(--text);
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 14px;
   min-height: 42px;
   box-sizing: border-box;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -208,7 +219,7 @@ textarea::placeholder {
   outline: none !important;
   padding: 8px 10px !important;
   width: 100%;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text);
   min-height: auto !important;
 }
@@ -220,7 +231,7 @@ textarea::placeholder {
   gap: 6px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
 }
@@ -264,7 +275,7 @@ textarea::placeholder {
 }
 
 .kpi-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -278,7 +289,7 @@ textarea::placeholder {
 }
 
 .kpi-subtitle {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-light);
 }
 
@@ -447,14 +458,14 @@ textarea::placeholder {
 }
 
 .sidebar-user-name {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
 }
 
 .sidebar-user-role {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -704,7 +715,7 @@ textarea::placeholder {
   background: var(--panel);
   color: var(--danger);
   border: 1px solid rgba(220, 38, 38, 0.25);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   box-sizing: border-box;
@@ -774,7 +785,7 @@ textarea::placeholder {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .table th {
@@ -954,14 +965,14 @@ textarea::placeholder {
 
 .modal-title {
   margin: 0;
-  font-size: 18.5px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.015em;
 }
 
 .modal-subtitle {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
   display: block;
@@ -1125,6 +1136,7 @@ img.tup-messenger-avatar {
   gap: 10px;
   background: var(--bg);
   scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 .tup-chat-date-divider {
@@ -1149,14 +1161,14 @@ img.tup-messenger-avatar {
 .tup-chat-date-divider span {
   position: relative;
   z-index: 2;
-  background: var(--panel);
-  border: 1px solid var(--border-subtle);
-  padding: 3px 12px;
-  border-radius: 12px;
+  background: var(--surface-raised, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .tup-chat-message-row {
@@ -1192,21 +1204,21 @@ img.tup-messenger-avatar {
 
 .tup-chat-bubble {
   max-width: min(80%, 540px);
-  padding: 10px 15px;
-  border-radius: 16px;
-  font-size: 13.5px;
-  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.45;
   word-break: break-word;
   position: relative;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tup-chat-bubble.incoming {
-  background: var(--panel);
+  background: var(--panel, #ffffff);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
-  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 18px 18px 18px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme="dark"] .tup-chat-bubble.incoming {
@@ -1215,10 +1227,10 @@ img.tup-messenger-avatar {
 }
 
 .tup-chat-bubble.outgoing {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #c92a2a, #b4232a);
   color: #ffffff;
-  border-bottom-right-radius: 4px;
-  box-shadow: 0 2px 6px rgba(201, 42, 42, 0.22);
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 2px 8px rgba(180, 35, 42, 0.22);
 }
 
 :root[data-theme="dark"] .tup-chat-bubble.outgoing {
@@ -1228,13 +1240,89 @@ img.tup-messenger-avatar {
 }
 
 .tup-chat-time {
-  font-size: 10.5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   margin-top: 3px;
   padding: 0 6px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Patient Chat Resolved Status Card */
+.patient-chat-resolved-card {
+  padding: 16px 20px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.patient-chat-resolved-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.patient-chat-resolved-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.patient-chat-resolved-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.patient-chat-resolved-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.patient-chat-resolved-cta {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .patient-chat-resolved-card {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .patient-chat-resolved-cta {
+    justify-content: center;
+    width: 100%;
+  }
 }
 
 .tup-chat-composer {
@@ -1254,7 +1342,7 @@ img.tup-messenger-avatar {
   padding: 9px 16px;
   background: var(--input-bg);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 14px;
   font-family: inherit;
   resize: none;
   min-height: 40px;
@@ -1281,7 +1369,7 @@ img.tup-messenger-avatar {
   justify-content: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
@@ -1299,6 +1387,405 @@ img.tup-messenger-avatar {
 .tup-chat-send-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Patient Messages Polish (Impeccable & Emil Kowalski Standards) */
+.patient-messages-header {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.patient-messages-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.patient-messages-sub {
+  margin-top: 4px;
+  color: var(--muted, #64748b);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.patient-mobile-header-inquiry-btn {
+  display: none;
+}
+
+.tup-inbox-new-inquiry-btn {
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Clinical Notice Banner */
+.patient-messages-notice-banner {
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 180ms ease;
+}
+
+.patient-messages-notice-icon-wrap {
+  color: var(--color-primary, #b4232a);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.patient-messages-notice-content {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted, #64748b);
+}
+
+.patient-messages-notice-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary, #b4232a);
+  background: var(--color-primary-tint, rgba(180, 35, 42, 0.08));
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.patient-messages-notice-text {
+  color: var(--text);
+}
+
+.patient-messages-notice-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.patient-messages-notice-dismiss:hover {
+  color: var(--text);
+  background: var(--surface-raised, #f1f5f9);
+}
+
+/* Tactile Segmented Track */
+.patient-messages-segmented-track-wrap {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+}
+
+.patient-messages-segmented-track {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-raised, #f1f5f9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0 0 16px 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.patient-messages-segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 16px;
+  min-height: 40px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .patient-messages-segmented-tab:hover {
+    color: var(--text);
+  }
+}
+
+.patient-messages-segmented-tab:active {
+  transform: scale(0.98);
+}
+
+.patient-messages-segmented-tab.active {
+  background: var(--panel, #ffffff);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.patient-messages-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--bg, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  transition: all 140ms ease;
+}
+
+.patient-messages-segmented-tab.active .patient-messages-tab-badge {
+  background: var(--color-primary-tint, rgba(180, 35, 42, 0.1));
+  color: var(--color-primary, #b4232a);
+}
+
+:root[data-theme="dark"] .patient-messages-notice-icon-wrap {
+  color: #60a5fa;
+}
+
+:root[data-theme="dark"] .patient-messages-notice-tag {
+  color: #93c5fd;
+  background: rgba(96, 165, 250, 0.12);
+}
+
+:root[data-theme="dark"] .patient-messages-segmented-tab.active .patient-messages-tab-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* Anti-Slop Empty State */
+.patient-messages-empty-card {
+  padding: 56px 20px;
+  text-align: center;
+  background: var(--panel, #ffffff);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.patient-messages-empty-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-primary-tint, rgba(180, 35, 42, 0.08));
+  color: var(--color-primary, #b4232a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  border: 1px solid rgba(180, 35, 42, 0.15);
+}
+
+.patient-messages-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px 0;
+}
+
+.patient-messages-empty-desc {
+  font-size: 14px;
+  color: var(--text-muted, #64748b);
+  max-width: 400px;
+  line-height: 1.55;
+  margin: 0 0 20px 0;
+}
+
+.patient-messages-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms ease;
+}
+
+.patient-messages-empty-cta:active {
+  transform: scale(0.98);
+}
+
+/* New Inquiry Dialog / Mobile Bottom Sheet */
+.patient-inquiry-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg, rgba(0, 0, 0, 0.6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3200;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: modalFadeIn 180ms ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.patient-inquiry-modal-dialog {
+  width: min(94vw, 520px);
+  background: var(--panel);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalScaleUp 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.patient-modal-drag-handle {
+  display: none;
+}
+
+.patient-inquiry-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.patient-inquiry-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.patient-inquiry-modal-sub {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+
+.patient-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+
+.patient-modal-close-btn:hover {
+  background: var(--surface-raised, #f1f5f9);
+  color: var(--text);
+}
+
+.patient-inquiry-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.patient-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.patient-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Custom Select Wrapper with Positioned Chevron */
+.patient-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.patient-select-wrapper select,
+.patient-select-wrapper .input,
+.patient-select-wrapper .patient-input-accessible {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 38px !important;
+  cursor: pointer;
+}
+
+.patient-select-chevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted, #64748b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.patient-select-wrapper select:focus ~ .patient-select-chevron,
+.patient-select-wrapper .input:focus ~ .patient-select-chevron {
+  color: var(--color-primary, #b4232a);
+}
+
+.patient-inquiry-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* Two-Panel Messaging Workspace (Used by both Student and Staff) */
@@ -1350,7 +1837,7 @@ img.tup-messenger-avatar {
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -1408,8 +1895,8 @@ img.tup-messenger-avatar {
 
 :root[data-theme="dark"] .tup-inbox-item.active,
 :root[data-theme="dark"] .tup-staff-inbox-item.active {
-  background: rgba(180, 35, 42, 0.18);
-  border-color: rgba(180, 35, 42, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .tup-chat-panel,
@@ -1491,14 +1978,216 @@ img.tup-messenger-avatar {
     display: none !important;
   }
 
+  /* Full-Height Mobile Chat Focus */
+  .patient-mobile-hide-on-chat {
+    display: none !important;
+  }
+
+  /* Compact mobile inquiry action (hidden on mobile in favor of dedicated inbox action) */
+  .patient-mobile-header-inquiry-btn {
+    display: none !important;
+  }
+
+  /* Dedicated inbox header new inquiry button touch target */
+  .tup-inbox-new-inquiry-btn {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Consistent 12px Breathing Margin Below Mobile Navigation Bar Across All Patient Pages */
+  .patient-dashboard-page,
+  .patient-events-page,
+  .patient-schedule-page,
+  .patient-records-page,
+  .patient-profile-page,
+  .patient-settings-page,
+  .patient-messages-top-bar {
+    margin-top: 12px !important;
+  }
+
+  /* Zero Outer Page Scrolling on Mobile - Lock Body/Main and Enforce Internal Scrolling */
+  main.main.patient-messages-main-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    padding: 14px 14px !important;
+    padding-top: 56px !important;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+  }
+
+  .patient-messages-page {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+
+  .patient-messages-page .patient-main-layout-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Compact Top Bar on Mobile - Stable Fixed Position */
+  .patient-messages-top-bar {
+    flex-shrink: 0 !important;
+  }
+
+  .patient-messages-header {
+    margin-bottom: 16px !important;
+  }
+
+  .patient-messages-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    color: var(--text) !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .patient-messages-sub {
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    color: var(--muted, #64748b) !important;
+    margin-top: 4px !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  /* Compact Clinical Notice Banner */
+  .patient-messages-notice-banner {
+    padding: 6px 10px !important;
+    margin-bottom: 6px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    border-radius: 8px !important;
+    gap: 8px !important;
+  }
+
+  .patient-messages-notice-content {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  .patient-messages-notice-tag {
+    font-size: 11px !important;
+    padding: 1px 4px !important;
+  }
+
+  .patient-messages-notice-dismiss {
+    padding: 2px !important;
+  }
+
+  /* Segmented Track */
+  .patient-messages-segmented-track-wrap {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .patient-messages-segmented-track {
+    margin: 0 auto 8px auto !important;
+    padding: 3px !important;
+  }
+
+  .patient-messages-segmented-tab {
+    padding: 7px 14px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+  }
+
   .tup-two-panel-messenger,
   .tup-staff-messenger {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
-    height: calc(100vh - 150px);
+    height: calc(100vh - 84px);
+    height: calc(100dvh - 84px);
     min-height: 480px;
     border-radius: 12px;
     overflow: hidden;
+  }
+
+  /* Mobile List View: Compact, non-stretched container with internal scrolling */
+  .tup-two-panel-messenger.mobile-inbox-active {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    max-height: calc(100dvh - 180px) !important;
+    border-radius: 12px;
+    overflow: hidden !important;
+    margin-bottom: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .tup-two-panel-messenger.mobile-inbox-active .tup-inbox-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .tup-two-panel-messenger.mobile-inbox-active .tup-inbox-header {
+    flex-shrink: 0 !important;
+    padding: 8px 12px !important;
+  }
+
+  .tup-two-panel-messenger.mobile-inbox-active .tup-inbox-search {
+    margin-top: 6px !important;
+  }
+
+  /* Initial 5 items displayed (~360px), scrolling internally when >5 items */
+  .tup-two-panel-messenger.mobile-inbox-active .tup-inbox-list {
+    max-height: min(360px, calc(100dvh - 270px)) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex: 1 1 auto;
+    padding: 4px 6px !important;
+  }
+
+  /* Mobile Chat View: Fixed height with breathing margin below top navbar */
+  .tup-two-panel-messenger.mobile-chat-active {
+    margin-top: 12px !important;
+    height: calc(100vh - 84px) !important;
+    height: calc(100dvh - 84px) !important;
+    max-height: calc(100dvh - 84px) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Compact Empty State */
+  .patient-messages-empty-card {
+    padding: 24px 16px !important;
+    margin: 6px 0 !important;
+  }
+
+  .patient-messages-empty-title {
+    font-size: 15px !important;
+  }
+
+  .patient-messages-empty-desc {
+    font-size: 12px !important;
+    margin-bottom: 12px !important;
   }
 
   .tup-inbox-panel.hidden-mobile,
@@ -1521,23 +2210,63 @@ img.tup-messenger-avatar {
 
   .tup-chat-panel,
   .tup-staff-chat-panel {
-    flex: 1;
-    width: 100%;
-    min-height: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .tup-messenger-header {
+    flex-shrink: 0 !important;
+    min-height: 52px !important;
     padding: 10px 12px;
     gap: 8px;
   }
 
-  .tup-mobile-back,
+  .tup-mobile-back {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 8px;
+    background: var(--surface-raised, #f1f5f9);
+    color: var(--text);
+    flex-shrink: 0;
+  }
+
+  .tup-mobile-back span {
+    display: none !important;
+  }
+
   .tup-staff-mobile-back {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     padding: 4px 6px;
-    font-size: 12.5px;
+    font-size: 13px;
+  }
+
+  /* Mobile Input Auto-Zoom Prevention (mobile-native standard: >= 16px prevents iOS Safari zoom) */
+  .input,
+  input[type="text"],
+  input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  input[type="password"],
+  input[type="number"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  .tup-chat-header-concern-badge {
+    display: none !important;
   }
 
   .tup-chat-bubble {
@@ -1546,18 +2275,129 @@ img.tup-messenger-avatar {
 
   .tup-chat-composer {
     padding: 8px 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     gap: 6px;
   }
 
   .tup-chat-input {
-    font-size: 13px;
-    padding: 8px 10px;
+    font-size: 16px !important;
+    padding: 8px 12px;
   }
 
   .tup-chat-send-btn {
     padding: 8px 12px;
     font-size: 13px;
   }
+
+  /* Mobile Bottom Sheet Drawer for Inquiry */
+  .patient-inquiry-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .patient-inquiry-modal-dialog {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 24px 24px 0 0;
+    border-bottom: none;
+    animation: sheetSlideUp 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .patient-modal-drag-handle {
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--border-hover, #cbd5e1);
+    margin: 10px auto 4px auto;
+  }
+
+  .patient-inquiry-modal-footer {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@keyframes sheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Text & Layout Density UI Modifiers (TASK-027)
+   ========================================================================== */
+
+/* Compact Mode UI Adjustments */
+html[data-density="compact"] .card {
+  padding: 16px;
+}
+
+html[data-density="compact"] .table th,
+html[data-density="compact"] .table td {
+  padding: 8px 12px;
+}
+
+html[data-density="compact"] .input,
+html[data-density="compact"] .select,
+html[data-density="compact"] select.input {
+  padding: 6px 10px;
+  min-height: 36px;
+  font-size: 13px;
+}
+
+html[data-density="compact"] .btn {
+  padding: 6px 12px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+html[data-density="compact"] .menu-item {
+  padding: 6px 10px;
+  min-height: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+html[data-density="compact"] .menu-item .nav-label {
+  font-size: 13px;
+}
+
+/* Comfortable Mode UI Adjustments */
+html[data-density="comfortable"] .card {
+  padding: 26px;
+}
+
+html[data-density="comfortable"] .table th,
+html[data-density="comfortable"] .table td {
+  padding: 16px 20px;
+}
+
+html[data-density="comfortable"] .input,
+html[data-density="comfortable"] .select,
+html[data-density="comfortable"] select.input {
+  padding: 10px 14px;
+  min-height: 44px;
+  font-size: 15px;
+}
+
+html[data-density="comfortable"] .btn {
+  padding: 10px 18px;
+  min-height: 42px;
+  font-size: 15px;
+}
+
+html[data-density="comfortable"] .menu-item {
+  padding: 10px 14px;
+  min-height: 46px;
+  height: 46px;
+  font-size: 15px;
+}
+
+html[data-density="comfortable"] .menu-item .nav-label {
+  font-size: 15px;
 }
 
 

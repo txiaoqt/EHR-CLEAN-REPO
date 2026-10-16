@@ -89,7 +89,7 @@ const PCAccessRequired = ({ onLogout }) => {
         <p
           style={{
             margin: '0 0 10px',
-            fontSize: 14.5,
+            fontSize: 14,
             lineHeight: 1.55,
             color: 'var(--text)',
             fontWeight: 500
@@ -131,7 +131,7 @@ const PCAccessRequired = ({ onLogout }) => {
                 width: '100%',
                 justifyContent: 'center',
                 fontWeight: 600,
-                fontSize: 13.5,
+                fontSize: 14,
                 padding: '9px 16px'
               }}
             >

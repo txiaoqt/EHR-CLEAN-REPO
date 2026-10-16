@@ -134,7 +134,13 @@
   --primary: #b4232a;
   --primary-hover: #991b1b;
   --accent: #b4232a;
-  --danger: #ef4444;
+  --color-primary-text: #fda4af;
+
+  /* Danger & Status: Soft, Readable Coral-Rose (Eliminates Neon Glare) */
+  --danger: #f87171;
+  --color-rose: #f87171;
+  --color-rose-bg: rgba(248, 113, 113, 0.14);
+  --color-rose-text: #fda4af;
 
   /* Semantic Status Colors: Calibrated for Dark Surfaces (Not Neon) */
   --color-purple: #a78bfa;
@@ -154,10 +160,6 @@
   --color-amber-bg: rgba(251, 191, 36, 0.14);
   --color-amber-text: #fde68a;
   --warning: #fbbf24;
-
-  --color-rose: #f87171;
-  --color-rose-bg: rgba(248, 113, 113, 0.14);
-  --color-rose-text: #fca5a5;
 
   /* Greys Inverted Spectrum for Dark Hierarchy */
   --grey-50: #1e293b;

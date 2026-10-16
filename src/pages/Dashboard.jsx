@@ -519,7 +519,7 @@ const Dashboard = () => {
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 20,
                   padding: '3px 10px',
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: 600,
                   color: 'var(--text)',
                   cursor: 'pointer',
@@ -562,7 +562,7 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
-            <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 600, fontSize: 14.5, whiteSpace: 'nowrap' }}>
+            <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
               New Appointment
             </button>
           </div>
@@ -595,7 +595,7 @@ const Dashboard = () => {
               <div>
                 <div className="card-header" style={{ marginBottom: 14 }}>
                   <div>
-                    <h3 className="card-title" style={{ fontSize: 17.5 }}>Upcoming Schedule</h3>
+                    <h3 className="card-title" style={{ fontSize: 18 }}>Upcoming Schedule</h3>
                     <span className="card-subtitle" style={{ fontSize: 13 }}>Next scheduled consultations</span>
                   </div>
                   <button
@@ -621,7 +621,7 @@ const Dashboard = () => {
                 {todayAppointments.length === 0 ? (
                   <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--grey-100)', borderRadius: 10, border: '1px solid var(--border-subtle)', margin: '8px 0' }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No upcoming appointments scheduled</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Check the Appointments page to view the full schedule and active queue.</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Check the Appointments page to view the full schedule and active queue.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
@@ -630,7 +630,7 @@ const Dashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
                           <span style={{ fontWeight: 700, color: 'var(--text)', minWidth: 68, flexShrink: 0 }}>{appt.appointment_time || '09:00 AM'}</span>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>{appt.patient_id}</span>
-                          <span style={{ color: 'var(--text-light)', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appt.reason || 'Consultation'}</span>
+                          <span style={{ color: 'var(--text-light)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appt.reason || 'Consultation'}</span>
                         </div>
                         <span className="badge badge-info" style={{ fontSize: 11, flexShrink: 0 }}>{appt.status || 'Scheduled'}</span>
                       </div>
@@ -639,7 +639,7 @@ const Dashboard = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: 12, marginTop: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: 12, marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
                 <span>Scheduled Consultations</span>
                 <span style={{ color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/appointments')}>
                   Manage Schedule & Queue →
@@ -649,7 +649,7 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 310, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 17.5 }}>Diagnosis Distribution</h3>
+                <h3 className="card-title" style={{ fontSize: 18 }}>Diagnosis Distribution</h3>
                 <span className="card-subtitle" style={{ fontSize: 13 }}>Clinical Assessment Breakdown</span>
               </div>
 
@@ -675,7 +675,7 @@ const Dashboard = () => {
                   aria-label="Diagnosis distribution list"
                 >
                   {topComplaintsList.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text)', minWidth: 0 }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text)', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: DONUT_COLORS[idx % DONUT_COLORS.length], flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
@@ -689,7 +689,7 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 17.5 }}>Visit Over Time</h3>
+                <h3 className="card-title" style={{ fontSize: 18 }}>Visit Over Time</h3>
                 <span className="card-subtitle" style={{ fontSize: 13 }}>Monthly Consult Volume</span>
               </div>
               <div className="dashboard-chart-wrapper">
@@ -699,7 +699,7 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 17.5 }}>Top 10 Chief Complaints</h3>
+                <h3 className="card-title" style={{ fontSize: 18 }}>Top 10 Chief Complaints</h3>
                 <span className="card-subtitle" style={{ fontSize: 13 }}>Most Frequent Cases</span>
               </div>
               <div className="dashboard-chart-wrapper">
@@ -714,34 +714,34 @@ const Dashboard = () => {
                 <span style={{ color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
                   <AlertIcon size={18} />
                 </span>
-                <h3 className="card-title" style={{ fontSize: 17.5, margin: 0 }}>Alerts</h3>
+                <h3 className="card-title" style={{ fontSize: 18, margin: 0 }}>Alerts</h3>
               </div>
               {lowStockItems.length === 0 ? (
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>All systems normal</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3 }}>No alerts at this time.</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>All systems normal</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>No alerts at this time.</div>
                 </div>
               ) : (
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--danger)' }}>{lowStockItems.length} Low Stock Alert{lowStockItems.length > 1 ? 's' : ''}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3 }}>Click to review and reorder low inventory items</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>Click to review and reorder low inventory items</div>
                 </div>
               )}
             </div>
 
             <div className="card" style={{ padding: '18px 20px' }}>
-              <h3 className="card-title" style={{ fontSize: 17.5, marginBottom: 12 }}>Quick Actions</h3>
+              <h3 className="card-title" style={{ fontSize: 18, marginBottom: 12 }}>Quick Actions</h3>
               <div className="quick-actions-grid">
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13.5, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/patients')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/patients')}>
                   Register Patient
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13.5, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/encounter')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/encounter')}>
                   New Encounter
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13.5, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={requestExportCensus}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={requestExportCensus}>
                   Export Census
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13.5, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/reports')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/reports')}>
                   View Reports
                 </button>
               </div>
@@ -749,7 +749,7 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '18px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h3 className="card-title" style={{ fontSize: 17.5, margin: 0 }}>Recent Encounters</h3>
+                <h3 className="card-title" style={{ fontSize: 18, margin: 0 }}>Recent Encounters</h3>
                 <button
                   type="button"
                   onClick={() => navigate('/encounters')}
@@ -783,7 +783,7 @@ const Dashboard = () => {
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: idx < Math.min(recentEncounters.length, 4) - 1 ? '1px solid var(--border-subtle)' : 'none', minWidth: 0, gap: 8 }}>
                         <span style={{ fontWeight: 700, color: 'var(--text)', width: 90, flexShrink: 0 }}>{enc.patient_id || 'Unknown'}</span>
                         <span style={{ color: 'var(--text-muted)', flex: 1, padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{enc.chief_complaint || 'General Checkup'}</span>
-                        <span style={{ color: 'var(--text-light)', fontSize: 11.5, flexShrink: 0 }}>{timeStr}</span>
+                        <span style={{ color: 'var(--text-light)', fontSize: 12, flexShrink: 0 }}>{timeStr}</span>
                       </div>
                     );
                   })}
@@ -815,7 +815,7 @@ const Dashboard = () => {
                 {patientSuggestions.length > 0 && (
                   <div style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 150, overflowY: 'auto', marginTop: 4 }}>
                     {patientSuggestions.map(p => (
-                      <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 12.5, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
                         <strong>{p.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.id})</span>
                       </div>
                     ))}
@@ -932,7 +932,7 @@ const Dashboard = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
                   <h3 id="weather-modal-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Weather & Meteorological Outlook</h3>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Location: {weatherState.place || 'Asia/Manila'}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Location: {weatherState.place || 'Asia/Manila'}</span>
                 </div>
                 <button type="button" className="modal-close-btn" onClick={() => setShowWeatherModal(false)} aria-label="Close weather modal">
                   <CloseIcon size={18} />
@@ -964,7 +964,7 @@ const Dashboard = () => {
 
               {/* 24-Hour Sparkline Chart */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>24-Hour Temperature Forecast</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>24-Hour Temperature Forecast</div>
                 <div style={{ height: 110, minWidth: 0 }}>
                   {weatherState.hourly && <Line data={getWeatherSparkline()} options={sparkOptions} />}
                 </div>
@@ -973,7 +973,7 @@ const Dashboard = () => {
               {/* 7-Day Forecast Row */}
               {weatherState.daily && (
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>7-Day Weather Outlook</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>7-Day Weather Outlook</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, textAlign: 'center' }}>
                     {(weatherState.daily.time || []).slice(0, 7).map((t, idx) => {
                       const dayName = new Date(t).toLocaleDateString(undefined, { weekday: 'short' });

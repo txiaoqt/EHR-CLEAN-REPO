@@ -994,7 +994,7 @@ const Events = () => {
                               </span>
                               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                                 {r.blood_type && (
-                                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
                                     {r.blood_type}
                                   </span>
                                 )}
@@ -1357,7 +1357,7 @@ const Events = () => {
                             </span>
                             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                               {r.blood_type && (
-                                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
                                   {r.blood_type}
                                 </span>
                               )}

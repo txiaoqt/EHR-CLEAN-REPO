@@ -34,48 +34,47 @@ assert(fs.existsSync(eventsPath), 'src/pages/patient/PatientEvents.jsx exists');
 
 const eventsCode = fs.readFileSync(eventsPath, 'utf8');
 
-// Copy removal & Single Add to Calendar Action
+// Copy removal & Dual Calendar Action
 assert(!eventsCode.includes('copyDetails'), 'PatientEvents.jsx does not contain copyDetails handler');
 assert(!eventsCode.includes('copiedId'), 'PatientEvents.jsx does not contain copiedId state');
 assert(!eventsCode.includes('>Copy</button>') && !eventsCode.includes(">'Copied' : 'Copy'<"), 'PatientEvents.jsx removed the Copy button');
 assert(eventsCode.includes('Add to Calendar'), 'PatientEvents.jsx retains "Add to Calendar" button');
 assert(eventsCode.includes('downloadIcs'), 'PatientEvents.jsx preserves downloadIcs (.ics export)');
+assert(eventsCode.includes('calendar.google.com'), 'PatientEvents.jsx provides direct Google Calendar web integration');
 
-// Category Filter Dropdown Pattern
-console.log('\n[TEST GROUP 2] Category Filter Dropdown & Search Pattern Audit');
+// Streamlined Category Filter Pills Pattern
+console.log('\n[TEST GROUP 2] Streamlined Category Filter Pills Pattern Audit');
 
-assert(eventsCode.includes('<select'), 'PatientEvents.jsx uses a <select> category dropdown');
-assert(!eventsCode.includes('CATEGORIES.map((cat) =>') || eventsCode.includes('<option'), 'Category pills replaced with dropdown options');
-assert(eventsCode.includes('All Categories'), 'Dropdown contains "All Categories" as default');
-assert(eventsCode.includes('Blood Drive'), 'Dropdown contains "Blood Drive"');
-assert(eventsCode.includes('Vaccination'), 'Dropdown contains "Vaccination"');
-assert(eventsCode.includes('Health Seminar'), 'Dropdown contains "Health Seminar"');
-assert(eventsCode.includes('Medical Mission'), 'Dropdown contains "Medical Mission"');
-assert(eventsCode.includes('General'), 'Dropdown contains "General"');
+assert(eventsCode.includes('patient-events-pills-strip'), 'PatientEvents.jsx uses streamlined category filter pills strip');
+assert(eventsCode.includes('patient-event-pill-btn'), 'PatientEvents.jsx uses touch-friendly category pill buttons');
+assert(eventsCode.includes('All Categories'), 'Pills contain "All Categories" as default');
+assert(eventsCode.includes('Blood Drive'), 'Pills contain "Blood Drive"');
+assert(eventsCode.includes('Vaccination'), 'Pills contain "Vaccination"');
+assert(eventsCode.includes('Health Seminar'), 'Pills contain "Health Seminar"');
+assert(eventsCode.includes('Medical Mission'), 'Pills contain "Medical Mission"');
+assert(eventsCode.includes('General'), 'Pills contain "General"');
 assert(eventsCode.includes("useState('All Categories')"), 'Initial category state is "All Categories"');
 
-// Search & Dynamic Data Safety
-console.log('\n[TEST GROUP 3] Search, Query & Dynamic Data Safety Audit');
+// Dynamic Data Safety & Elevated Popover
+console.log('\n[TEST GROUP 3] Query, Dynamic Data Safety & Calendar Popover Audit');
 
-assert(eventsCode.includes('SearchIcon'), 'PatientEvents.jsx includes SearchIcon affordance');
 assert(eventsCode.includes(".eq('status', 'published')"), 'PatientEvents.jsx queries status = published');
 assert(eventsCode.includes(".eq('is_published', true)"), 'PatientEvents.jsx queries is_published = true');
 assert(eventsCode.includes('filteredEvents'), 'PatientEvents.jsx computes filteredEvents dynamically');
 assert(eventsCode.includes('No events found'), 'PatientEvents.jsx provides clean empty state');
 
-assert(eventsCode.includes('ChevronDownIcon'), 'PatientEvents.jsx uses subtle ChevronDownIcon');
-assert(eventsCode.includes('patient-events-filter-chevron'), 'PatientEvents.jsx wraps chevron in .patient-events-filter-chevron');
+assert(eventsCode.includes('ChevronDownIcon'), 'PatientEvents.jsx uses subtle ChevronDownIcon for popover trigger');
+assert(eventsCode.includes('patient-calendar-popover'), 'PatientEvents.jsx includes calendar choice popover menu');
 
 // Responsive CSS Rules Audit
-console.log('\n[TEST GROUP 4] Custom Chevron & Responsive CSS Rules Audit');
+console.log('\n[TEST GROUP 4] Streamlined Pills & Responsive CSS Rules Audit');
 
 const layoutCss = fs.readFileSync(path.join(projectRoot, 'src/styles/layout.css'), 'utf8');
 assert(layoutCss.includes('.patient-events-grid'), 'layout.css contains .patient-events-grid');
-assert(layoutCss.includes('.patient-events-filter-controls'), 'layout.css contains .patient-events-filter-controls');
-assert(layoutCss.includes('.patient-events-search-wrapper'), 'layout.css contains .patient-events-search-wrapper');
-assert(layoutCss.includes('.patient-events-select-wrapper'), 'layout.css contains .patient-events-select-wrapper');
-assert(layoutCss.includes('.patient-events-filter-select') && layoutCss.includes('appearance: none'), 'layout.css hides native select appearance on category dropdown');
-assert(layoutCss.includes('.patient-events-filter-chevron') && layoutCss.includes('right: 14px'), 'layout.css positions chevron with 14px right breathing room');
+assert(layoutCss.includes('.patient-events-pills-strip'), 'layout.css contains .patient-events-pills-strip');
+assert(layoutCss.includes('.patient-event-pill-btn'), 'layout.css contains .patient-event-pill-btn');
+assert(layoutCss.includes('.patient-calendar-popover'), 'layout.css contains .patient-calendar-popover');
+
 
 // Staff Portal Safety Check
 console.log('\n[TEST GROUP 5] Staff / Admin Portal Non-Interference Audit');
@@ -114,7 +113,7 @@ for (const vp of viewports) {
   const isTablet = vp.width > 767 && vp.width < 1024;
   assert(
     true,
-    `Viewport ${vp.width}px (${vp.name}) validates: ${isMobile ? '1-col events, stacked filter controls' : isTablet ? '2-col events, inline filter' : 'Desktop multi-col events'}`
+    `Viewport ${vp.width}px (${vp.name}) validates: ${isMobile ? '1-col events, streamlined pills filter' : isTablet ? '2-col events, horizontal pills filter' : 'Desktop multi-col events'}`
   );
 }
 

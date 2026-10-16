@@ -196,7 +196,7 @@ const ResetPassword = () => {
     color: '#333333',
     background: '#ffffff',
     outline: 'none',
-    fontSize: '13.5px',
+    fontSize: '14px',
     transition: 'all 0.2s ease',
   };
 
@@ -272,7 +272,7 @@ const ResetPassword = () => {
           >
             TUP Manila Clinic
           </h1>
-          <div style={{ fontSize: 12.5, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 500 }}>
+          <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 500 }}>
             Patient Portal · Password Recovery
           </div>
         </div>
@@ -306,7 +306,7 @@ const ResetPassword = () => {
             <h2 style={{ margin: '0 0 10px 0', fontSize: 22, fontWeight: 800, fontFamily: '"Merriweather", serif' }}>
               Password Updated
             </h2>
-            <p style={{ fontSize: 13.5, color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
               Your password has been successfully updated. You may now log in to the Patient Portal with your new credentials.
             </p>
             <button
@@ -461,7 +461,7 @@ const ResetPassword = () => {
                 </button>
               </div>
               {newPass && confirmNewPass && !passwordsMatch && (
-                <div style={{ color: '#fed7d7', fontSize: 11.5, marginTop: 2 }}>
+                <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
                   Passwords do not match.
                 </div>
               )}

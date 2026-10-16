@@ -58,8 +58,8 @@ const PatientRecords = () => {
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: 20 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Records</h2>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+            <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Records</h2>
+            <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
               View selected summaries of your completed clinic visits and consultations.
             </div>
           </div>
@@ -69,7 +69,7 @@ const PatientRecords = () => {
         <div className="card" style={{ padding: 22, border: '1px solid var(--border)', borderRadius: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
                 Encounter History
               </h3>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
@@ -158,7 +158,7 @@ const PatientRecords = () => {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>
                         {r.encounter_date ? new Date(r.encounter_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Recent Visit'}
                       </span>
                       <span className="badge badge-success" style={{ fontWeight: 600 }}>

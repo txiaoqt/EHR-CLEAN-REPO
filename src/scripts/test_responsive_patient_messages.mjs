@@ -91,6 +91,51 @@ function runTests() {
   assert(staffBackNav, 'TEST 12: Staff mobile back button dynamically returns to active list (Inbox or History)');
 
   // ---------------------------------------------------------------------------
+  // 4B. CENTERED SEGMENTED PILL TRACK AUDIT (TASK-016)
+  // ---------------------------------------------------------------------------
+  const trackWrapperExists =
+    patientMsgFile.includes('patient-messages-segmented-track-wrap') &&
+    cssFile.includes('.patient-messages-segmented-track-wrap');
+  assert(trackWrapperExists, 'TEST 13: PatientMessages wraps segmented track in .patient-messages-segmented-track-wrap');
+
+  const desktopLeftAndMobileCenter =
+    cssFile.includes('justify-content: flex-start') &&
+    cssFile.includes('margin: 0 0 16px 0') &&
+    cssFile.includes('justify-content: center !important') &&
+    cssFile.includes('margin: 0 auto 8px auto !important') &&
+    cssFile.includes('min-height: 40px !important');
+  assert(desktopLeftAndMobileCenter, 'TEST 14: Desktop aligns tab track to left while mobile strictly preserves centered alignment and >=40px touch targets');
+
+  // ---------------------------------------------------------------------------
+  // 4C. MOBILE CHAT HEADER SCROLL & LIFECYCLE RESILIENCE (TASK-018)
+  // ---------------------------------------------------------------------------
+  const scrollResetResilience =
+    patientMsgFile.includes('const resetMobileScroll = () => {') &&
+    patientMsgFile.includes('main.patient-messages-main-container') &&
+    patientMsgFile.includes('.tup-two-panel-messenger') &&
+    patientMsgFile.includes('requestAnimationFrame(() => resetMobileScroll())') &&
+    patientMsgFile.includes('[mobileViewingChat]');
+  assert(scrollResetResilience, 'TEST 15: Scroll reset helper and lifecycle resilience implemented across containers');
+
+  const cssHeaderFlexStability =
+    cssFile.includes('.tup-messenger-header') &&
+    cssFile.includes('flex-shrink: 0 !important') &&
+    cssFile.includes('min-height: 52px !important') &&
+    cssFile.includes('.tup-chat-panel') &&
+    cssFile.includes('overflow: hidden !important');
+  assert(cssHeaderFlexStability, 'TEST 16: CSS flex stability, min-height, and overflow protection verified for mobile chat header');
+
+  // ---------------------------------------------------------------------------
+  // 4D. MOBILE 5-ITEM VISIBLE INBOX DISPLAY THRESHOLD (TASK-019)
+  // ---------------------------------------------------------------------------
+  const inbox5ItemThreshold =
+    cssFile.includes('.tup-two-panel-messenger.mobile-inbox-active .tup-inbox-list') &&
+    cssFile.includes('360px') &&
+    cssFile.includes('overflow-y: auto !important') &&
+    cssFile.includes('overscroll-behavior: contain !important');
+  assert(inbox5ItemThreshold, 'TEST 17: Mobile inbox list displays 5 items initially (~360px) before internal scrolling');
+
+  // ---------------------------------------------------------------------------
   // 5. VIEWPORT TEST MATRIX VERIFICATION
   // ---------------------------------------------------------------------------
   const testedViewports = [

@@ -1,6 +1,11 @@
 /* base.css */
 *{box-sizing:border-box}
-html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font-sans); font-size:var(--font-size-base, 14px); line-height:1.5; -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+h1{font-size:var(--font-size-3xl, 28px); line-height:1.2; margin:0 0 16px;}
+h2{font-size:var(--font-size-2xl, 24px); line-height:1.25; margin:0 0 12px;}
+h3{font-size:var(--font-size-lg, 18px); line-height:1.3; margin:0 0 8px;}
+h4{font-size:var(--font-size-md, 16px); line-height:1.35; margin:0 0 6px;}
 a{color:inherit; text-decoration:none}
 button,input,textarea,select{font:inherit}
 img{max-width:100%; display:block}
