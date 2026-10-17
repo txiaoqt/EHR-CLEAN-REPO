@@ -1,0 +1,64 @@
+# ============================================================================
+# Dependencies
+# ============================================================================
+# Reinstalled by `npm install` on every build (see vercel.json installCommand),
+# so committing them only bloats the repo and lets the installed tree drift
+# away from package-lock.json.
+node_modules/
+
+# ============================================================================
+# Build output
+# ============================================================================
+# Vercel builds from source and serves `dist` as outputDirectory (vercel.json),
+# so the built files are generated, never edited by hand.
+dist/
+dist-ssr/
+*.local
+
+# ============================================================================
+# Environment
+# ============================================================================
+# Real credentials. Committed once and still in the history — untracking stops
+# future changes leaking, but the values should be rotated regardless.
+# `.env.example` stays tracked: it is the template, with placeholders only.
+.env
+.env.local
+.env.*.local
+
+# ============================================================================
+# Supabase CLI
+# ============================================================================
+# Local CLI state (project ref, versions, pooler URL) — machine-specific.
+supabase/.temp/
+
+# ============================================================================
+# Scratch
+# ============================================================================
+# One-off probes and verification scripts used while investigating.
+scratch/
+
+# ============================================================================
+# Logs
+# ============================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================================
+# Editor and OS
+# ============================================================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ============================================================================
+# Test output
+# ============================================================================
+coverage/
+.nyc_output/
