@@ -10,9 +10,15 @@ export const normalizeTheme = (value) => {
     const trimmed = value.trim().toLowerCase();
     if (trimmed === 'dark') return 'dark';
     if (trimmed === 'light') return 'light';
+    // 'system' is a MODE, not a theme: it is stored as the preference and
+    // resolved to light or dark when applied to the document.
+    if (trimmed === 'system') return 'system';
   }
   return 'light';
 };
+
+/** Resolves a stored mode to the theme the document should actually use. */
+export const resolveTheme = (mode) => (normalizeTheme(mode) === 'system' ? getSystemTheme() : normalizeTheme(mode));
 
 export const getSystemTheme = () => {
   if (typeof window !== 'undefined' && window.matchMedia) {
@@ -23,17 +29,18 @@ export const getSystemTheme = () => {
 
 export const getStoredTheme = () => {
   if (typeof window === 'undefined') return null;
+  const valid = (v) => v === 'dark' || v === 'light' || v === 'system';
   try {
     const primary = localStorage.getItem(THEME_STORAGE_KEY);
-    if (primary && (primary === 'dark' || primary === 'light')) return primary;
+    if (valid(primary)) return primary;
 
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacy && (legacy === 'dark' || legacy === 'light')) return legacy;
+    if (valid(legacy)) return legacy;
 
     const settingsRaw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (settingsRaw) {
       const parsed = JSON.parse(settingsRaw);
-      if (parsed?.theme === 'dark' || parsed?.theme === 'light') {
+      if (valid(parsed?.theme)) {
         return parsed.theme;
       }
     }
@@ -44,7 +51,9 @@ export const getStoredTheme = () => {
 export const resolveInitialTheme = () => {
   const explicit = getStoredTheme();
   if (explicit) return explicit;
-  return getSystemTheme();
+  // No stored preference: remember 'system' rather than freezing today's OS
+  // setting, so the app keeps following it.
+  return 'system';
 };
 
 const ThemeContext = createContext({
@@ -67,12 +76,15 @@ export const ThemeProvider = ({ children }) => {
 
   const applyThemeToDOM = useCallback((mode) => {
     if (typeof document === 'undefined') return;
+    // The attribute gets the RESOLVED theme, so the stylesheet only ever sees
+    // light or dark; 'system' lives in state and in storage.
     const normalized = normalizeTheme(mode);
-    document.documentElement.setAttribute('data-theme', normalized);
+    const resolved = normalized === 'system' ? getSystemTheme() : normalized;
+    document.documentElement.setAttribute('data-theme', resolved);
 
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', normalized === 'dark' ? '#0f172a' : '#8C1515');
+      metaThemeColor.setAttribute('content', resolved === 'dark' ? '#0f172a' : '#8C1515');
     }
   }, []);
 
@@ -97,8 +109,23 @@ export const ThemeProvider = ({ children }) => {
   }, [applyThemeToDOM]);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    // Flip from what is actually on screen. With mode 'system' the raw value is
+    // neither 'dark' nor 'light', so comparing it directly would always send the
+    // user to dark instead of to the opposite of what they are looking at.
+    setTheme(resolveTheme(theme) === 'dark' ? 'light' : 'dark');
   }, [theme, setTheme]);
+
+  // In 'system' mode, follow the OS when it changes rather than freezing the
+  // value that happened to be current at load.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    if (normalizeTheme(theme) !== 'system') return undefined;
+
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyThemeToDOM('system');
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, [theme, applyThemeToDOM]);
 
   // Synchronize on mount and apply data-theme
   useEffect(() => {
@@ -141,7 +168,7 @@ export const ThemeProvider = ({ children }) => {
     theme,
     setTheme,
     toggleTheme,
-    isDark: theme === 'dark',
+    isDark: resolveTheme(theme) === 'dark',
   };
 
   return (

@@ -9,7 +9,6 @@ import {
   ReportsIcon,
   UsersIcon,
   AlertIcon,
-  SearchIcon,
   CloseIcon
 } from '../components/icons/Icons.jsx';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
@@ -26,7 +25,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import { logAudit } from '../utils.js';
+import { loadSettings, logAudit } from '../utils.js';
 import { buildCsv, downloadBlob, exportFilename } from '../utils/export/csv.js';
 import { useAuth } from '../AuthContext.jsx';
 import { useTheme } from '../ThemeContext.jsx';
@@ -70,6 +69,13 @@ const Dashboard = () => {
   const [totalPatients, setTotalPatients] = useState(0);
   const [todayAppointments, setTodayAppointments] = useState([]);
 
+  // "Upcoming" means not yet seen. The query fetches today's appointments
+  // excluding Cancelled, so Completed ones came through too and appeared under
+  // an "Upcoming Schedule" heading — showing visits that were already finished.
+  const upcomingToday = todayAppointments.filter(
+    (a) => (a.status || '').toLowerCase() === 'scheduled'
+  );
+
   const [recentEncounters, setRecentEncounters] = useState([]);
   const [rawVisitsDateCounts, setRawVisitsDateCounts] = useState({});
   const [rawTopComplaints, setRawTopComplaints] = useState([]);
@@ -77,10 +83,15 @@ const Dashboard = () => {
   const [topComplaintsList, setTopComplaintsList] = useState([]);
 
   const [lowStockItems, setLowStockItems] = useState([]);
-  const [showAlertsModal, setShowAlertsModal] = useState(false);
+  // The Settings toggle is only real if something reads it. Defaults to shown.
+  const [showStockAlerts, setShowStockAlerts] = useState(() => loadSettings().notifications_stock !== false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  useEffect(() => {
+    const onChange = () => setShowStockAlerts(loadSettings().notifications_stock !== false);
+    window.addEventListener('settingsChanged', onChange);
+    return () => window.removeEventListener('settingsChanged', onChange);
+  }, []);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
 
   const [weatherState, setWeatherState] = useState({ loading: false, error: null, current: null, daily: null, hourly: null, place: null });
   const [weatherTab, setWeatherTab] = useState('temperature');
@@ -241,15 +252,6 @@ const Dashboard = () => {
     };
     run();
   }, []);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!searchQuery.trim()) { setSearchSuggestions([]); return; }
-      const { data } = await supabase.from('students').select('id,name').or(`name.ilike.%${searchQuery}%,id.ilike.%${searchQuery}%`).limit(10);
-      setSearchSuggestions(data || []);
-    };
-    run();
-  }, [searchQuery]);
 
   useEffect(() => {
     const run = async () => {
@@ -553,32 +555,10 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="dashboard-header-actions">
-            <div className="dashboard-search-container">
-              <div className="dashboard-search-wrapper">
-                <SearchIcon size={16} className="dashboard-search-icon" />
-                <input
-                  type="search"
-                  className="dashboard-search-input"
-                  placeholder="Search patient, appointment, or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Search patient, appointment, or ID"
-                />
-              </div>
-              {searchSuggestions.length > 0 && (
-                <div className="dashboard-search-dropdown">
-                  {searchSuggestions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="dashboard-search-result-item"
-                      onClick={() => navigate(`/patient-profile?id=${s.id}`)}
-                    >
-                      <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* The patient/appointment search lived here. It was removed in
+                favour of the top bar's page palette: two search fields on one
+                screen, doing different things, is a coin flip for whoever is
+                using it. */}
             <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', whiteSpace: 'nowrap' }}>
               New Appointment
             </button>
@@ -588,7 +568,7 @@ const Dashboard = () => {
         <section className="dashboard-kpis-grid">
           {[
             { title: 'Encounters Today', val: encountersToday, sub: encountersToday === 0 ? 'No encounters today' : `${encountersToday} encounter${encountersToday > 1 ? 's' : ''}`, Icon: EncountersIcon },
-            { title: 'Appointments Today', val: appointmentsToday, sub: appointmentsToday === 0 ? 'No appointments today' : `${appointmentsToday} scheduled`, Icon: CalendarIcon },
+            { title: 'Appointments Today', val: appointmentsToday, sub: appointmentsToday === 0 ? 'No appointments today' : `${appointmentsToday} booked`, Icon: CalendarIcon },
             { title: 'Future Appointments', val: futureScheduledAppointments, sub: futureScheduledAppointments === 0 ? 'No future appointments' : `${futureScheduledAppointments} scheduled`, Icon: ClockIcon },
             { title: 'Visits This Week', val: totalVisitsWeek, sub: totalVisitsWeek === 0 ? 'No visits this week' : `${totalVisitsWeek} total visits`, Icon: ReportsIcon },
             { title: 'Total Patients', val: totalPatients, sub: 'Registered patients', Icon: UsersIcon }
@@ -635,21 +615,23 @@ const Dashboard = () => {
                   </button>
                 </div>
 
-                {todayAppointments.length === 0 ? (
+                {upcomingToday.length === 0 ? (
                   <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--grey-100)', borderRadius: 10, border: '1px solid var(--border-subtle)', margin: '8px 0' }}>
                     <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 4 }}>No upcoming appointments scheduled</div>
                     <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Check the Appointments page to view the full schedule and active queue.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
-                    {todayAppointments.slice(0, 4).map((appt, idx) => (
+                    {upcomingToday.slice(0, 4).map((appt, idx) => (
                       <div key={appt.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'var(--grey-100)', borderRadius: 8, fontSize: 'var(--font-size-sm)', gap: 8, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
                           <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', minWidth: 68, flexShrink: 0 }}>{appt.appointment_time || '09:00 AM'}</span>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)', flexShrink: 0 }}>{appt.patient_id}</span>
                           <span style={{ color: 'var(--text-light)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appt.reason || 'Consultation'}</span>
                         </div>
-                        <span className="badge badge-info" style={{ fontSize: 'var(--font-size-2xs)', flexShrink: 0 }}>{appt.status || 'Scheduled'}</span>
+                        {/* No status badge: every row here is Scheduled now, so
+                            a badge repeating the heading said nothing. It only
+                            carried meaning when the list mixed statuses. */}
                       </div>
                     ))}
                   </div>
@@ -726,9 +708,12 @@ const Dashboard = () => {
           </div>
 
           <div className="dashboard-operations-column">
+            {/* Gated on the Settings toggle, which is what makes that switch
+                real rather than decorative. */}
+            {showStockAlerts && (
             <div className="card" style={{ padding: '18px 20px', cursor: lowStockItems.length > 0 ? 'pointer' : 'default' }} onClick={lowStockItems.length > 0 ? openAlertsModal : undefined}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
+                <span style={{ color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}>
                   <AlertIcon size={18} />
                 </span>
                 <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>Alerts</h3>
@@ -745,6 +730,7 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
+            )}
 
             <div className="card" style={{ padding: '18px 20px' }}>
               <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', marginBottom: 12 }}>Quick Actions</h3>

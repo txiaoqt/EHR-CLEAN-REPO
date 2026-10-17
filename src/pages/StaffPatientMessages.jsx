@@ -13,6 +13,7 @@ import {
   RESOLVED_PHOTO_NOTICE,
 } from '../utils/messageAttachments.js';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
+import { emailEnabled } from '../utils.js';
 
 // Date/time formatting helpers
 const formatMessageTime = (isoString) => {
@@ -579,6 +580,8 @@ const StaffPatientMessages = () => {
 
       // Asynchronously trigger direct inquiry / message alert notification (evaluates patient_settings preferences)
       try {
+        // Settings → Notifications can turn email off.
+        if (emailEnabled()) {
         const staffRole = userRole || 'physician';
         const staffName = user?.name || (staffRole === 'physician' ? 'Dr. Rivera' : 'Nurse Santos');
         supabase.functions.invoke('send-patient-notification', {
@@ -597,6 +600,7 @@ const StaffPatientMessages = () => {
         }).catch((fnErr) => {
           console.warn('Edge function message notification error (non-blocking):', fnErr);
         });
+        }
       } catch (invokeErr) {
         console.warn('Error initiating message alert notification:', invokeErr);
       }

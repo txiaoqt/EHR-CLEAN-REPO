@@ -182,6 +182,27 @@ export const HistoryIcon = ({ size = 18, className = '' }) => (
   </svg>
 );
 
+/* A clipboard with written lines: the clinical register, where visits are
+   recorded. Distinct from HistoryIcon, which is a clock with an arrow and reads
+   as "what happened before" — the audit trail. */
+export const MedicalLogIcon = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <path d="M9 4h6v3H9z" />
+    <path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+    <line x1="9" y1="16" x2="13" y2="16" />
+  </svg>
+);
+
+/* Stacked discs: a stored archive. */
+export const BackupIcon = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <ellipse cx="12" cy="5.5" rx="7.5" ry="2.5" />
+    <path d="M4.5 5.5v6c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-6" />
+    <path d="M4.5 11.5v6c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-6" />
+  </svg>
+);
+
 export const EyeIcon = ({ size = 18, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />

@@ -13,6 +13,7 @@ import {
   EncountersIcon,
   UserIcon,
   SettingsIcon,
+  HelpIcon,
   LogoutIcon,
   CloseIcon,
   ChevronLeftIcon,
@@ -25,6 +26,7 @@ const PATIENT_NAV = [
   { path: '/patient/schedule', label: 'Schedule', icon: ClockIcon },
   { path: '/patient/messages', label: 'Messages', icon: MessagesIcon },
   { path: '/patient/records', label: 'Records', icon: EncountersIcon },
+  { path: '/patient/help', label: 'Help', icon: HelpIcon },
   { path: '/patient/settings', label: 'Settings', icon: SettingsIcon },
 ];
 

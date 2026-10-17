@@ -1,649 +1,299 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient.js';             // supabase client
-import {
-  loadSettings,
-  saveSettings as saveSettingsUtil,
-  translate,
-  formatDate,
-  formatTime
-} from '../utils.js';                                        // utilities
-import { useAuth } from '../AuthContext.jsx';                // auth context
-import { useTheme, normalizeTheme } from '../ThemeContext.jsx';
-import { isPhysician } from '../accessControl.js';          // access control
-import { CloseIcon } from '../components/icons/Icons.jsx';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient.js';
+import { loadSettings, saveSettings as saveSettingsUtil } from '../utils.js';
+import { useAuth } from '../AuthContext.jsx';
+import { useTheme } from '../ThemeContext.jsx';
+import { SunIcon, MoonIcon, DesktopIcon } from '../components/icons/Icons.jsx';
+
+/**
+ * Staff settings.
+ *
+ * Cards, not a section list: each area of configuration is its own card, so the
+ * whole page can be scanned at once rather than navigated one section at a time.
+ *
+ * Two things deliberately are NOT here:
+ *
+ *  - Audit categories. Everything clinical and administrative is logged, always.
+ *    Making that configurable invites turning the record off, and a log with
+ *    holes in it is worse than no log.
+ *  - Backup. It has its own page, because a verified backup is an operational
+ *    task rather than a preference.
+ */
+
+const CLINIC_FIELDS = [
+  ['clinic_name', 'Clinic name'],
+  ['clinic_email', 'Official email'],
+  ['clinic_phone', 'Contact number'],
+  ['clinic_address', 'Address'],
+];
 
 const Settings = () => {
-  const location = useLocation();
   const { user: authUser } = useAuth();
   const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
 
-  const [settings, setSettings] = useState(() => ({
-    ...loadSettings(),
-    theme: globalTheme,
-  }));
-  const [loading, setLoading] = useState(false);
-
+  const [settings, setSettings] = useState(() => loadSettings());
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-  const [backingUp, setBackingUp] = useState(false);
-  const [lastBackup, setLastBackup] = useState(() => localStorage.getItem('last_backup') || 'Never');
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showBackupPasswordModal, setShowBackupPasswordModal] = useState(false);
-  const [backupPasswordInput, setBackupPasswordInput] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
-  const backupCardRef = useRef(null);
+  const [clinic, setClinic] = useState(() => {
+    const s = loadSettings();
+    return {
+      clinic_name: s.clinic_name || 'TUP Clinic',
+      clinic_email: s.clinic_email || 'clinic@tup.edu.ph',
+      clinic_phone: s.clinic_phone || '(02) 301-3001 loc. 605',
+      clinic_address: s.clinic_address || 'Ayala Blvd., Ermita, Manila, 1000, Philippines',
+    };
+  });
 
   useEffect(() => {
     setSettings((prev) => (prev.theme !== globalTheme ? { ...prev, theme: globalTheme } : prev));
   }, [globalTheme]);
 
-  useEffect(() => {
-    if (location?.state?.focus === 'backup' && backupCardRef.current) {
-      setTimeout(() => {
-        try {
-          backupCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (e) { /* ignore */ }
-      }, 150);
-    }
-  }, [location]);
-
-  const handleSettingChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  const revertSettings = () => {
-    const saved = loadSettings();
-    setSettings({ ...saved, theme: normalizeTheme(saved.theme) });
-    if (saved.theme) window.applyTheme && window.applyTheme(normalizeTheme(saved.theme));
-    setMessage('Reverted to saved settings.');
-    setMessageType('info');
-    setTimeout(() => setMessage(''), 2500);
-  };
-
-  const saveSettings = async () => {
-    saveSettingsUtil(settings);
-    setMessage(translate('settings_saved'));
-    setMessageType('success');
+  const flash = (text, type = 'success') => {
+    setMessage(text);
+    setMessageType(type);
     setTimeout(() => setMessage(''), 3000);
+  };
 
-    try {
-      for (const [key, value] of Object.entries(settings)) {
-        await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' });
-      }
-    } catch (err) {
-      console.warn('Failed to sync settings to Supabase:', err);
-    }
+  // Changes apply and persist immediately. A Save button would imply the change
+  // is not live yet, which for a theme or a toggle is simply untrue.
+  const persist = (next) => {
+    setSettings(next);
+    saveSettingsUtil(next);
+    window.dispatchEvent(new CustomEvent('settingsChanged'));
+    supabase
+      .from('settings')
+      .upsert(Object.entries(next).map(([key, value]) => ({ key, value })), { onConflict: 'key' })
+      .then(() => {}, () => {});
+  };
+
+  const changeTheme = (mode) => {
+    setGlobalTheme(mode);
+    persist({ ...settings, theme: mode });
   };
 
   const changePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setMessage('Passwords do not match.');
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
+    if (!newPassword || newPassword !== confirmPassword) {
+      flash('The two passwords do not match.', 'error');
       return;
     }
-    if (newPassword.length < 6) {
-      setMessage('Password must be at least 6 characters.');
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
+    if (newPassword.length < 8) {
+      flash('Use at least 8 characters.', 'error');
       return;
     }
-
+    setSavingPassword(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-
-      setMessage('Password changed successfully!');
-      setMessageType('success');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => setMessage(''), 3000);
+      flash('Password updated.');
     } catch (err) {
-      console.error('Error changing password:', err);
-      setMessage(`Error changing password: ${err.message || 'Unknown error'}`);
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
-    }
-  };
-
-  const handleBackupSubmit = async (e) => {
-    e.preventDefault();
-    if (!backupPasswordInput) return;
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: authUser?.email,
-        password: backupPasswordInput
-      });
-
-      if (error) {
-        setMessage('Incorrect password.');
-        setMessageType('error');
-        setTimeout(() => setMessage(''), 3000);
-        return;
-      }
-
-      setShowBackupPasswordModal(false);
-      setBackupPasswordInput('');
-      backupAll();
-    } catch (err) {
-      console.error(err);
-      setMessage('Verification failed.');
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
-    }
-  };
-
-  const backupAll = async () => {
-    if (!isPhysician(authUser)) {
-      setMessage('Access denied.');
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-    setBackingUp(true);
-    setMessage('Preparing backup...');
-    setMessageType('info');
-
-    try {
-      const tables = [
-        'patients',
-        'encounters',
-        'appointments',
-        'inventory',
-        'users',
-        'settings',
-        'audit_logs'
-      ];
-
-      const results = {};
-
-      for (const t of tables) {
-        try {
-          const { data, error } = await supabase.from(t).select('*');
-          if (error) results[t] = { error: error.message };
-          else results[t] = data || [];
-        } catch (err) {
-          results[t] = { error: err.message };
-        }
-      }
-
-      const payload = {
-        exported_at: new Date().toISOString(),
-        exported_by: authUser?.email || 'unknown',
-        data: results
-      };
-
-      const filename = `tup_ehr_backup_${new Date()
-        .toISOString()
-        .replace(/[:.]/g, '-')}.json`;
-
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: 'application/json'
-      });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      const ts = new Date().toLocaleString();
-      localStorage.setItem('last_backup', ts);
-      setLastBackup(ts);
-
-      try {
-        await supabase.from('settings').upsert(
-          [{ key: 'last_backup', value: ts }],
-          { onConflict: 'key' }
-        );
-      } catch (e) {
-        console.warn('Failed to upsert last_backup:', e);
-      }
-
-      try {
-        window.dispatchEvent(new CustomEvent('backupCompleted', { detail: ts }));
-      } catch (e) {
-        try {
-          const ev = new Event('backupCompleted');
-          window.dispatchEvent(ev);
-        } catch (_) { /* ignore */ }
-      }
-
-      setMessage('Backup complete! File downloaded.');
-      setMessageType('success');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (err) {
-      console.error('Backup failed:', err);
-      setMessage('Backup failed.');
-      setMessageType('error');
-      setTimeout(() => setMessage(''), 3000);
+      flash(err?.message || 'Could not update the password.', 'error');
     } finally {
-      setBackingUp(false);
+      setSavingPassword(false);
     }
   };
 
-  if (loading) return <main className="main"><div className="card">Loading…</div></main>;
+  const switchRow = (key, label, note, last = false) => (
+    <label className={`settings-row has-control${last ? ' is-last' : ''}`} style={last ? { borderBottom: 'none', paddingBottom: 0 } : undefined}>
+      <div>
+        <div className="settings-row-label">{label}</div>
+        <div className="settings-row-note">{note}</div>
+      </div>
+      {/* No "ON/OFF" caption: the switch position already says it, and a second
+          indicator beside the first was visual noise. */}
+      <div className="settings-switch">
+        <input
+          type="checkbox"
+          checked={settings[key] !== false}
+          onChange={(e) => persist({ ...settings, [key]: e.target.checked })}
+          aria-label={label}
+        />
+        <span className="settings-switch-slider" />
+      </div>
+    </label>
+  );
+
+  const appearances = [
+    { id: 'light', label: 'Light', Icon: SunIcon, note: 'Always light, high contrast' },
+    { id: 'dark', label: 'Dark', Icon: MoonIcon, note: 'Always dark, easier at night' },
+    { id: 'system', label: 'System default', Icon: DesktopIcon, note: 'Follows your operating system' },
+  ];
 
   return (
     <main className="main">
-      {showBackupPasswordModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
-          backdropFilter: 'blur(2px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 3000
-        }}>
-          <form onSubmit={handleBackupSubmit} style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', width: 440, padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Authorize Database Backup</h3>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => {
-                  setShowBackupPasswordModal(false);
-                  setBackupPasswordInput('');
-                }}
-                aria-label="Close modal"
-              >
-                <CloseIcon size={18} />
-              </button>
-            </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5, marginTop: 0 }}>
-              Enter your staff password to proceed with downloading the complete system backup archive.
-            </p>
-            <input
-              type="password"
-              className="input"
-              autoFocus
-              placeholder="Enter your account password"
-              value={backupPasswordInput}
-              onChange={e => setBackupPasswordInput(e.target.value)}
-              style={{ width: '100%', marginBottom: 18, marginTop: 8 }}
-            />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => {
-                  setShowBackupPasswordModal(false);
-                  setBackupPasswordInput('');
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn">
-                Confirm & Backup
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {message && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          padding: '12px 20px',
-          color: 'var(--text-on-primary)',
-          fontWeight: 'var(--font-weight-bold)',
-          borderRadius: 12,
-          background: messageType === 'error'
-            ? 'var(--danger)'
-            : messageType === 'success'
-            ? 'var(--color-emerald)'
-            : 'var(--color-blue)',
-          boxShadow: 'var(--shadow-lg)',
-          zIndex: 2000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <span>{message}</span>
-        </div>
-      )}
-
       <div className="page">
-        {/* 1. Page Header: Page identity and configuration save actions */}
         <div className="page-header">
           <div className="page-header-title-block">
-            <h1 className="page-header-title">System & Staff Settings</h1>
+            <h1 className="page-header-title">System &amp; Staff Settings</h1>
             <div className="page-header-subtitle">
-              Manage account credentials, interface preferences, clinic backup archives, and sync options.
-            </div>
-          </div>
-
-          <div className="page-header-actions">
-            <button type="button" className="btn secondary" onClick={revertSettings}>
-              Reset to Saved
-            </button>
-            <button type="button" className="btn" onClick={saveSettings}>
-              Save Changes
-            </button>
-          </div>
-        </div>
-
-        {/* 2. Configuration Grid: Account & Security + Preferences & Appearance */}
-        <div className="settings-main-grid" style={{ marginBottom: 20 }}>
-          {/* Left Column: Account & Security */}
-          <div className="card" style={{ padding: '22px 24px' }}>
-            <div className="card-header" style={{ marginBottom: 16 }}>
-              <div>
-                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Account & Security</h3>
-                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
-                  Authenticated staff identity and credential management
-                </span>
-              </div>
-              <span className="badge badge-info">{authUser?.role || 'Staff'}</span>
-            </div>
-
-            {/* Active Account Identity Block */}
-            <div style={{ padding: '16px 18px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>
-                  Active Account User
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--success)' }}>
-                  <span className="status-dot" style={{ width: 6, height: 6 }}></span> Active Session
-                </span>
-              </div>
-              <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)', marginTop: 2 }}>
-                {authUser?.name || authUser?.email || 'Logged In Staff'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-                <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--panel)', border: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
-                  {authUser?.role || 'Staff'}
-                </span>
-                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
-                  {authUser?.email || 'N/A'}
-                </span>
-              </div>
-            </div>
-
-            {/* Password Update Section */}
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 18 }}>
-              <h4 style={{ margin: '0 0 2px 0', fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Change Password</h4>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginBottom: 14 }}>Update your staff portal security credentials</div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 6 }}>New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter new password"
-                    className="input"
-                    style={{ width: '100%' }}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    aria-label="New password"
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 6 }}>Confirm Password</label>
-                  <input
-                    type="password"
-                    placeholder="Confirm new password"
-                    className="input"
-                    style={{ width: '100%' }}
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    aria-label="Confirm password"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
-                  Minimum 8 characters with at least one letter and number.
-                </span>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={changePassword}
-                  disabled={!newPassword || !confirmPassword}
-                >
-                  Update Password
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Preferences & Interface Appearance */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Preferences & Auto-Sync Card */}
-            <div className="card" style={{ padding: '22px 24px' }}>
-              <div className="card-header" style={{ marginBottom: 12 }}>
-                <div>
-                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Preferences & Auto-Sync</h3>
-                  <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
-                    Automated workflows and notification parameters
-                  </span>
-                </div>
-                <span className="badge badge-neutral">Configuration</span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* Auto-Save Drafts */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 2px',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ paddingRight: 16 }}>
-                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Auto-Save Drafts</div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Automatically preserve encounter SOAP drafts</div>
-                  </div>
-                  <div className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={!!settings.auto_save}
-                      onChange={e => handleSettingChange('auto_save', e.target.checked)}
-                      aria-label="Auto-Save Drafts"
-                    />
-                    <span className="settings-switch-slider" />
-                    <span className="settings-switch-text" style={{ color: settings.auto_save ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
-                      {settings.auto_save ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                </label>
-
-                {/* Email Notifications */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 2px',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ paddingRight: 16 }}>
-                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Email Notifications</div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Receive emergency triage and appointment alerts</div>
-                  </div>
-                  <div className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={!!settings.notifications_email}
-                      onChange={e => handleSettingChange('notifications_email', e.target.checked)}
-                      aria-label="Email Notifications"
-                    />
-                    <span className="settings-switch-slider" />
-                    <span className="settings-switch-text" style={{ color: settings.notifications_email ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
-                      {settings.notifications_email ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                </label>
-
-                {/* Low Stock Warning Banners */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 2px 4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ paddingRight: 16 }}>
-                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Low Stock Warning Banners</div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Show inventory reorder alerts in dashboard header</div>
-                  </div>
-                  <div className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={!!settings.notifications_stock}
-                      onChange={e => handleSettingChange('notifications_stock', e.target.checked)}
-                      aria-label="Low Stock Warning Banners"
-                    />
-                    <span className="settings-switch-slider" />
-                    <span className="settings-switch-text" style={{ color: settings.notifications_stock ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
-                      {settings.notifications_stock ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Interface Appearance Card */}
-            <div className="card" style={{ padding: '22px 24px' }}>
-              <div className="card-header" style={{ marginBottom: 14 }}>
-                <div>
-                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Interface Appearance</h3>
-                  <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
-                    Select daylight or contrast display mode
-                  </span>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 6,
-                  padding: 4,
-                  background: 'var(--surface-raised)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 10,
-                }}
-              >
-                <button
-                  type="button"
-                  className={globalTheme === 'light' ? 'btn' : 'btn secondary'}
-                  style={{
-                    flex: 1,
-                    padding: '8px 16px',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: globalTheme === 'light' ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
-                    borderRadius: 7,
-                    border: 'none',
-                    background: globalTheme === 'light' ? 'var(--panel)' : 'transparent',
-                    color: globalTheme === 'light' ? 'var(--text)' : 'var(--muted)',
-                    boxShadow: globalTheme === 'light' ? 'var(--shadow-sm)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onClick={() => {
-                    setGlobalTheme('light');
-                    handleSettingChange('theme', 'light');
-                    saveSettingsUtil({ ...settings, theme: 'light' });
-                  }}
-                >
-                  Light Mode
-                </button>
-
-                <button
-                  type="button"
-                  className={globalTheme === 'dark' ? 'btn' : 'btn secondary'}
-                  style={{
-                    flex: 1,
-                    padding: '8px 16px',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: globalTheme === 'dark' ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
-                    borderRadius: 7,
-                    border: 'none',
-                    background: globalTheme === 'dark' ? 'var(--panel)' : 'transparent',
-                    color: globalTheme === 'dark' ? 'var(--text)' : 'var(--muted)',
-                    boxShadow: globalTheme === 'dark' ? 'var(--shadow-sm)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onClick={() => {
-                    setGlobalTheme('dark');
-                    handleSettingChange('theme', 'dark');
-                    saveSettingsUtil({ ...settings, theme: 'dark' });
-                  }}
-                >
-                  Dark Mode
-                </button>
-              </div>
+              Account credentials, notification preferences, appearance, audit records and backup.
             </div>
           </div>
         </div>
 
-        {/* 3. Administration: Database Backup & Comprehensive Archive */}
-        {isPhysician(authUser) && (
+        {message && (
           <div
-            className="card"
-            ref={backupCardRef}
-            style={{ padding: '22px 24px' }}
+            role="status"
+            style={{
+              marginBottom: 16,
+              padding: '10px 14px',
+              borderRadius: 10,
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 'var(--font-weight-semibold)',
+              background: messageType === 'error' ? 'var(--color-rose-bg)' : 'var(--color-emerald-bg)',
+              color: messageType === 'error' ? 'var(--color-rose-text)' : 'var(--color-emerald-text)',
+            }}
           >
-            <div className="card-header" style={{ marginBottom: 8 }}>
-              <div>
-                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Database Backup & Comprehensive Archive</h3>
-                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
-                  Generate an offline JSON backup of all clinical tables, patient profiles, encounters, and audit records
-                </span>
-              </div>
-              <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', fontWeight: 'var(--font-weight-semibold)' }}>Offline Snapshot</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-              <div>
-                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)' }}>Last Backup Performed:</div>
-                <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{lastBackup}</div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={backingUp}
-                  onClick={() => setShowBackupPasswordModal(true)}
-                >
-                  {backingUp ? 'Backing up…' : 'Export Full System Backup'}
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={() => {
-                    setMessage(lastBackup === 'Never'
-                      ? 'No previous backup record found in this session.'
-                      : `Last system backup completed: ${lastBackup}`);
-                    setMessageType('info');
-                    setTimeout(() => setMessage(''), 3500);
-                  }}
-                >
-                  Backup History
-                </button>
-              </div>
-            </div>
+            {message}
           </div>
         )}
+
+        {/* Row 1 — account and notifications */}
+        <div className="settings-main-grid">
+          <div className="card settings-card">
+            <header className="settings-card-head">
+              <h2>Account &amp; Security</h2>
+              <p>Authenticated staff identity and credential management.</p>
+            </header>
+
+            <div className="settings-identity">
+              <div className="settings-identity-label">Active account user</div>
+              <div className="settings-identity-body">
+                <div>
+                  <div className="settings-identity-name">{authUser?.name || 'Staff'}</div>
+                  <div className="settings-identity-meta">
+                    {authUser?.role || 'physician'} · {authUser?.email}
+                  </div>
+                </div>
+                <span className="settings-identity-status">
+                  <span className="status-dot" style={{ width: 7, height: 7 }} /> Active session
+                </span>
+              </div>
+            </div>
+
+            <div className="settings-subhead">
+              <div className="settings-subhead-title">Change password</div>
+              <div className="settings-subhead-note">
+                Minimum 8 characters. Your email and role are managed by clinic administration.
+              </div>
+            </div>
+
+            <div className="settings-password-grid">
+              <div className="settings-field" style={{ marginBottom: 0 }}>
+                <label htmlFor="new-password">New password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  className="input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="settings-field" style={{ marginBottom: 0 }}>
+                <label htmlFor="confirm-password">Confirm password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  className="input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={changePassword}
+                disabled={savingPassword || !newPassword || !confirmPassword}
+              >
+                {savingPassword ? 'Updating…' : 'Update password'}
+              </button>
+            </div>
+          </div>
+
+          <div className="card settings-card">
+            <header className="settings-card-head">
+              <h2>Notifications</h2>
+              <p>What the system tells you, and by which route.</p>
+            </header>
+
+            {switchRow('notifications_stock', 'Low stock warning banners',
+              'Show the reorder alert at the top of the dashboard when stock falls below its threshold.')}
+            {switchRow('notifications_email', 'Email notifications',
+              'Appointment confirmations, reschedule notices and clinic announcements.')}
+            {switchRow('notifications_email_blast', 'Allow email blasts',
+              'Permits sending an announcement to every registered patient at once.', true)}
+
+            <div className="settings-callout">
+              Email delivery depends on the deployed <code>send-patient-notification</code> and{' '}
+              <code>send-event-announcement</code> functions and on the mail provider being configured.
+              If sending fails, the portal still records the action.
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2 — appearance and clinic identity */}
+        <div className="settings-main-grid">
+          <div className="card settings-card">
+            <header className="settings-card-head">
+              <h2>Interface Appearance</h2>
+              <p>
+                Saved to this browser. System default follows your operating system and keeps following
+                it when the system changes.
+              </p>
+            </header>
+
+            <div className="settings-choices" role="radiogroup" aria-label="Appearance">
+              {appearances.map(({ id, label, Icon, note }) => {
+                const selected = globalTheme === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className={`settings-choice${selected ? ' is-selected' : ''}`}
+                    onClick={() => changeTheme(id)}
+                  >
+                    <Icon size={18} />
+                    <span className="settings-choice-label">{label}</span>
+                    <span className="settings-choice-note">{note}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card settings-card">
+            <header className="settings-card-head">
+              <h2>System Information</h2>
+              <p>Shown on exported reports and the letters the clinic issues.</p>
+            </header>
+            {CLINIC_FIELDS.map(([key, label]) => (
+              <div className="settings-field" key={key}>
+                <label htmlFor={key}>{label}</label>
+                <input
+                  id={key}
+                  className="input"
+                  value={clinic[key]}
+                  onChange={(e) => setClinic((prev) => ({ ...prev, [key]: e.target.value }))}
+                  onBlur={(e) => persist({ ...settings, [key]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </main>
   );

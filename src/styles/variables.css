@@ -71,6 +71,13 @@
   --color-primary-tint: #fff1f2;
   --color-primary-tint-hover: #ffe4e6;
   --color-primary-border: rgba(201, 42, 42, 0.18);
+  /* Accent text (links, the role line, "today" markers). Defined here in the
+     base light tokens as well as in themes.css, because ~20 call sites across
+     Appointments, Dashboard, Events and MyProfile read it with a hardcoded
+     dark-mode fallback: var(--color-primary-text, #fda4af). If the token is
+     ever unresolved — no data-theme attribute, a stylesheet load order change —
+     that fallback renders a light pink on a white page. */
+  --color-primary-text: #c92a2a;
 
   /* Semantic Category Colors */
   --color-purple: #7c3aed;

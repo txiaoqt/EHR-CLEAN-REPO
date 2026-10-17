@@ -21,10 +21,14 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   HistoryIcon,
+  MedicalLogIcon,
+  BackupIcon,
   LogoutIcon
 } from '../icons/Icons.jsx';
 
-const NAV_GROUPS = [
+// Exported so the command palette searches the same list the sidebar renders —
+// a page reachable in one must be reachable in the other.
+export const NAV_GROUPS = [
   {
     label: 'MAIN',
     items: [
@@ -36,7 +40,7 @@ const NAV_GROUPS = [
   {
     label: 'CLINICAL',
     items: [
-      { page: 'medical-log', label: 'Medical Log', icon: HistoryIcon },
+      { page: 'medical-log', label: 'Medical Log', icon: MedicalLogIcon },
       { page: 'inventory', label: 'inventory', icon: InventoryIcon },
       { page: 'reports', label: 'reports', icon: ReportsIcon },
     ]
@@ -58,6 +62,7 @@ const NAV_GROUPS = [
     label: 'ADMINISTRATION',
     items: [
       { page: 'audit-trail', label: 'Audit Trail', icon: HistoryIcon, roles: ['admin', 'physician'] },
+      { page: 'backup-recovery', label: 'Backup & Recovery', icon: BackupIcon, roles: ['admin', 'physician'], paletteOnly: true },
       { page: 'settings', label: 'Settings', icon: SettingsIcon },
     ]
   }
@@ -155,7 +160,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
     setShowConfirm(true);
   };
 
-  const openBackupSettings = () => navigate('/settings', { state: { focus: 'backup' } });
+  const openBackupSettings = () => navigate('/backup-recovery');
 
   return (
     <>
@@ -216,7 +221,12 @@ const Sidebar = ({ collapsed = false, toggle }) => {
           {NAV_GROUPS.map((group, gIdx) => (
             <div key={gIdx} className="nav-group">
               <div className="nav-group-label">{group.label}</div>
-              {group.items.filter((item) => !item.roles || item.roles.includes((user?.role || '').toString().trim().toLowerCase())).map(({ page, label, icon: IconComponent }) => {
+              {group.items.filter((item) =>
+                (!item.roles || item.roles.includes((user?.role || '').toString().trim().toLowerCase())) &&
+                // Some destinations are reachable from Search pages but kept out
+                // of the sidebar, which otherwise grows past the viewport.
+                !item.paletteOnly
+              ).map(({ page, label, icon: IconComponent }) => {
                 const isActive = location.pathname === `/${page}` || (page === 'dashboard' && location.pathname === '/');
                 const navTitle = translate(label) || label;
                 return (

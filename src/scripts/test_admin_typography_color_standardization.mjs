@@ -42,6 +42,15 @@ const portalFiles = [...adminFiles, ...patientFiles];
 
 const read = (rel) => fs.readFileSync(path.join(projectRoot, rel), 'utf8');
 
+// Content assertions must not read prose. A comment explaining WHY something is
+// absent will happily match a check for its absence — that has bitten this suite
+// before (an "@font-face" mention, a "Filters —" mention, and the staff-procedure
+// example below). Strip comments before asserting on what the code does.
+const readCode = (rel) =>
+  read(rel)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
 // -----------------------------------------------------------------------------
 // [TEST GROUP 1] Page Header Typography Standardization
 // -----------------------------------------------------------------------------
@@ -293,6 +302,126 @@ assert(
   'no inline override still leads with an unloaded font'
 );
 console.log('  ✓ PASS: Segoe UI leads the stack, and nothing fetches a webfont');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP 9] Help serves two audiences, from two pages
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 9] Help is split by audience');
+
+// The staff page was serving both: its Standard Operating Guides are staff
+// procedures, while its contact details and privacy note are things a patient
+// needs. Moving the whole page would have left staff without their procedures
+// and given students instructions they cannot act on — so it is split.
+const staffHelp = read('src/pages/Help.jsx');
+const patientHelp = read('src/pages/patient/PatientHelp.jsx');
+// Comment-free, for the absence checks below.
+const patientHelpCode = readCode('src/pages/patient/PatientHelp.jsx');
+
+for (const sop of [
+  'How to register a new patient',
+  'How to record clinical vitals & encounters',
+  'How to manage pharmaceutical inventory',
+  'How to generate statistical clinic reports',
+]) {
+  assert(staffHelp.includes(sop), `staff Help keeps its procedure: ${sop}`);
+}
+// A patient cannot act on inventory or report generation.
+assert(
+  !/pharmaceutical inventory/.test(patientHelpCode),
+  'the patient page carries no staff-only procedure'
+);
+
+// The contact block belongs to both — a patient needs the phone number and hours
+// as much as staff do.
+for (const [label, src] of [['staff', staffHelp], ['patient', patientHelp]]) {
+  assert(/301-3001/.test(src), `${label} Help shows the clinic hotline`);
+  assert(/clinic@tup\.edu\.ph/.test(src), `${label} Help shows the clinic email`);
+  assert(/7:00 AM/.test(src), `${label} Help shows the clinic hours`);
+}
+
+// Student-facing content that did not exist anywhere before.
+for (const topic of ['book an appointment', 'cancel', 'visit records', 'acknowledge a visit', 'message the clinic']) {
+  assert(new RegExp(topic, 'i').test(patientHelp), `patient Help explains: ${topic}`);
+}
+assert(
+  /Who can see my health records\?/.test(patientHelp),
+  'the privacy question is answered for the patient'
+);
+
+// Wired up: route + sidebar, or the page is unreachable.
+const appSrcForHelp = read('src/App.jsx');
+assert(/path="\/patient\/help"/.test(appSrcForHelp), 'the patient Help route exists');
+assert(/from '\.\/pages\/patient\/PatientHelp/.test(appSrcForHelp), 'it is imported');
+assert(
+  /path: '\/patient\/help', label: 'Help'/.test(read('src/components/sidebar/PatientSidebar.jsx')),
+  'the patient sidebar links to it'
+);
+console.log('  ✓ PASS: staff keep their procedures, patients get their own page');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP 10] The dashboard's "Upcoming" means not yet seen
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 10] Dashboard — upcoming means not yet completed');
+
+const dashSrc = readCode('src/pages/Dashboard.jsx');
+// The query fetches today's appointments excluding only Cancelled, so Completed
+// ones came through and appeared under an "Upcoming Schedule" heading — listing
+// visits that were already finished.
+assert(
+  /const upcomingToday = todayAppointments\.filter\([\s\S]{0,160}=== 'scheduled'/.test(dashSrc),
+  'the Upcoming Schedule list is filtered to appointments not yet completed'
+);
+assert(
+  /upcomingToday\.length === 0/.test(dashSrc) && /upcomingToday\.slice\(0, 4\)/.test(dashSrc),
+  'the empty state and the list both use the filtered set'
+);
+// The KPI counts today's non-cancelled appointments, so calling them "scheduled"
+// was wrong whenever one had already been completed.
+assert(
+  /\$\{appointmentsToday\} booked/.test(dashSrc),
+  'the Appointments Today count is labelled for what it counts'
+);
+assert(
+  !/\$\{appointmentsToday\} scheduled/.test(dashSrc),
+  'it no longer claims those appointments are all scheduled'
+);
+// Every row is Scheduled now, so a badge repeating the heading said nothing.
+assert(
+  !/appt\.status \|\| 'Scheduled'/.test(dashSrc),
+  'no badge repeats the heading on every row'
+);
+console.log('  ✓ PASS: dashboard — upcoming is filtered, the count is honest');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP 11] Search pages covers destinations the sidebar omits
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 11] Palette-only destinations stay reachable');
+
+// Backup & Recovery is deliberately not in the sidebar — the list otherwise grows
+// past the viewport — but it must stay reachable from Search pages. The palette
+// builds from the sidebar's own NAV_GROUPS, so the flag has to be honoured on
+// exactly one side.
+const sidebarSrc = readCode('src/components/sidebar/Sidebar.jsx');
+assert(
+  /page: 'backup-recovery'[\s\S]{0,140}paletteOnly: true/.test(sidebarSrc),
+  'Backup & Recovery is flagged as palette-only'
+);
+assert(
+  /!item\.paletteOnly/.test(sidebarSrc),
+  'the sidebar filters palette-only entries out of its own list'
+);
+
+const paletteSrc = readCode('src/components/CommandPalette.jsx');
+assert(
+  !/paletteOnly/.test(paletteSrc),
+  'the palette does NOT filter on paletteOnly, so it still offers the page'
+);
+// It must keep the role gate, or it would offer pages the sidebar hides.
+assert(
+  /if \(item\.roles && !item\.roles\.includes\(role\)\) continue;/.test(paletteSrc),
+  'the palette still respects the role gate'
+);
+console.log('  ✓ PASS: sidebar omits it, Search pages still finds it');
 
 console.log('\n' + '='.repeat(80));
 console.log(' ALL TYPOGRAPHY & COLOR STANDARDIZATION TESTS PASSED (100%)');

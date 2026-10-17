@@ -452,17 +452,42 @@ const MedicalLog = () => {
   const endIndex = Math.min((page + 1) * PAGE_SIZE, total);
   const hasFilters = course !== 'all' || search.trim() !== '';
 
+  // Two frozen columns, not one: the medicine grid is ~1000px wide, so with
+  // only the date frozen, scrolling to a medicine pushed the patient's name off
+  // screen and you could no longer tell whose row you were typing into.
+  //
+  // The second column's offset is only correct if the first is exactly this
+  // wide, so the first carries width AND min-width and its content is nowrap.
+  // Verified in a headless Chrome render: with nowrap it holds at 92px and the
+  // second column sits flush against it.
+  const STICKY_FIRST_WIDTH = 92;
   const stickyHead = {
     position: 'sticky',
     left: 0,
+    width: STICKY_FIRST_WIDTH,
+    minWidth: STICKY_FIRST_WIDTH,
     background: 'var(--surface-raised)',
-    zIndex: 2,
+    zIndex: 3,
+  };
+  const stickyHead2 = {
+    position: 'sticky',
+    left: STICKY_FIRST_WIDTH,
+    background: 'var(--surface-raised)',
+    zIndex: 3,
   };
   const stickyCell = {
     position: 'sticky',
     left: 0,
+    width: STICKY_FIRST_WIDTH,
+    minWidth: STICKY_FIRST_WIDTH,
     background: 'var(--panel)',
-    zIndex: 1,
+    zIndex: 2,
+  };
+  const stickyCell2 = {
+    position: 'sticky',
+    left: STICKY_FIRST_WIDTH,
+    background: 'var(--panel)',
+    zIndex: 2,
   };
 
   return (
@@ -488,7 +513,7 @@ const MedicalLog = () => {
         <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 200 }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', display: 'inline-flex' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'inline-flex' }}>
                 <SearchIcon size={16} />
               </span>
               <input
@@ -550,23 +575,69 @@ const MedicalLog = () => {
             <table className="table" aria-label="Medical log">
               <thead>
                 <tr>
-                  <th style={{ ...stickyHead, whiteSpace: 'nowrap', minWidth: 92 }}>Date</th>
-                  <th style={{ whiteSpace: 'nowrap', minWidth: 92 }}>Student ID</th>
-                  <th style={{ minWidth: 150 }}>Name</th>
-                  <th style={{ minWidth: 46 }}>Sex</th>
-                  <th style={{ minWidth: 68 }}>Dept./Course</th>
-                  <th style={{ minWidth: 160 }}>Complaint</th>
-                  <th style={{ minWidth: 96 }}>Signature</th>
+                  <th style={{ ...stickyHead, whiteSpace: 'nowrap' }}>Date</th>
+                  <th style={{ ...stickyHead2, whiteSpace: 'nowrap', minWidth: 92 }}>Student ID</th>
+                  <th style={{ whiteSpace: 'nowrap', minWidth: 150 }}>Name</th>
+                  {/* nowrap on every horizontal header: without it the narrow
+                      ones broke mid-word ("Se x", "Dept./Cours e"). */}
+                  <th style={{ whiteSpace: 'nowrap', minWidth: 46 }}>Sex</th>
+                  <th style={{ whiteSpace: 'nowrap', minWidth: 68 }}>Dept./Course</th>
+                  {/* Was 160px holding one- or two-word entries like "Fever". */}
+                  <th style={{ whiteSpace: 'nowrap', minWidth: 96 }}>Complaint</th>
+                  <th style={{ whiteSpace: 'nowrap', minWidth: 118 }}>Signature</th>
                   {medicines.map((m) => (
                     <th
                       key={m.item_name}
                       title={`${m.item_name} — ${m.stock_quantity} ${m.unit} in stock`}
-                      style={{ minWidth: 58, maxWidth: 72, verticalAlign: 'bottom', fontSize: 'var(--font-size-2xs)', lineHeight: 1.2 }}
+                      style={{
+                        verticalAlign: 'bottom',
+                        // A plain width, NOT min/max-width: on a table cell
+                        // max-width squeezes the column and the rotated name
+                        // wraps mid-string ("Mecilizine / Tablet"), which is
+                        // the exact thing rotating was meant to stop. Verified
+                        // in a headless Chrome render.
+                        //
+                        // 46, not 40: the cell input declares minWidth 46, so
+                        // that is what the column actually renders at. The two
+                        // must agree or the comment describes a width that never
+                        // ships.
+                        width: 46,
+                        padding: '10px 4px',
+                        fontSize: 'var(--font-size-2xs)',
+                      }}
                     >
-                      {m.item_name}
-                      <span style={{ display: 'block', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-light)' }}>
-                        {m.stock_quantity}
-                      </span>
+                      {/* A flex column so the pair is centred: in vertical
+                          writing the block axis runs right-to-left, which left
+                          the name hugging the right edge of its cell. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            // Read bottom-to-top, as on a printed log. The names
+                            // are long and the columns narrow, so horizontal text
+                            // broke mid-word ("Alu min um Hyd rox ide"); rotated,
+                            // a column only needs to be as wide as the font is
+                            // tall.
+                            writingMode: 'vertical-rl',
+                            transform: 'rotate(180deg)',
+                            whiteSpace: 'nowrap',
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          {m.item_name}
+                        </span>
+                        {/* The count stays HORIZONTAL — digits rotated are hard
+                            to read, and this is the number being scanned. */}
+                        <span
+                          style={{
+                            writingMode: 'horizontal-tb',
+                            fontWeight: 'var(--font-weight-normal)',
+                            color: 'var(--text-muted)',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {m.stock_quantity}
+                        </span>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -591,10 +662,10 @@ const MedicalLog = () => {
                     const profile = profiles[row.patient_id] || null;
                     return (
                       <tr key={row.visit_id}>
-                        <td style={{ ...stickyCell, whiteSpace: 'nowrap', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        <td className="sticky-cell" style={{ ...stickyCell, whiteSpace: 'nowrap', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                           {displayDate(row.visit_date)}
                         </td>
-                        <td style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{row.patient_id || '—'}</td>
+                        <td className="sticky-cell" style={{ ...stickyCell2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{row.patient_id || '—'}</td>
                         <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>
                           {row.patient_name || profile?.full_name || '—'}
                         </td>
@@ -604,7 +675,11 @@ const MedicalLog = () => {
 
                         <td>
                           {/* The signature belongs to the PATIENT: they confirm
-                              what they were given. Staff do not sign here. */}
+                              what they were given. Staff do not sign here.
+
+                              The date is deliberately not shown — it is stored
+                              (patient_signed_at) and the table already has a
+                              Date column, so repeating it here added noise. */}
                           {(() => {
                             const patientUrl = signatureUrl(row.patient_signature_path);
                             if (patientUrl) {
@@ -612,14 +687,13 @@ const MedicalLog = () => {
                                 <SignatureImage
                                   url={patientUrl}
                                   alt="Patient acknowledgement signature"
-                                  height={22}
-                                  maxWidth={100}
-                                  caption={row.patient_signed_at ? displayDate(row.patient_signed_at) : undefined}
+                                  width={104}
+                                  height={24}
                                 />
                               );
                             }
                             return (
-                              <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-light)' }}>
+                              <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)' }}>
                                 Awaiting patient
                               </span>
                             );
@@ -641,6 +715,7 @@ const MedicalLog = () => {
                                 min="0"
                                 inputMode="numeric"
                                 aria-label={`${m.item_name} given to ${row.patient_name || row.patient_id}`}
+                                className="medlog-cell-input"
                                 defaultValue={value}
                                 disabled={isSaving}
                                 onBlur={(e) => commitCell(row, m.item_name, e.target.value)}
@@ -651,6 +726,11 @@ const MedicalLog = () => {
                                   textAlign: 'center',
                                   padding: '4px 2px',
                                   borderRadius: 6,
+                                  // The frame is shown at rest, deliberately. Hiding it
+                                  // until hover made it unclear where you could type —
+                                  // for staff scanning the grid, the box IS the
+                                  // affordance, and a known pattern outranks a calmer
+                                  // surface on a data-entry screen.
                                   border: '1px solid var(--border)',
                                   background: isSaving ? 'var(--surface-raised)' : 'var(--input-bg)',
                                   color: 'var(--text)',

@@ -197,6 +197,32 @@ const MyProfile = () => {
   }, [authUser]);
 
   // ---------- Modal: load full activity on demand ----------
+  // An activity log reads better grouped: a flat list of timestamps makes you
+  // scan each one to work out whether it happened today. Grouping by day answers
+  // that before you read a single row.
+  const groupedActivity = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const groups = [];
+    for (const item of recentActivity || []) {
+      const when = item.created_at ? new Date(item.created_at) : null;
+      let label = 'Earlier';
+      if (when) {
+        const day = new Date(when.getFullYear(), when.getMonth(), when.getDate());
+        if (day.getTime() === today.getTime()) label = 'Today';
+        else if (day.getTime() === yesterday.getTime()) label = 'Yesterday';
+        else label = when.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.items.push(item);
+      else groups.push({ label, items: [item] });
+    }
+    return groups;
+  })();
+
   const openActivityModal = async () => {
     setShowActivityModal(true);
     setModalLoading(true);
@@ -391,7 +417,27 @@ const MyProfile = () => {
           </div>
         </div>
 
-        {/* 2. Main Profile Workspace (Profile Overview + Recent Operational Activity) */}
+        {/* 2. Clinical engagement, given its own row. It was previously a line
+            inside the overview card's metadata list — a statistic buried among
+            labels, when it is the most concrete thing on the page. */}
+        <div className="profile-kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+          {[
+            { label: 'Encounters recorded', value: stats.encountersCreated, note: 'Clinical notes you have written' },
+            { label: 'Appointments booked', value: stats.appointmentsScheduled, note: 'Consultations you have scheduled' },
+          ].map(({ label, value, note }) => (
+            <div key={label} className="card" style={{ padding: '16px 18px' }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1.1, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {value}
+              </div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>{note}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* 3. Main Profile Workspace (Profile Overview + Recent Operational Activity) */}
         <div className="profile-main-grid">
           {/* Left Column: Profile Overview Card */}
           <div className="card" style={{ padding: '22px 20px', textAlign: 'center' }}>
@@ -464,12 +510,8 @@ const MyProfile = () => {
                     <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{user.role || 'Staff'}</span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>Clinical Engagement</span>
-                    <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)' }}>
-                      {stats.encountersCreated} Encounters · {stats.appointmentsScheduled} Appointments
-                    </span>
-                  </div>
+                  {/* Clinical engagement moved to its own KPI row above — this
+                      repeated the same two numbers a second time. */}
                 </div>
               </div>
             ) : (
@@ -484,7 +526,7 @@ const MyProfile = () => {
                   placeholder="Enter full name"
                   style={{ width: '100%' }}
                 />
-                <div style={{ color: 'var(--text-light)', fontSize: 'var(--font-size-2xs)', marginTop: 6, lineHeight: 1.4 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-2xs)', marginTop: 6, lineHeight: 1.4 }}>
                   Note: Official email and role changes must be requested through clinic administration.
                 </div>
               </div>
@@ -504,41 +546,52 @@ const MyProfile = () => {
             </div>
 
             {recentActivity && recentActivity.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {recentActivity.map((act, index) => (
-                  <button
-                    type="button"
-                    key={act.id || `${act.created_at}-${Math.random()}`}
-                    onClick={() => openActivity(act)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px 14px',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: index < recentActivity.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s ease',
-                      gap: 16
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--grey-50, #f8fafc)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    title={act.detail || act.action || ''}
-                  >
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      {/* Primary readable action description */}
-                      <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {act.detail || act.action || 'Activity'}
-                      </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {groupedActivity.map((group) => (
+                  <div key={group.label}>
+                    <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                      {group.label}
                     </div>
-                    {/* Timestamp */}
-                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {act.created_at ? new Date(act.created_at).toLocaleString() : ''}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {group.items.map((act, index) => (
+                        <button
+                          type="button"
+                          /* A stable key: this was `${created_at}-${Math.random()}`,
+                             which changed on every render and defeated reconciliation. */
+                          key={act.id || `${act.created_at || ''}-${act.detail || act.action || index}`}
+                          onClick={() => openActivity(act)}
+                          className="profile-activity-row"
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px 14px',
+                            borderRadius: 8,
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: index < group.items.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            gap: 16,
+                            color: 'inherit',
+                            font: 'inherit',
+                          }}
+                          title={act.detail || act.action || ''}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            {/* Primary readable action description */}
+                            <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {act.detail || act.action || 'Activity'}
+                            </div>
+                          </div>
+                          {/* Timestamp — time only, since the day is now the heading */}
+                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                            {act.created_at ? new Date(act.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : (

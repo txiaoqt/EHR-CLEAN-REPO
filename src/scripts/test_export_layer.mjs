@@ -478,6 +478,164 @@ assert(
 );
 console.log('  ✓ PASS: register shows Signature beside Complaint, with the drawn signature');
 
+// The on-screen register's own layout rules.
+assert(
+  /writingMode: 'vertical-rl'/.test(medPageMarkup) && /transform: 'rotate\(180deg\)'/.test(medPageMarkup),
+  'medicine names print vertically, reading bottom-to-top'
+);
+assert(
+  /verticalAlign: 'bottom',[\s\S]{0,700}?width: 46,/.test(medPageMarkup),
+  'a rotated medicine column has a plain width'
+);
+// 46 matches the cell input's minWidth, so the declared width is the real one.
+assert(
+  /minWidth: 46,\s*\n\s*textAlign: 'center'/.test(medPageMarkup),
+  'the column width and the cell input width agree'
+);
+// min/max-width on a table cell squeezes it, and the rotated name then wraps
+// mid-string — the very thing rotating was meant to prevent. Confirmed in a
+// headless Chrome render, so the guard is deliberate.
+assert(
+  !/minWidth: 34/.test(medPageMarkup) && !/maxWidth: 46/.test(medPageMarkup),
+  'no min/max-width on a rotated medicine column'
+);
+// In vertical writing the block axis runs right-to-left, so without a centring
+// wrapper the name hugged the right edge of its cell.
+assert(
+  /flexDirection: 'column', alignItems: 'center', gap: 6/.test(medPageMarkup),
+  'the rotated name and its count are centred in the cell'
+);
+// Digits rotated are hard to read, and the count is the number being scanned.
+assert(
+  /writingMode: 'horizontal-tb'/.test(medPageMarkup),
+  'the stock count stays horizontal while the name is rotated'
+);
+// Without nowrap the narrow headers broke mid-word ("Se x", "Dept./Cours e").
+const headerNowrap = (medPageMarkup.match(/whiteSpace: 'nowrap'/g) || []).length;
+assert(headerNowrap >= 7, `every horizontal header is nowrap (${headerNowrap} found)`);
+// 160px held one- or two-word complaints.
+assert(
+  /whiteSpace: 'nowrap', minWidth: 96 \}\}>Complaint/.test(medPageMarkup),
+  'Complaint is no longer given 160px for a word like "Fever"'
+);
+// The signed date lives in the record and the Date column already shows it.
+assert(
+  !/caption=\{row\.patient_signed_at/.test(medPageMarkup),
+  'the register does not repeat the signed date under the signature'
+);
+assert(
+  /width=\{104\}/.test(medPageMarkup) && /height=\{24\}/.test(medPageMarkup),
+  'the signature occupies a fixed box, however long the signature is'
+);
+console.log('  ✓ PASS: register — vertical medicine names, nowrap headers, fixed signature box');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP] Contrast and interaction fixes from the design audit
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 16] Audit fixes — contrast, frozen columns, states');
+
+// --text-light is the DISABLED token and measures 3.07:1 on the panel and
+// 2.54:1 on the navy header — both below AA for the sizes used here.
+assert(
+  !/var\(--text-light\)/.test(medPageMarkup),
+  'the register uses no disabled-token text for real content'
+);
+// The medicine grid is ~1000px wide; with only the date frozen, scrolling to a
+// medicine pushed the patient's name off screen.
+assert(
+  /const stickyCell2 = \{/.test(medPageMarkup) && /className="sticky-cell"/.test(medPageMarkup),
+  'a second column is frozen so the patient stays visible while scrolling'
+);
+assert(
+  /const STICKY_FIRST_WIDTH = 92/.test(medPageMarkup),
+  'the first column has a fixed width, so the second column\u2019s offset is exact'
+);
+
+const componentsCss = read('src/styles/components.css');
+// A frozen cell sets its own background to stay opaque, which defeated the row hover.
+assert(
+  /\.table tr:hover td\.sticky-cell/.test(componentsCss),
+  'the frozen cells take part in the row hover'
+);
+assert(
+  /transition: transform 160ms ease-out/.test(componentsCss),
+  'buttons animate their press feedback instead of snapping'
+);
+// The frame is shown at rest: for staff scanning the grid it IS the affordance
+// that says "you can type here". Hiding it until hover left them guessing, and a
+// known pattern outranks a calmer surface on a data-entry screen.
+assert(
+  /border: '1px solid var\(--border\)'/.test(medPageMarkup) &&
+    /\.medlog-cell-input:focus/.test(componentsCss),
+  'medicine cells are framed at rest, with a focus ring on top'
+);
+assert(
+  /\.medlog-cell-input:hover \{\s*\n\s*background: var\(--surface-raised\)/.test(componentsCss),
+  'hover adds feedback rather than revealing the frame'
+);
+console.log('  ✓ PASS: audit fixes in place');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP] The register's horizontal scroller
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 17] The scroller matches the system');
+
+assert(
+  /\.table-responsive::-webkit-scrollbar-thumb \{[\s\S]{0,220}border-radius: var\(--radius-full\)/.test(componentsCss),
+  'the scrollbar thumb is rounded, like every other surface in the system'
+);
+assert(
+  /\.table-responsive::-webkit-scrollbar \{[\s\S]{0,80}height: 10px/.test(componentsCss),
+  'the bar is thinner than the platform default'
+);
+// The chat reveals its bar on hover. This one must NOT: with two columns frozen
+// it is the only sign there are more columns to the right.
+assert(
+  /\.table-responsive \{\s*\n\s*scrollbar-width: thin;\s*\n\s*scrollbar-color: rgba\(148, 163, 184, 0\.45\) transparent/.test(componentsCss),
+  'the bar is visible at rest, not revealed on hover'
+);
+assert(
+  !/\.table-responsive::-webkit-scrollbar-thumb \{[^}]*background: transparent/.test(componentsCss),
+  'the thumb is not transparent at rest'
+);
+console.log('  ✓ PASS: scroller — thin, rounded, and visible at rest');
+
+// -----------------------------------------------------------------------------
+// [TEST GROUP] Scrollbars across the whole app
+// -----------------------------------------------------------------------------
+console.log('\n[TEST GROUP 18] One scrollbar treatment, app-wide');
+
+const baseCss = read('src/styles/base.css');
+// The platform default is a chunky square slab that reads as the OS, not this
+// app. One default covers the shell (main + sidebar) and every panel.
+assert(
+  /\*\s*\{[\s\S]{0,120}scrollbar-width: thin/.test(baseCss),
+  'a global default styles every scrollbar, not one container at a time'
+);
+assert(
+  /\*::-webkit-scrollbar-thumb \{[\s\S]{0,260}border-radius: var\(--radius-full/.test(baseCss),
+  'the thumb is rounded app-wide'
+);
+assert(
+  /\*::-webkit-scrollbar \{[\s\S]{0,80}width: 10px/.test(baseCss),
+  'the bar is thinner than the platform default'
+);
+// Visible at rest — a bar that only appears when you are already over the thing
+// is a poor signpost that content continues.
+assert(
+  /\*::-webkit-scrollbar-thumb \{[\s\S]{0,120}background: rgba\(148, 163, 184, 0\.45\)/.test(baseCss),
+  'the thumb is visible at rest, not transparent'
+);
+// The chat deliberately reveals on hover. Its rules are more specific, so the
+// global default must not have swallowed it.
+const chatRules = read('src/styles/components.css');
+assert(
+  /\.tup-chat-messages-area::-webkit-scrollbar-thumb/.test(chatRules) &&
+    /\.tup-chat-messages-area:hover::-webkit-scrollbar-thumb/.test(chatRules),
+  'the chat keeps its hover-reveal override'
+);
+console.log('  ✓ PASS: scrollbars unified, chat override preserved');
+
 // -----------------------------------------------------------------------------
 // [TEST GROUP] Patient acknowledgement of a visit
 // -----------------------------------------------------------------------------

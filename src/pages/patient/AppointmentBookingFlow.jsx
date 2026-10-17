@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
+import { emailEnabled } from '../../utils.js';
 
 const SLOT_TIMES = ['09:00-12:00', '13:00-16:00', '16:00-19:00'];
 const SLOT_CAPACITY = 1;
@@ -691,6 +692,9 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
       // Asynchronously trigger appointment reminder/confirmation notification (evaluates patient_settings preferences)
       try {
+        // Settings → Notifications can turn email off; without this the toggle
+        // would be decorative.
+        if (emailEnabled()) {
         supabase.functions.invoke('send-patient-notification', {
           body: {
             type: 'appointment_confirmation',
@@ -711,6 +715,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         }).catch((fnErr) => {
           console.warn('Edge function notification error (non-blocking):', fnErr);
         });
+        }
       } catch (invokeErr) {
         console.warn('Error initiating appointment notification:', invokeErr);
       }

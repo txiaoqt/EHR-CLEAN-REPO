@@ -1,0 +1,84 @@
+name: EHR manual backup
+
+# Manual only, by design. A backup that runs on a schedule nobody watches is a
+# backup nobody has checked; this is started deliberately and its log read.
+on:
+  workflow_dispatch:
+
+# Read-only token: the job never needs to write to the repository.
+permissions:
+  contents: read
+
+# Two backups at once would compete for the same bucket prefix and the same
+# database connection. Queue them instead.
+concurrency:
+  group: ehr-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+        with:
+          # The job needs no git credentials after checkout.
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The runner has no dependencies — node built-ins plus the docker and aws
+      # CLIs already on the image — so there is nothing to install.
+
+      - name: Validate backup code
+        run: node --test scripts/backup/backup.test.mjs
+
+      - name: Check runner tooling
+        run: |
+          set -euo pipefail
+          command -v docker >/dev/null
+          command -v aws >/dev/null
+          docker info >/dev/null 2>&1
+
+      - name: Back up database and Storage, verify, package and upload to R2
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          # Anything written from here is owner-only.
+          umask 077
+          # Fail before doing any work if a secret is missing, naming it but
+          # never printing its value.
+          node --input-type=module -e "import { validateSecrets } from './scripts/backup/common.mjs'; validateSecrets(process.env)"
+          # The temporary directory lives OUTSIDE the checkout, so the runner
+          # cannot write into the repository or delete part of it.
+          export EHR_BACKUP_TEMP
+          EHR_BACKUP_TEMP=$(mktemp -d "$RUNNER_TEMP/ehr-backup.XXXXXXXX")
+          printf 'EHR_BACKUP_TEMP=%s\n' "$EHR_BACKUP_TEMP" >> "$GITHUB_ENV"
+          node scripts/backup/run-backup.mjs
+
+      - name: Clean temporary backup data on success or failure
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${EHR_BACKUP_TEMP:-}" ]]; then
+            # Refuse to delete anything that is not a directory this workflow
+            # created, even if the variable was tampered with.
+            case "$EHR_BACKUP_TEMP" in
+              "$RUNNER_TEMP"/ehr-backup.*) rm -rf -- "$EHR_BACKUP_TEMP" ;;
+              *) printf 'Refusing unsafe cleanup path\n' >&2; exit 1 ;;
+            esac
+          fi

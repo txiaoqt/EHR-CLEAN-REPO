@@ -44,6 +44,10 @@
   padding: 10px 20px;
   border-radius: var(--radius-md);
   cursor: pointer;
+  /* Without this the press scale and hover snapped instantly, which reads as a
+     jump rather than feedback. 160ms is the press-feedback band. */
+  transition: transform 160ms ease-out, background-color 160ms ease-out,
+              border-color 160ms ease-out, color 160ms ease-out;
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-base);
   font-family: inherit;
@@ -871,6 +875,48 @@ textarea::placeholder {
   overflow-x: auto;
 }
 
+/* The register scrolls sideways through 24 medicine columns. Unlike the chat,
+   this bar stays VISIBLE rather than appearing on hover: with the first two
+   columns frozen, it is the only sign there are more columns to the right, so
+   hiding it would hide the affordance. It matches the system's treatment —
+   thin, rounded, token-coloured — just without the reveal. */
+.table-responsive {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.table-responsive::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: var(--radius-full);
+  /* Inset the thumb so it reads as a slim pill rather than a full-height slab. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+  background-clip: content-box;
+}
+
+.table-responsive::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* See base.css: kept for engines that honour it, verified not to work in
+   current Chrome. Nothing depends on it. */
+.table-responsive::-webkit-scrollbar-button {
+  display: none;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -898,6 +944,798 @@ textarea::placeholder {
 
 .table tr:hover td {
   background: var(--surface-raised);
+}
+
+/* The frozen columns set their own background so they stay opaque over scrolled
+   content — which otherwise defeats the row hover, leaving the row lit up
+   everywhere except where the eye starts. */
+.table tr:hover td.sticky-cell {
+  background: var(--surface-raised);
+}
+
+/* Medicine entry cells in the Medical Log. The frame is shown at rest: it is the
+   affordance that says "you can type here", and hiding it until hover left staff
+   guessing. Hover and focus add feedback on top rather than revealing the box. */
+.medlog-cell-input {
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.medlog-cell-input:hover {
+  background: var(--surface-raised);
+}
+
+.medlog-cell-input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+/* Staff profile activity rows. This hover was previously applied by mutating
+   style.background from onMouseEnter/onMouseLeave, which cannot respond to
+   keyboard focus and left the row looking inert when tabbed to. */
+.profile-activity-row {
+  transition: background-color 140ms ease-out;
+}
+
+.profile-activity-row:hover,
+.profile-activity-row:focus-visible {
+  background: var(--grey-50, #f8fafc);
+}
+
+.profile-activity-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* ==========================================================================
+   Staff top bar — page search + account menu
+   ==========================================================================
+   Mirrors the patient header's role on the staff surface. It is sticky and
+   offset by the sidebar width, so it aligns with the content below it rather
+   than floating over the navigation. */
+.staff-topbar {
+  /* FIXED, not sticky. #app-root is display:flex, so a sticky header becomes a
+     flex sibling and takes width from the content beside it — which narrowed
+     every page and wrapped the dashboard KPI titles onto two lines. Fixed takes
+     it out of the flow, exactly as .patient-app-header already does. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+/* The content must clear the fixed bar. Scoped to the staff surface via a root
+   class, so the patient portal — which has its own header and its own spacing —
+   is untouched. */
+#app-root.has-staff-topbar main.main {
+  padding-top: 80px;
+}
+
+@media (min-width: 1024px) {
+  .staff-topbar {
+    left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    padding: 0 32px;
+  }
+
+  #app-root.sidebar-collapsed .staff-topbar {
+    left: var(--sidebar-collapsed-width, 64px);
+    width: calc(100% - var(--sidebar-collapsed-width, 64px));
+  }
+}
+
+.topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 400px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 140ms ease-out, color 140ms ease-out;
+}
+
+.topbar-search:hover {
+  border-color: var(--color-primary);
+  color: var(--text);
+}
+
+.topbar-search-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-kbd {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.topbar-account {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.topbar-account-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+}
+
+.topbar-account-trigger:hover,
+.topbar-account-trigger[aria-expanded="true"] {
+  background: var(--surface-raised);
+}
+
+.topbar-avatar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.topbar-account-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.topbar-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 224px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 95;
+}
+
+.topbar-menu-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.topbar-menu-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-menu-email {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-subtle);
+}
+
+.topbar-menu-section {
+  padding: 4px 6px 6px;
+}
+
+.topbar-menu-heading {
+  display: block;
+  padding: 2px 4px 6px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.topbar-appearance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-raised);
+  border-radius: 6px;
+}
+
+.topbar-appearance-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+
+.topbar-appearance-option:hover {
+  color: var(--text);
+}
+
+.topbar-appearance-option.is-selected {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-xs);
+}
+
+.topbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+}
+
+.topbar-menu-item:hover {
+  background: var(--surface-raised);
+}
+
+.topbar-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.topbar-menu-item.is-danger:hover {
+  background: var(--color-rose-bg);
+}
+
+/* --------------------------------------------------------------------------
+   Command palette (Ctrl+K)
+   -------------------------------------------------------------------------- */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: var(--overlay-bg, rgba(0, 0, 0, 0.45));
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+}
+
+.palette {
+  width: min(94vw, 520px);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--color-primary);
+}
+
+.palette-input {
+  /* An <input> carries an intrinsic width from its `size` attribute, and a flex
+     item defaults to min-width:auto — so without both of these it refuses to
+     shrink and pushes the ESC pill out of the row. Verified in a render. */
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+}
+
+.palette-input::placeholder {
+  color: var(--text-muted);
+}
+
+.palette-list {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette-item[data-active="true"] {
+  background: var(--color-primary-tint);
+  color: var(--color-primary-text);
+}
+
+.palette-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-item-group {
+  flex-shrink: 0;
+  font-size: var(--font-size-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   Settings
+   ========================================================================== */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.settings-tab {
+  padding: 9px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: color 140ms ease-out, border-color 140ms ease-out;
+}
+
+.settings-tab:hover {
+  color: var(--text);
+}
+
+.settings-tab.is-active {
+  color: var(--color-primary-text);
+  border-bottom-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-section-title {
+  margin: 0 0 4px;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text);
+}
+
+.settings-section-note {
+  margin: 0 0 18px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+/* Appearance: three cards, each naming what it does rather than a bare label. */
+.settings-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.settings-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease-out, background-color 140ms ease-out;
+}
+
+.settings-choice:hover {
+  border-color: var(--color-primary);
+}
+
+.settings-choice.is-selected {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.settings-choice-label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-choice-note {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.settings-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-switch-label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+}
+
+.settings-switch-note {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 62ch;
+}
+
+.settings-field {
+  margin-bottom: 14px;
+  max-width: 360px;
+}
+
+.settings-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Settings — one card per area, arranged in a two-column grid
+   ========================================================================== */
+.settings-card {
+  padding: 22px 24px;
+}
+
+/* Rows of cards are separated by margin rather than gap, because the last card
+   on the page is full-width and outside the grid.
+   `align-items: start` stops the grid forcing both cards in a row to the same
+   height — without it the shorter card ("Interface Appearance") stretched to
+   match its neighbour and ended in a large blank space. */
+.settings-main-grid {
+  margin-bottom: 20px;
+  align-items: start;
+}
+
+.settings-card-head {
+  margin-bottom: 18px;
+}
+
+.settings-card-head h2 {
+  margin: 0 0 4px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--text);
+}
+
+.settings-card-head p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+/* Active account panel */
+.settings-identity {
+  padding: 14px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.settings-identity-label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.settings-identity-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-identity-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text);
+}
+
+.settings-identity-meta {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.settings-identity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-emerald-text);
+}
+
+.settings-subhead {
+  margin-bottom: 12px;
+}
+
+.settings-subhead-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text);
+}
+
+.settings-subhead-note {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.settings-password-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.settings-choices {
+  display: grid;
+  /* 118px so three choices sit in one row inside a half-width card; at 150px the
+     third wrapped to its own line, which read as an afterthought. */
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+}
+
+.settings-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease-out, background-color 140ms ease-out;
+}
+
+.settings-choice:hover {
+  border-color: var(--color-primary);
+}
+
+.settings-choice.is-selected {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary);
+}
+
+.settings-choice.is-selected .settings-choice-label {
+  color: var(--color-primary-text);
+}
+
+.settings-choice-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-choice-note {
+  font-size: var(--font-size-2xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Only rows that carry a switch are capped: the cap exists to keep the control
+   near its label instead of at the far edge of a full-width card. Capping the
+   row also caps its border, so an information-only row was left with a divider
+   that stopped short of the card. */
+.settings-row.has-control {
+  max-width: 680px;
+}
+
+.settings-row-label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+}
+
+.settings-row-note {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.settings-field {
+  margin-bottom: 14px;
+  max-width: 100%;
+}
+
+/* .input declares no width of its own, so an <input> falls back to the browser's
+   `size="20"` default (~150px) and looks undersized inside a 460px card. */
+.settings-field .input {
+  width: 100%;
+}
+
+.settings-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.settings-callout {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.settings-callout code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.95em;
+  color: var(--text);
+}
+
+@media (max-width: 1023px) {
+  .settings-password-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Backup & Recovery */
+.backup-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.backup-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.backup-fact-label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.backup-fact-value {
+  margin-top: 3px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Table Pagination Footer */

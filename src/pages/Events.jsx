@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { ChevronDownIcon } from '../components/icons/Icons.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
+import { emailEnabled } from '../utils.js';
 
 const CATEGORIES = ['All', 'Blood Drive', 'Vaccination', 'Health Seminar', 'Medical Mission', 'General'];
 const STATUSES = ['All', 'published', 'draft', 'cancelled', 'archived'];
@@ -330,6 +331,12 @@ const Events = () => {
     setEmailResult(null);
 
     try {
+      // Settings → Notifications can disable blasts. Checked here, at the only
+      // place a blast is sent, rather than leaving the toggle decorative.
+      if (!emailEnabled('blast')) {
+        setEmailResult({ ok: false, message: 'Email blasts are turned off in Settings.' });
+        return;
+      }
       const selectedIdsArray = Array.from(selectedRecipientIds);
       const { data, error } = await supabase.functions.invoke('send-event-announcement', {
         body: {

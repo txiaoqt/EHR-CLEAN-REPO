@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/sidebar/Sidebar.jsx';
+import StaffTopBar from './components/header/StaffTopBar.jsx';
 import PatientSidebar from './components/sidebar/PatientSidebar.jsx';
 import PatientHeader from './components/header/PatientHeader.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -16,6 +17,7 @@ import StaffPatientMessages from './pages/StaffPatientMessages.jsx';
 import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
+import BackupRecovery from './pages/BackupRecovery.jsx';
 import AuditTrail from './pages/AuditTrail.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import PatientDashboard from './pages/patient/PatientDashboard.jsx';
@@ -25,6 +27,7 @@ import PatientMessages from './pages/patient/PatientMessages.jsx';
 import PatientRecords from './pages/patient/PatientRecords.jsx';
 import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
 import PatientSettings from './pages/patient/PatientSettings.jsx';
+import PatientHelp from './pages/patient/PatientHelp.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
@@ -228,7 +231,13 @@ function AppShell() {
   const shouldRenderSidebar = canAccessAuthenticatedHome && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
 
   return (
-    <div id="app-root" className={sidebarCollapsed ? 'sidebar-collapsed' : ''}>
+    <div
+      id="app-root"
+      className={[
+        sidebarCollapsed ? 'sidebar-collapsed' : '',
+        shouldRenderSidebar && !IS_USER_SURFACE ? 'has-staff-topbar' : '',
+      ].filter(Boolean).join(' ')}
+    >
       {shouldRenderSidebar && (
         <div id="sidebar-container" className={`sidebar-container ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {IS_USER_SURFACE ? (
@@ -256,6 +265,8 @@ function AppShell() {
         </>
       )}
 
+      {shouldRenderSidebar && !IS_USER_SURFACE && <StaffTopBar />}
+
       <Routes>
         <Route path="/" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Navigate to="/login" replace />)} />
         <Route path="/login" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Login />)} />
@@ -276,6 +287,7 @@ function AppShell() {
             <Route path="/messages" element={guard(<StaffPatientMessages />, ['admin', 'physician', 'nurse'])} />
             <Route path="/help" element={guard(<Help />, ['admin', 'physician', 'nurse'])} />
             <Route path="/settings" element={guard(<Settings />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/backup-recovery" element={guard(<BackupRecovery />, ['admin', 'physician'])} />
             <Route path="/audit-trail" element={guard(<AuditTrail />, ['admin', 'physician'])} />
             <Route path="/my-profile" element={guard(<MyProfile />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patient-profile" element={guard(<PatientProfile />, ['admin', 'physician', 'nurse'])} />
@@ -292,6 +304,7 @@ function AppShell() {
             <Route path="/patient/records" element={guard(<PatientRecords />, ['patient'])} />
             <Route path="/patient/profile" element={guard(<PatientProfilePortal />, ['patient'])} />
             <Route path="/patient/settings" element={guard(<PatientSettings />, ['patient'])} />
+            <Route path="/patient/help" element={guard(<PatientHelp />, ['patient'])} />
           </>
         )}
 

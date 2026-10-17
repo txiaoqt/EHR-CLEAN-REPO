@@ -156,7 +156,36 @@ export const formatWeight = (kg, useMetric = true) => {
   return `${lbs} lbs`;
 };
 
+/**
+ * Whether outbound email is permitted.
+ *
+ * Settings stores the preference; this is what reads it. Without a consumer the
+ * toggle would be another switch wired to nothing.
+ *
+ * `!== false` so the default is ON: an unset preference must not silently stop
+ * the clinic telling a patient their appointment was confirmed.
+ */
+export const emailEnabled = (kind = 'notifications') => {
+  try {
+    const prefs = loadSettings();
+    if (prefs.notifications_email === false) return false;
+    if (kind === 'blast' && prefs.notifications_email_blast === false) return false;
+    return true;
+  } catch (_) {
+    return true;
+  }
+};
+
 // Audit logging utilities
+/**
+ * Writes an entry to the audit log.
+ *
+ * There is deliberately no way to switch this off. Everything clinical and
+ * administrative is recorded, always: a log with holes in it is worse than no
+ * log, because it looks complete while being incomplete. An earlier version let
+ * each category be disabled from Settings, and that was the wrong shape of
+ * control to offer.
+ */
 export const logAudit = async (action, description, userName, extra = {}) => {
   try {
     // Try to get current user if not provided

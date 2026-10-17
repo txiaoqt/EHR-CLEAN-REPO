@@ -1,7 +1,61 @@
 /* base.css */
 *{box-sizing:border-box}
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font-sans); font-size:var(--font-size-base, 16px); line-height:var(--line-height-normal, 1.5); -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font-sans); font-size:var(--font-size-base, 14px); line-height:var(--line-height-normal, 1.5); -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars, everywhere.
+
+   The platform default is a chunky square-edged slab that reads as part of the
+   operating system rather than this app. One default here — thin, rounded,
+   token-coloured, and VISIBLE at rest — covers the shell (main and the sidebar)
+   and every panel without listing them.
+
+   Visible at rest, not revealed on hover: a bar that only appears when you are
+   already over the thing is a poor signpost that content continues. The one
+   exception is the patient chat, which deliberately reveals on hover; its rules
+   are more specific and still win.
+   --------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: var(--radius-full, 9999px);
+  /* Inset so it reads as a slim pill rather than a full-width slab. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* The platform's stepper arrows at each end. This is the documented way to
+   remove them, and it is kept for engines that honour it — but it was verified
+   NOT to work in current Chrome (three variants rendered identically, arrows
+   intact), where the legacy ::-webkit-scrollbar pseudo-elements are partly
+   deprecated. The arrows there are the platform's and cannot be styled away.
+   Nothing depends on this rule; it is a best-effort cleanup. */
+*::-webkit-scrollbar-button {
+  display: none;
+}
 h1{font-size:var(--font-size-3xl, 30px); font-weight:var(--font-weight-extrabold, 800); line-height:1.2; margin:0 0 16px;}
 h2{font-size:var(--font-size-2xl, 26px); font-weight:var(--font-weight-extrabold, 800); line-height:var(--line-height-tight, 1.25); margin:0 0 12px;}
 h3{font-size:var(--font-size-lg, 20px); font-weight:var(--font-weight-bold, 700); line-height:1.3; margin:0 0 8px;}
