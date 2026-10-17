@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateSecrets, redact, REQUIRED_SECRETS } from './common.mjs';
 import { backupIdentity } from './run-backup.mjs';
+import { inspectEndpoint } from './check-r2.mjs';
 
 const completeEnv = () => ({
   SUPABASE_DB_URL: 'postgresql://user:pw@db.example.com:5432/postgres',
@@ -112,4 +113,52 @@ test('a missing or malformed run identity is refused', () => {
   ]) {
     assert.throws(() => backupIdentity({ ...dispatchEnv(), ...patch }));
   }
+});
+
+// --- R2 endpoint shape -------------------------------------------------------
+// A malformed endpoint makes the aws CLI print `Invalid endpoint: <value>`, and
+// GitHub redacts the value, so the log says nothing. These cover the ways it
+// actually gets pasted wrong.
+
+const GOOD = 'https://a1b2c3d4e5f60718293a4b5c6d7e8f90.r2.cloudflarestorage.com';
+
+test('a well-formed endpoint passes', () => {
+  assert.deepEqual(inspectEndpoint(GOOD), { ok: true, problems: [] });
+});
+
+test('a jurisdiction endpoint passes', () => {
+  assert.equal(inspectEndpoint('https://a1b2c3d4e5f60718293a4b5c6d7e8f90.eu.r2.cloudflarestorage.com').ok, true);
+});
+
+test('a trailing slash is reported', () => {
+  const { ok, problems } = inspectEndpoint(`${GOOD}/`);
+  assert.equal(ok, false);
+  assert.match(problems.join(' '), /trailing slash/);
+});
+
+test('a pasted newline is reported', () => {
+  const { ok, problems } = inspectEndpoint(`${GOOD}\n`);
+  assert.equal(ok, false);
+  assert.match(problems.join(' '), /whitespace/);
+});
+
+test('the r2.dev public URL is named for what it is', () => {
+  const { ok, problems } = inspectEndpoint('https://pub-abc123.r2.dev');
+  assert.equal(ok, false);
+  assert.match(problems.join(' '), /public bucket URL/);
+});
+
+test('doubled scheme, quotes and a dashboard URL are all caught', () => {
+  assert.match(inspectEndpoint(`https://${GOOD}`).problems.join(' '), /twice/);
+  assert.match(inspectEndpoint(`"${GOOD}"`).problems.join(' '), /quote/);
+  assert.match(inspectEndpoint('https://dash.cloudflare.com/').problems.join(' '), /dashboard URL/);
+});
+
+test('a wrong host is reported', () => {
+  assert.match(inspectEndpoint('https://example.com').problems.join(' '), /r2\.cloudflarestorage\.com/);
+});
+
+test('an empty endpoint reports a problem rather than passing', () => {
+  assert.equal(inspectEndpoint('').ok, false);
+  assert.equal(inspectEndpoint(undefined).ok, false);
 });

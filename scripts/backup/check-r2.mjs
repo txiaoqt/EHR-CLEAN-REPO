@@ -23,10 +23,64 @@ import { validateSecrets, redact, run, log } from './common.mjs';
 
 const PROBE_PREFIX = '_checks';
 
+/**
+ * Checks the endpoint's SHAPE before handing it to the aws CLI.
+ *
+ * The CLI answers a malformed endpoint with `Invalid endpoint: <value>`, and
+ * GitHub then redacts the value, so the log says nothing useful. Worse, a
+ * trailing slash or a stray newline is invisible in a secret field. This says
+ * what is actually wrong without ever printing the value.
+ */
+export function inspectEndpoint(raw) {
+  const value = String(raw ?? '');
+  const problems = [];
+
+  if (value !== value.trim()) {
+    problems.push('it has leading or trailing whitespace (a newline pasted with it is the usual cause)');
+  }
+  const trimmed = value.trim();
+
+  if (!/^https:\/\//.test(trimmed)) {
+    problems.push('it does not start with https://');
+  }
+  if (trimmed.endsWith('/')) {
+    problems.push('it ends with a trailing slash — the endpoint should be the host only');
+  }
+  if (/^https:\/\/https:\/\//.test(trimmed)) {
+    problems.push('it has https:// twice');
+  }
+  if (/["']/.test(trimmed)) {
+    problems.push('it contains quote characters — paste the value without them');
+  }
+  if (/\.r2\.dev/.test(trimmed)) {
+    problems.push('it is an r2.dev public bucket URL, not the S3 API endpoint — the S3 endpoint is https://<ACCOUNT_ID>.r2.cloudflarestorage.com');
+  }
+  if (/cloudflare\.com\/?$/.test(trimmed) && !/r2\.cloudflarestorage\.com/.test(trimmed)) {
+    problems.push('it looks like a dashboard URL rather than the S3 API endpoint');
+  }
+  if (!/\.r2\.cloudflarestorage\.com$/.test(trimmed) && !/\.r2\.cloudflarestorage\.com/.test(trimmed)) {
+    problems.push('it does not end with .r2.cloudflarestorage.com');
+  }
+
+  return { ok: problems.length === 0, problems };
+}
+
 export async function checkR2(env = process.env) {
   validateSecrets(env);
 
-  const { R2_BUCKET_NAME, R2_ENDPOINT } = env;
+  const { R2_BUCKET_NAME } = env;
+  // Trimmed, so a pasted newline cannot reach the CLI. aws rejects a value with
+  // one and the error is unreadable.
+  const R2_ENDPOINT = String(env.R2_ENDPOINT).trim();
+
+  const shape = inspectEndpoint(env.R2_ENDPOINT);
+  if (!shape.ok) {
+    // Report every problem at once, so this does not take one run each.
+    throw new Error(
+      `R2_ENDPOINT looks wrong:\n  - ${shape.problems.join('\n  - ')}\n` +
+      `It should be exactly: https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+    );
+  }
   const r2Env = {
     ...process.env,
     AWS_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID,
