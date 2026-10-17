@@ -157,7 +157,7 @@ export const formatWeight = (kg, useMetric = true) => {
 };
 
 // Audit logging utilities
-export const logAudit = async (action, description, userName) => {
+export const logAudit = async (action, description, userName, extra = {}) => {
   try {
     // Try to get current user if not provided
     let finalUserName = userName;
@@ -177,8 +177,18 @@ export const logAudit = async (action, description, userName) => {
 
     const { error } = await supabase.from('audit_logs').insert([{
       user_name: finalUserName,
+      // Mirrored into performed_by so the audit trail page and the profile
+      // activity feed agree on who performed an action. Historically only
+      // user_name was written, which left the profile feed (which matches on
+      // performed_by) permanently empty.
+      performed_by: finalUserName,
       action,
-      description
+      description,
+      ...(extra.meta ? { meta: extra.meta } : {}),
+      ...(extra.type ? { type: extra.type } : {}),
+      ...(extra.appointment_id ? { appointment_id: extra.appointment_id } : {}),
+      ...(extra.encounter_id ? { encounter_id: extra.encounter_id } : {}),
+      ...(extra.item_id ? { item_id: extra.item_id } : {}),
     }]);
     if (error) {
       console.error('Audit log error:', error);

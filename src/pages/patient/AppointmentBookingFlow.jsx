@@ -134,7 +134,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         .from('appointments')
         .select('*')
         .eq('patient_id', patientId.trim())
-        .in('status', ['Scheduled', 'Checked-in'])
+        .eq('status', 'Scheduled')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -179,7 +179,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
           .from('appointments')
           .select('department, appointment_date, appointment_time, status')
           .gte('appointment_date', today)
-          .in('status', ['Scheduled', 'Checked-in']);
+          .eq('status', 'Scheduled');
 
         if (!directErr && directRows) {
           directRows.forEach((row) => {
@@ -532,7 +532,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         .from('appointments')
         .select('id, appointment_date, appointment_time, department, service_type, status, queue_number, reference_code')
         .eq('patient_id', form.patient_id.trim())
-        .in('status', ['Scheduled', 'Checked-in'])
+        .eq('status', 'Scheduled')
         .limit(1);
 
       if (!activeErr && activeRows && activeRows.length > 0) {
@@ -567,7 +567,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
           .eq('department', form.department)
           .eq('appointment_date', form.appointment_date)
           .eq('appointment_time', form.appointment_time)
-          .in('status', ['Scheduled', 'Checked-in'])
+          .eq('status', 'Scheduled')
           .limit(1);
         if (slotOccupants && slotOccupants.length >= SLOT_CAPACITY) {
           currentSlotOccupied = true;
@@ -595,20 +595,14 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         return;
       }
 
-      let queueNumber = null;
       let referenceCode = null;
       const status = 'Scheduled'; // All new appointments consistently start as Scheduled
 
-      if (form.appointment_type === 'Same-day Appointment') {
-        const sameDayRows = appointments.filter((a) =>
-          a.appointment_date === form.appointment_date &&
-          a.department === form.department &&
-          a.appointment_type === 'Same-day Appointment' &&
-          typeof a.queue_number === 'number',
-        );
-        const maxQueue = sameDayRows.reduce((m, a) => Math.max(m, a.queue_number || 0), 0);
-        queueNumber = maxQueue + 1;
-      } else {
+      // Same-day queue numbers are allocated server-side by the
+      // assign_same_day_queue_number() trigger. The client cannot compute them:
+      // this list is RLS-scoped to the signed-in patient's own rows, so a
+      // client-side MAX() never sees other patients' bookings.
+      if (form.appointment_type !== 'Same-day Appointment') {
         referenceCode = createReferenceCode(form.appointment_date);
       }
 
@@ -623,7 +617,6 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         department: form.department,
         appointment_type: form.appointment_type,
         service_type: form.service_type,
-        queue_number: queueNumber,
         reference_code: referenceCode,
         status,
       };
@@ -679,14 +672,22 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         throw error;
       }
 
-      setNotice(
-        form.appointment_type === 'Same-day Appointment'
-          ? `Appointment reserved! Queue Number: #${queueNumber}. Status: Scheduled. Please proceed to the clinic waiting area.`
-          : `Appointment confirmed! Reference Code: ${referenceCode}. Status: Scheduled.`,
-      );
       setForm((p) => ({ ...p, appointment_time: '' }));
       await loadAppointments();
-      await loadActiveAppointment(form.patient_id);
+      // The queue number is assigned by the database trigger — read it back
+      // rather than trusting a client-side guess.
+      const booked = await loadActiveAppointment(form.patient_id);
+      const assignedQueue = booked?.queue_number ?? null;
+
+      if (form.appointment_type === 'Same-day Appointment') {
+        setNotice(
+          assignedQueue != null
+            ? `Appointment reserved! Queue Number: #${assignedQueue}. Status: Scheduled. Please proceed to the clinic waiting area.`
+            : 'Appointment reserved! Status: Scheduled. Please proceed to the clinic waiting area.',
+        );
+      } else {
+        setNotice(`Appointment confirmed! Reference Code: ${referenceCode}. Status: Scheduled.`);
+      }
 
       // Asynchronously trigger appointment reminder/confirmation notification (evaluates patient_settings preferences)
       try {
@@ -702,7 +703,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               department: form.department,
               service_type: form.service_type,
               appointment_type: form.appointment_type,
-              queue_number: queueNumber,
+              queue_number: assignedQueue,
               reference_code: referenceCode,
               clinician_name: form.clinician_name || 'To be assigned',
             },
@@ -731,10 +732,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: 24 }}>
           <div className="page-header-title-block">
-            <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
+            <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
               {kioskMode ? 'Clinic Kiosk Booking' : 'Schedule'}
             </h2>
-            <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+            <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
               Manage your appointments and available clinic schedules.
             </div>
           </div>
@@ -751,8 +752,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   borderRadius: 10,
                   padding: '12px 16px',
                   color: 'var(--danger, #dc2626)',
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -771,7 +772,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               </div>
             )}
 
-            {/* Active Appointment Notice Card (if student already has Scheduled or Checked-in appointment) */}
+            {/* Active Appointment Notice Card (if student already has a Scheduled appointment) */}
             {activeAppointment && (
               <div
                 className="patient-active-appointment-card"
@@ -788,15 +789,15 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <strong style={{ fontSize: 16, color: 'var(--text)' }}>
+                    <strong style={{ fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>
                       Active Appointment in Progress
                     </strong>
                     <span
                       style={{
-                        background: activeAppointment.status === 'Checked-in' ? 'var(--color-emerald-bg)' : 'var(--color-blue-bg)',
-                        color: activeAppointment.status === 'Checked-in' ? 'var(--color-emerald-text)' : 'var(--color-blue-text)',
-                        fontWeight: 700,
-                        fontSize: 12,
+                        background: 'var(--color-blue-bg)',
+                        color: 'var(--color-blue-text)',
+                        fontWeight: 'var(--font-weight-bold)',
+                        fontSize: 'var(--font-size-xs)',
                         padding: '3px 8px',
                         borderRadius: 6,
                       }}
@@ -805,20 +806,20 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     </span>
                   </div>
                   {activeAppointment.queue_number && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+                    <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
                       Queue #{activeAppointment.queue_number}
                     </span>
                   )}
                   {activeAppointment.reference_code && (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+                    <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
                       Ref: {activeAppointment.reference_code}
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 'var(--font-size-base)', color: 'var(--text-muted)' }}>
                   Schedule: <strong>{activeAppointment.appointment_date}</strong> at <strong>{activeAppointment.appointment_time}</strong> • Department: <strong>{activeAppointment.department}</strong> ({activeAppointment.service_type || 'Consultation'})
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text)', fontWeight: 'var(--font-weight-medium)', marginTop: 2 }}>
                   You already have an active appointment. Please complete or cancel your current appointment before booking another.
                 </div>
               </div>
@@ -849,10 +850,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 }}
               >
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.2px' }}>
                     Select Clinic Department &amp; Preferred Date
                   </h3>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 3 }}>
                     Choose your clinic department, appointment type, and schedule date
                   </div>
                 </div>
@@ -861,7 +862,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 16 }}>
                   {/* Clinic Department */}
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', display: 'block', marginBottom: 8, color: 'var(--text)' }}>
                       Clinic Department
                     </label>
                     <div className="segmented-control-container">
@@ -883,7 +884,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
                   {/* Appointment Mode */}
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8, color: 'var(--text)' }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', display: 'block', marginBottom: 8, color: 'var(--text)' }}>
                       Appointment Mode
                     </label>
                     <div className="segmented-control-container">
@@ -914,7 +915,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 </div>
 
                 {!sameDayHasAvailableSlot && (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 10, padding: '12px 16px', color: 'var(--danger)', fontSize: 13, fontWeight: 500 }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 10, padding: '12px 16px', color: 'var(--danger)', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
                     Same-day slots are currently unavailable for {form.department}. Switched to Future Appointment.
                   </div>
                 )}
@@ -931,7 +932,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     >
                       <ChevronLeftIcon size={14} />
                     </button>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                    <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.2px' }}>
                       {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
                     </div>
                     <button
@@ -953,8 +954,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                         style={{
                           textAlign: 'center',
                           padding: '4px 0',
-                          fontWeight: 700,
-                          fontSize: 11,
+                          fontWeight: 'var(--font-weight-bold)',
+                          fontSize: 'var(--font-size-2xs)',
                           letterSpacing: '0.6px',
                           textTransform: 'uppercase',
                           color: 'var(--muted)',
@@ -1008,7 +1009,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ fontWeight: selected ? 800 : isToday ? 800 : 600, fontSize: 13 }}>
+                            <span style={{ fontWeight: selected ? 'var(--font-weight-extrabold)' : isToday ? 'var(--font-weight-extrabold)' : 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
                               {cell.getDate()}
                             </span>
                             {isToday && (
@@ -1027,8 +1028,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                             <div
                               className="calendar-cell-pct"
                               style={{
-                                fontSize: 11,
-                                fontWeight: 700,
+                                fontSize: 'var(--font-size-2xs)',
+                                fontWeight: 'var(--font-weight-bold)',
                                 marginTop: 2,
                                 padding: '1px 6px',
                                 borderRadius: 6,
@@ -1074,12 +1075,12 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)' }}>
+                      <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)' }}>
                         Selected Time Slot
                       </div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                      <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
                         {form.appointment_time}{' '}
-                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>
+                        <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--muted)' }}>
                           ({formatLongDate(form.appointment_date)})
                         </span>
                       </div>
@@ -1089,8 +1090,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       className="btn small secondary"
                       onClick={() => setShowSlotModal(true)}
                       style={{
-                        fontSize: 12,
-                        fontWeight: 600,
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 'var(--font-weight-semibold)',
                         padding: '6px 14px',
                         borderRadius: 8,
                         flexShrink: 0,
@@ -1108,11 +1109,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       background: 'var(--surface-raised, #f8fafc)',
                       border: '1px dashed var(--border)',
                       color: 'var(--muted)',
-                      fontSize: 13,
+                      fontSize: 'var(--font-size-sm)',
                       lineHeight: 1.5,
                     }}
                   >
-                    <strong style={{ color: 'var(--text)', display: 'block', fontSize: 13, marginBottom: 2 }}>
+                    <strong style={{ color: 'var(--text)', display: 'block', fontSize: 'var(--font-size-sm)', marginBottom: 2 }}>
                       Click any date on the calendar above
                     </strong>
                     Choose a date to open the real-time time slot availability picker.
@@ -1135,10 +1136,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 }}
               >
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.2px' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.2px' }}>
                     Additional Information
                   </h3>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 3 }}>
                     Appointment details and institutional record confirmation
                   </div>
                 </div>
@@ -1147,7 +1148,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Service Type */}
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6, color: 'var(--text)' }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', display: 'block', marginBottom: 6, color: 'var(--text)' }}>
                       Service Type
                     </label>
                     <div className="patient-select-wrapper" style={{ position: 'relative' }}>
@@ -1155,12 +1156,12 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                         className="patient-input-accessible"
                         style={{
                           width: '100%',
-                          fontSize: 14,
+                          fontSize: 'var(--font-size-base)',
                           padding: '10px 36px 10px 14px',
                           borderRadius: 10,
                           background: 'var(--panel, #ffffff)',
                           border: '1px solid var(--border)',
-                          fontWeight: 500,
+                          fontWeight: 'var(--font-weight-medium)',
                         }}
                         value={form.service_type}
                         onChange={(e) => setForm((p) => ({ ...p, service_type: e.target.value }))}
@@ -1189,25 +1190,25 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                         Institutional Record
                       </div>
-                      <span className="immutable-record-badge" style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: 'var(--panel, #ffffff)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                      <span className="immutable-record-badge" style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', background: 'var(--panel, #ffffff)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
                         Immutable • Student Record
                       </span>
                     </div>
 
                     {/* Student ID Number */}
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         Student ID Number
                       </label>
                       <input
                         className="patient-input-accessible"
                         style={{
                           width: '100%',
-                          fontSize: 14,
-                          fontWeight: 600,
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-semibold)',
                           background: 'var(--panel, #ffffff)',
                           cursor: 'not-allowed',
                           color: 'var(--text)',
@@ -1224,15 +1225,15 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
                     {/* Patient Full Name */}
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         Patient Full Name
                       </label>
                       <input
                         className="patient-input-accessible"
                         style={{
                           width: '100%',
-                          fontSize: 14,
-                          fontWeight: 600,
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-semibold)',
                           background: 'var(--panel, #ffffff)',
                           cursor: 'not-allowed',
                           color: 'var(--text)',
@@ -1262,8 +1263,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       width: '100%',
                       justifyContent: 'center',
                       padding: '14px 20px',
-                      fontSize: 15,
-                      fontWeight: 700,
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 'var(--font-weight-bold)',
                       borderRadius: 10,
                       background: (!form.appointment_time || activeAppointment)
                         ? 'var(--surface-raised, #f1f5f9)'
@@ -1286,7 +1287,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                         : 'Confirm & Book Appointment'}
                   </button>
                   {!form.appointment_time && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 10, fontWeight: 500 }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', textAlign: 'center', marginTop: 10, fontWeight: 'var(--font-weight-medium)' }}>
                       Select an available time slot on the calendar to activate confirmation.
                     </div>
                   )}
@@ -1322,8 +1323,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 <div>
                   <div
                     style={{
-                      fontSize: 11,
-                      fontWeight: 700,
+                      fontSize: 'var(--font-size-2xs)',
+                      fontWeight: 'var(--font-weight-bold)',
                       letterSpacing: '0.6px',
                       textTransform: 'uppercase',
                       color: 'var(--muted)',
@@ -1335,8 +1336,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   <h3
                     style={{
                       margin: 0,
-                      fontSize: 18,
-                      fontWeight: 800,
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 'var(--font-weight-extrabold)',
                       color: 'var(--text)',
                       lineHeight: 1.25,
                     }}
@@ -1357,7 +1358,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     justifyContent: 'center',
                     background: 'var(--surface-raised, rgba(0, 0, 0, 0.05))',
                     border: 'none',
-                    fontSize: 16,
+                    fontSize: 'var(--font-size-md)',
                     cursor: 'pointer',
                     color: 'var(--text)',
                     padding: 0,
@@ -1420,14 +1421,14 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       {/* Left: Time & Remaining Capacity */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, textAlign: 'left' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                          <span style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                             {row.time}
                           </span>
                           {selected && (
                             <span
                               style={{
-                                fontSize: 11,
-                                fontWeight: 800,
+                                fontSize: 'var(--font-size-2xs)',
+                                fontWeight: 'var(--font-weight-extrabold)',
                                 color: 'var(--primary, #8b0000)',
                                 background: 'rgba(140, 21, 21, 0.12)',
                                 padding: '2px 8px',
@@ -1438,7 +1439,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)' }}>
                           {row.isExpired
                             ? 'Slot ended'
                             : !isAvailable
@@ -1451,8 +1452,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       <div>
                         <span
                           style={{
-                            fontSize: 12,
-                            fontWeight: 700,
+                            fontSize: 'var(--font-size-xs)',
+                            fontWeight: 'var(--font-weight-bold)',
                             borderRadius: 9999,
                             padding: '4px 10px',
                             display: 'inline-flex',
@@ -1492,8 +1493,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   className="btn secondary"
                   onClick={() => setShowSlotModal(false)}
                   style={{
-                    fontSize: 14,
-                    fontWeight: 600,
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 'var(--font-weight-semibold)',
                     padding: '8px 18px',
                     borderRadius: 8,
                   }}
@@ -1531,12 +1532,12 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 {notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('already') || notice.toLowerCase().includes('unable')
                   ? 'Booking Notice'
                   : 'Appointment Confirmed'}
               </h3>
-              <div style={{ color: notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('already') || notice.toLowerCase().includes('unable') ? 'var(--danger)' : 'var(--text)', fontSize: 14, lineHeight: 1.5 }}>
+              <div style={{ color: notice.toLowerCase().includes('failed') || notice.toLowerCase().includes('already') || notice.toLowerCase().includes('unable') ? 'var(--danger)' : 'var(--text)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
                 {notice}
               </div>
               <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>

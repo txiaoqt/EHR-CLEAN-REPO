@@ -127,19 +127,19 @@ main.login-page-main,
 .page-header h2,
 .patient-page-title {
   margin: 0;
-  font-size: 26px;
-  font-weight: 800;
+  font-size: var(--font-size-page-title);
+  font-weight: var(--font-weight-extrabold);
   color: var(--text);
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: var(--line-height-tight, 1.25);
 }
 
 .page-header-subtitle,
 .patient-page-subtitle {
   margin-top: 4px;
   color: var(--muted, #64748b);
-  font-size: 14px;
-  font-weight: 400;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
   line-height: 1.45;
 }
 
@@ -188,7 +188,7 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
   flex-wrap: wrap;
   min-width: 0;
@@ -252,7 +252,7 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 14px !important;
+  font-size: var(--font-size-base) !important;
   font-family: inherit !important;
   color: var(--text) !important;
   width: 100% !important;
@@ -273,7 +273,7 @@ main.login-page-main,
 .dashboard-search-input::placeholder,
 .dashboard-search-wrapper input[type="search"]::placeholder {
   color: var(--text-muted) !important;
-  font-size: 14px !important;
+  font-size: var(--font-size-base) !important;
   opacity: 0.85;
 }
 
@@ -296,7 +296,7 @@ main.login-page-main,
   padding: 11px 14px;
   cursor: pointer;
   border-bottom: 1px solid var(--border-subtle, var(--border));
-  font-size: 14px;
+  font-size: var(--font-size-base);
   transition: background-color 0.12s ease;
 }
 
@@ -517,8 +517,8 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-medium) !important;
   color: var(--text) !important;
   width: 100% !important;
   padding: 0 8px !important;
@@ -560,8 +560,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -609,8 +609,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 12px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -698,8 +698,8 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-medium) !important;
   color: var(--text) !important;
   width: 100% !important;
   padding: 0 8px !important;
@@ -741,8 +741,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -852,8 +852,8 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-medium) !important;
   color: var(--text) !important;
   width: 100% !important;
   padding: 0 8px !important;
@@ -895,8 +895,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1008,8 +1008,8 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-medium) !important;
   color: var(--text) !important;
   width: 100% !important;
   padding: 0 8px !important;
@@ -1051,8 +1051,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1127,8 +1127,8 @@ main.login-page-main,
 }
 
 .reports-date-label {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   color: var(--text-muted, #64748b);
   cursor: pointer;
   user-select: none;
@@ -1139,8 +1139,8 @@ main.login-page-main,
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-semibold) !important;
   color: var(--text) !important;
   padding: 4px 6px !important;
   margin: 0 !important;
@@ -1166,8 +1166,8 @@ main.login-page-main,
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 34px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1294,7 +1294,7 @@ main.login-page-main,
 }
 
 .settings-switch input[type="checkbox"]:checked + .settings-switch-slider {
-  background-color: var(--color-primary, #c92a2a);
+  background-color: var(--color-emerald, #10b981);
 }
 
 .settings-switch input[type="checkbox"]:checked + .settings-switch-slider::before {
@@ -1302,12 +1302,12 @@ main.login-page-main,
 }
 
 .settings-switch input[type="checkbox"]:focus-visible + .settings-switch-slider {
-  box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.3);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
 }
 
 .settings-switch-text {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   color: var(--text-muted);
   min-width: 28px;
 }
@@ -1441,12 +1441,12 @@ main.login-page-main,
 
   .nav-group-label {
     padding: 0 10px !important;
-    font-size: 11px !important;
+    font-size: var(--font-size-2xs) !important;
   }
 
   .menu-item {
     padding: 8px 10px !important;
-    font-size: 13px !important;
+    font-size: var(--font-size-sm) !important;
     gap: 10px !important;
   }
 
@@ -1472,7 +1472,7 @@ main.login-page-main,
   }
 
   .dashboard-kpis-grid .kpi-value {
-    font-size: 22px !important;
+    font-size: var(--font-size-xl) !important;
   }
 
   .dashboard-analytics-grid {
@@ -1494,7 +1494,7 @@ main.login-page-main,
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     column-gap: 8px;
     row-gap: 4px;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
   }
 
   .appointments-date-grid,
@@ -1904,8 +1904,8 @@ main.login-page-main,
   .patient-page-title,
   .patient-messages-title,
   .page-header-title {
-    font-size: 20px !important;
-    font-weight: 800 !important;
+    font-size: var(--font-size-xl) !important;
+    font-weight: var(--font-weight-extrabold) !important;
     color: var(--text) !important;
     line-height: 1.25 !important;
     margin: 0 !important;
@@ -1917,8 +1917,8 @@ main.login-page-main,
   .patient-messages-sub,
   .page-header > div > div,
   .page-header > div:nth-child(2) {
-    font-size: 13px !important;
-    font-weight: 400 !important;
+    font-size: var(--font-size-sm) !important;
+    font-weight: var(--font-weight-normal) !important;
     color: var(--muted, #64748b) !important;
     line-height: 1.45 !important;
     margin-top: 4px !important;
@@ -1948,7 +1948,7 @@ main.login-page-main,
   }
 
   .booking-col-card h3 {
-    font-size: 16px !important;
+    font-size: var(--font-size-md) !important;
   }
 
   /* De-cramp Segmented Controls on Mobile */
@@ -1961,7 +1961,7 @@ main.login-page-main,
   .booking-col-card .segmented-tab-btn {
     padding: 8px 10px !important;
     min-width: 0 !important;
-    font-size: 13px !important;
+    font-size: var(--font-size-sm) !important;
     border-radius: 7px !important;
   }
 
@@ -1993,13 +1993,13 @@ main.login-page-main,
   }
 
   .booking-calendar-card .calendar-weekday-header {
-    font-size: 11px !important;
+    font-size: var(--font-size-2xs) !important;
     padding: 2px 0 !important;
   }
 
   /* Availability pill inside calendar cell on mobile: single line, no multi-line wrap */
   .calendar-cell-pct {
-    font-size: 11px !important;
+    font-size: var(--font-size-2xs) !important;
     padding: 1px 4px !important;
     white-space: nowrap !important;
     margin-top: 1px !important;
@@ -2027,7 +2027,7 @@ main.login-page-main,
 
   .booking-student-card .immutable-record-badge {
     white-space: nowrap !important;
-    font-size: 11px !important;
+    font-size: var(--font-size-2xs) !important;
     padding: 2px 6px !important;
     flex-shrink: 0 !important;
   }
@@ -2054,7 +2054,7 @@ main.login-page-main,
   .booking-submit-btn {
     width: 100% !important;
     padding: 12px 16px !important;
-    font-size: 14px !important;
+    font-size: var(--font-size-base) !important;
     min-height: 44px !important;
     border-radius: 10px !important;
   }
@@ -2126,7 +2126,7 @@ main.login-page-main,
   }
 
   .patient-settings-card h3 {
-    font-size: 16px !important;
+    font-size: var(--font-size-md) !important;
   }
 
   .patient-settings-card .card-header-block {
@@ -2149,7 +2149,7 @@ main.login-page-main,
     flex: 1 !important;
     justify-content: center !important;
     padding: 8px 6px !important;
-    font-size: 13px !important;
+    font-size: var(--font-size-sm) !important;
     min-width: 0 !important;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -2213,8 +2213,8 @@ main.login-page-main,
     margin-top: 14px !important;
     justify-content: center !important;
     align-items: center !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: var(--font-weight-semibold) !important;
     border-radius: 8px !important;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -2335,7 +2335,7 @@ main.login-page-main,
   min-width: 120px;
   padding: 10px 14px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -2356,7 +2356,7 @@ main.login-page-main,
 .segmented-tab-btn.active {
   background: var(--panel, #ffffff);
   color: var(--text, #0f172a);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   border-color: var(--border);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
@@ -2364,7 +2364,7 @@ main.login-page-main,
 .segmented-tab-btn:not(.active) {
   background: transparent;
   color: var(--muted, #64748b);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .calendar-cell-btn {
@@ -2409,7 +2409,7 @@ main.login-page-main,
 }
 
 .patient-input-accessible {
-  font-size: 16px !important;
+  font-size: var(--font-size-md) !important;
   min-height: 44px !important;
   height: 44px !important;
   border-radius: 10px !important;
@@ -2434,8 +2434,8 @@ main.login-page-main,
   transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease, background-color 150ms ease;
   border-radius: 12px !important;
   padding: 13px 28px !important;
-  font-size: 15px !important;
-  font-weight: 700 !important;
+  font-size: var(--font-size-base) !important;
+  font-weight: var(--font-weight-bold) !important;
 }
 
 .booking-submit-btn:active:not(:disabled) {
@@ -2477,8 +2477,8 @@ main.login-page-main,
   justify-content: center;
   padding: 6px 14px;
   border-radius: 9999px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-muted, #64748b);
   background: var(--bg, #f8fafc);
   border: 1px solid var(--border);
@@ -2505,7 +2505,7 @@ main.login-page-main,
 
 .patient-event-pill-btn.active {
   background: var(--color-primary, #c92a2a);
-  color: #ffffff;
+  color: var(--text-on-primary);
   border-color: var(--color-primary, #c92a2a);
   box-shadow: 0 2px 6px rgba(201, 42, 42, 0.25);
 }
@@ -2571,8 +2571,8 @@ main.login-page-main,
 }
 
 .patient-event-date-month {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-extrabold);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-primary, #c92a2a);
@@ -2581,8 +2581,8 @@ main.login-page-main,
 }
 
 .patient-event-date-day {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
   color: var(--text);
   line-height: 1;
 }
@@ -2601,16 +2601,16 @@ main.login-page-main,
 }
 
 .patient-event-org-label {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--text-muted, #64748b);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
 .patient-event-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   color: var(--text);
   line-height: 1.35;
   word-break: break-word;
@@ -2619,31 +2619,31 @@ main.login-page-main,
 /* Refined Category Badges */
 .patient-badge-blood {
   background: rgba(225, 29, 72, 0.1) !important;
-  color: #be123c !important;
+  color: var(--color-rose-text) !important;
   border: 1px solid rgba(225, 29, 72, 0.2) !important;
 }
 
 .patient-badge-vaccine {
   background: rgba(14, 165, 233, 0.1) !important;
-  color: #0284c7 !important;
+  color: var(--color-sky-text) !important;
   border: 1px solid rgba(14, 165, 233, 0.2) !important;
 }
 
 .patient-badge-seminar {
   background: rgba(99, 102, 241, 0.1) !important;
-  color: #4338ca !important;
+  color: var(--color-indigo-text) !important;
   border: 1px solid rgba(99, 102, 241, 0.2) !important;
 }
 
 .patient-badge-mission {
   background: rgba(16, 185, 129, 0.1) !important;
-  color: #047857 !important;
+  color: var(--color-emerald-text) !important;
   border: 1px solid rgba(16, 185, 129, 0.2) !important;
 }
 
 .patient-badge-general {
   background: rgba(100, 116, 139, 0.1) !important;
-  color: #475569 !important;
+  color: var(--grey-600) !important;
   border: 1px solid rgba(100, 116, 139, 0.2) !important;
 }
 
@@ -2663,9 +2663,9 @@ main.login-page-main,
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--text);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .patient-event-meta-icon {
@@ -2682,7 +2682,7 @@ main.login-page-main,
 /* Event Description */
 .patient-event-description {
   color: var(--text-muted, #64748b);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   margin: 0 0 14px 0;
   display: -webkit-box;
@@ -2798,14 +2798,14 @@ main.login-page-main,
 }
 
 .patient-calendar-popover-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
   line-height: 1.25;
 }
 
 .patient-calendar-popover-sub {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--text-muted, #64748b);
   line-height: 1.2;
   margin-top: 2px;
@@ -2815,8 +2815,8 @@ main.login-page-main,
   width: 100%;
   justify-content: center;
   min-height: 38px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -2851,14 +2851,14 @@ main.login-page-main,
 }
 
 .patient-events-empty-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   color: var(--text);
   margin-bottom: 4px;
 }
 
 .patient-events-empty-desc {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--text-muted, #64748b);
   max-width: 400px;
   margin: 0 auto 16px;
@@ -2870,8 +2870,8 @@ main.login-page-main,
   align-items: center;
   justify-content: center;
   padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -2964,29 +2964,29 @@ main.login-page-main,
 :root[data-theme="dark"] .patient-sidebar .menu-item.active,
 :root[data-theme="dark"] .menu-item.active {
   background: rgba(255, 255, 255, 0.08) !important;
-  color: #f8fafc !important;
+  color: var(--text) !important;
 }
 :root[data-theme="dark"] .patient-sidebar .menu-item.active .nav-icon,
 :root[data-theme="dark"] .menu-item.active .nav-icon {
-  color: #fda4af !important;
+  color: var(--color-primary-text) !important;
 }
 :root[data-theme="dark"] .patient-sidebar .menu-item.active .nav-label,
 :root[data-theme="dark"] .menu-item.active .nav-label {
-  color: #f8fafc !important;
-  font-weight: 600 !important;
+  color: var(--text) !important;
+  font-weight: var(--font-weight-semibold) !important;
 }
 
 /* Dark Mode Calendar Cell & Availability Softening (TASK-036) */
 :root[data-theme="dark"] .calendar-cell-btn.selected {
   background: #881318 !important;
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  color: #ffffff !important;
+  color: var(--text-on-primary) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
 }
 
 :root[data-theme="dark"] .calendar-cell-pct {
   background: rgba(52, 211, 153, 0.1) !important;
-  color: #34d399 !important;
-  font-weight: 600 !important;
+  color: var(--color-emerald) !important;
+  font-weight: var(--font-weight-semibold) !important;
 }
 

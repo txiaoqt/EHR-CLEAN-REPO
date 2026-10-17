@@ -380,11 +380,11 @@ const PatientProfilePortal = () => {
 
   const renderField = (label, value, placeholder = 'None provided') => (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
         {label}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 4, minHeight: 20 }}>
-        {value || <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{placeholder}</span>}
+      <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginTop: 4, minHeight: 20 }}>
+        {value || <span style={{ color: 'var(--muted)', fontWeight: 'var(--font-weight-normal)' }}>{placeholder}</span>}
       </div>
     </div>
   );
@@ -394,8 +394,8 @@ const PatientProfilePortal = () => {
       <section className="page patient-profile-page" style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', boxSizing: 'border-box' }}>
         {/* Page Header */}
         <div className="page-header patient-profile-header" style={{ marginBottom: 16 }}>
-          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Profile</h2>
-          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>Profile</h2>
+          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
             Manage your student details, emergency contacts, and personal health information.
           </div>
         </div>
@@ -434,7 +434,7 @@ const PatientProfilePortal = () => {
                     <button
                       type="button"
                       className="btn secondary small"
-                      style={{ fontSize: 11, padding: '3px 8px', width: '100%', whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', width: '100%', whiteSpace: 'nowrap' }}
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingPhoto}
                     >
@@ -444,7 +444,7 @@ const PatientProfilePortal = () => {
                       <button
                         type="button"
                         className="btn secondary small"
-                        style={{ fontSize: 11, padding: '2px 8px', width: '100%', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+                        style={{ fontSize: 'var(--font-size-2xs)', padding: '2px 8px', width: '100%', color: 'var(--danger)', whiteSpace: 'nowrap' }}
                         onClick={handleRemovePhoto}
                         disabled={uploadingPhoto}
                       >
@@ -459,18 +459,18 @@ const PatientProfilePortal = () => {
               <div className="patient-identity-info-section" style={{ flex: 1, minWidth: 0 }}>
                 {!editing ? (
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word' }}>
                       {profile.name || user?.name || 'Student Patient'}
                     </h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                      <span className="badge badge-primary" style={{ fontWeight: 700, fontSize: 11, padding: '2px 8px' }}>
+                      <span className="badge badge-primary" style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}>
                         Student / Patient
                       </span>
-                      <span className="badge badge-success" style={{ fontWeight: 600, fontSize: 11, padding: '2px 8px' }}>
+                      <span className="badge badge-success" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}>
                         Active
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, fontWeight: 500 }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 6, fontWeight: 'var(--font-weight-medium)' }}>
                       <strong style={{ color: 'var(--text)' }}>{profile.id || user?.patient_id || 'TUPM-XX-XXXX'}</strong>
                       <span style={{ margin: '0 6px' }}>·</span>
                       <span>{profile.year ? `Year ${profile.year}` : 'Year not specified'}</span>
@@ -480,15 +480,15 @@ const PatientProfilePortal = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
                     {/* Read-Only Full Name in Edit Mode */}
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
+                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
                         Full Name
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word', paddingTop: 2 }}>
+                      <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word', paddingTop: 2 }}>
                         {profile.name || user?.name || 'Student Patient'}
                       </div>
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 3, color: 'var(--text)' }}>
+                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 3, color: 'var(--text)' }}>
                         Academic Year Level
                       </label>
                       <input
@@ -496,7 +496,7 @@ const PatientProfilePortal = () => {
                         type="number"
                         min="1"
                         max="6"
-                        style={{ width: '100%', height: 36, fontSize: 13 }}
+                        style={{ width: '100%', height: 36, fontSize: 'var(--font-size-sm)' }}
                         value={profile.year}
                         onChange={(e) => setProfile((p) => ({ ...p, year: e.target.value }))}
                       />
@@ -512,7 +512,7 @@ const PatientProfilePortal = () => {
                 <button
                   type="button"
                   className="btn primary"
-                  style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: 13 }}
+                  style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: 'var(--font-size-sm)' }}
                   onClick={() => setEditing(true)}
                 >
                   Edit Profile
@@ -522,7 +522,7 @@ const PatientProfilePortal = () => {
                   <button
                     type="button"
                     className="btn secondary"
-                    style={{ padding: '8px 14px', fontSize: 13 }}
+                    style={{ padding: '8px 14px', fontSize: 'var(--font-size-sm)' }}
                     onClick={handleCancel}
                     disabled={saving}
                   >
@@ -531,7 +531,7 @@ const PatientProfilePortal = () => {
                   <button
                     type="button"
                     className="btn primary"
-                    style={{ padding: '8px 16px', fontSize: 13 }}
+                    style={{ padding: '8px 16px', fontSize: 'var(--font-size-sm)' }}
                     onClick={save}
                     disabled={saving}
                   >
@@ -548,7 +548,7 @@ const PatientProfilePortal = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Section 1: Contact Information */}
           <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
               Contact Information
             </h3>
             {!editing ? (
@@ -559,7 +559,7 @@ const PatientProfilePortal = () => {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Contact Phone Number
                   </label>
                   <input
@@ -571,7 +571,7 @@ const PatientProfilePortal = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Current Address
                   </label>
                   <input
@@ -588,7 +588,7 @@ const PatientProfilePortal = () => {
 
           {/* Section 2: Emergency Contact */}
           <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
               Emergency Contact
             </h3>
             {!editing ? (
@@ -599,7 +599,7 @@ const PatientProfilePortal = () => {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Emergency Contact Person
                   </label>
                   <input
@@ -611,7 +611,7 @@ const PatientProfilePortal = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Emergency Phone Number
                   </label>
                   <input
@@ -628,7 +628,7 @@ const PatientProfilePortal = () => {
 
           {/* Section 3: Health Information */}
           <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
               Health Information
             </h3>
             {!editing ? (
@@ -640,7 +640,7 @@ const PatientProfilePortal = () => {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Blood Type
                   </label>
                   <input
@@ -652,7 +652,7 @@ const PatientProfilePortal = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Known Allergies
                   </label>
                   <input
@@ -664,7 +664,7 @@ const PatientProfilePortal = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                     Current Active Medications
                   </label>
                   <input
@@ -681,7 +681,7 @@ const PatientProfilePortal = () => {
 
           {/* Section 4: Medical History & Clinical Notes */}
           <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
               Medical History & Clinical Notes
             </h3>
             {!editing ? (
@@ -690,7 +690,7 @@ const PatientProfilePortal = () => {
               </div>
             ) : (
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                   Patient Medical Notes & Special Conditions
                 </label>
                 <textarea
@@ -725,11 +725,11 @@ const PatientProfilePortal = () => {
               gap: 12,
             }}
           >
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{msg}</span>
+            <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>{msg}</span>
             <button
               type="button"
               className="btn small secondary"
-              style={{ padding: '2px 8px', fontSize: 12 }}
+              style={{ padding: '2px 8px', fontSize: 'var(--font-size-xs)' }}
               onClick={() => setMsgOpen(false)}
             >
               Dismiss

@@ -133,7 +133,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
             <div className="sidebar-user-role">
               <span>{displayRole}</span>
               <span className="status-dot"></span>
-              <span style={{ color: '#10b981', fontWeight: 600 }}>Active</span>
+              <span style={{ color: 'var(--color-emerald)', fontWeight: 'var(--font-weight-semibold)' }}>Active</span>
             </div>
           </div>
         </div>
@@ -228,10 +228,10 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 Sign Out?
               </h3>
-              <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 14, lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
                 Are you sure you want to log out of the Patient Portal?
               </p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>

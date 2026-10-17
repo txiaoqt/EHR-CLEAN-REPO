@@ -6,6 +6,11 @@
 /* ========================================================= */
 :root[data-theme="light"],
 :root {
+  /* Tells the UA which scheme native controls (select popups, date pickers,
+     scrollbars) should render in. Without this the <select> option list stays
+     light-on-light even when the app is in dark mode. */
+  color-scheme: light;
+
   /* Surfaces & Canvas */
   --bg: #f8fafc;
   --panel: #ffffff;
@@ -43,6 +48,11 @@
   --primary: #c92a2a;
   --primary-hover: #a61e1e;
   --accent: #c92a2a;
+  --color-primary-text: #c92a2a;
+  --color-chart-rose: #c92a2a;
+  --color-chart-rose-bg: rgba(201, 42, 42, 0.08);
+  --color-chart-bar: #c92a2a;
+  --color-chart-donut-border: #ffffff;
   --danger: #dc2626;
 
   /* Semantic Category & Status Colors */
@@ -67,6 +77,14 @@
   --color-rose: #e11d48;
   --color-rose-bg: rgba(225, 29, 72, 0.08);
   --color-rose-text: #be123c;
+
+  --color-sky: #0ea5e9;
+  --color-sky-bg: rgba(14, 165, 233, 0.1);
+  --color-sky-text: #0284c7;
+
+  --color-indigo: #6366f1;
+  --color-indigo-bg: rgba(99, 102, 241, 0.1);
+  --color-indigo-text: #4338ca;
 
   /* Greys Spectrum */
   --grey-50: #ffffff;
@@ -97,6 +115,10 @@
 /* 2. DARK THEME TOKENS (Deliberate Modern Healthcare Slate) */
 /* ========================================================= */
 :root[data-theme="dark"] {
+  /* Native controls follow the dark scheme — fixes the light <select> option
+     list appearing over a dark UI. */
+  color-scheme: dark;
+
   /* Surfaces & Canvas: Layered Deep Slate (No Harsh Pure Black) */
   --bg: #0f172a;               /* Page background: slate-900 */
   --panel: #1e293b;            /* Primary card / panel surface: slate-800 */
@@ -135,12 +157,24 @@
   --primary-hover: #991b1b;
   --accent: #b4232a;
   --color-primary-text: #fda4af;
+  --color-chart-rose: #f87171;
+  --color-chart-rose-bg: rgba(248, 113, 113, 0.14);
+  --color-chart-bar: rgba(248, 113, 113, 0.78);
+  --color-chart-donut-border: #1e293b;
 
   /* Danger & Status: Soft, Readable Coral-Rose (Eliminates Neon Glare) */
   --danger: #f87171;
   --color-rose: #f87171;
   --color-rose-bg: rgba(248, 113, 113, 0.14);
   --color-rose-text: #fda4af;
+
+  --color-sky: #38bdf8;
+  --color-sky-bg: rgba(56, 189, 248, 0.14);
+  --color-sky-text: #7dd3fc;
+
+  --color-indigo: #a5b4fc;
+  --color-indigo-bg: rgba(165, 180, 252, 0.14);
+  --color-indigo-text: #c7d2fe;
 
   /* Semantic Status Colors: Calibrated for Dark Surfaces (Not Neon) */
   --color-purple: #a78bfa;

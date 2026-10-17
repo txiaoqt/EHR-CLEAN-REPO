@@ -5,6 +5,9 @@ import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, canViewSensitiveField, getSensitivityLevel, isPhysician } from '../accessControl.js';
 import { CloseIcon } from '../components/icons/Icons.jsx';
+import ExportDialog from '../components/export/ExportDialog.jsx';
+import { useTableExport } from '../hooks/useTableExport.js';
+import { patientProfileExportConfig } from '../utils/export/configs.js';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 import { Line } from 'react-chartjs-2';
 import {
@@ -17,9 +20,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
 ChartJS.register(
   CategoryScale,
@@ -30,6 +30,17 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+// Renders the encounter's vitals object for the expanded visit detail.
+const formatVisitVitals = (vitals) => {
+  if (!vitals || typeof vitals !== 'object') return 'Not recorded';
+  const parts = [];
+  if (vitals.temp) parts.push(`Temp ${vitals.temp}°C`);
+  if (vitals.pulse) parts.push(`Pulse ${vitals.pulse} bpm`);
+  if (vitals.bp) parts.push(`BP ${vitals.bp}`);
+  if (vitals.weight) parts.push(`Weight ${vitals.weight} kg`);
+  return parts.length ? parts.join(' · ') : 'Not recorded';
+};
 
 const PatientProfile = () => {
   const { user } = useAuth();
@@ -64,7 +75,8 @@ const PatientProfile = () => {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [previewSrc, setPreviewSrc] = useState(null);
   const [previewType, setPreviewType] = useState(null);
-  const pdfExportRef = useRef(); // hidden export container
+  // Which visit's full clinical note is expanded in the Encounters card.
+  const [expandedVisit, setExpandedVisit] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -111,10 +123,10 @@ const PatientProfile = () => {
 
           // encounters
           const { data: encData } = await supabase
-            .from('encounters')
-            .select('*')
+            .from('medical_log_visits')
+            .select('visit_id, visit_source, appointment_id, encounter_id, visit_date, chief_complaint, hpi, physical_exam, assessment_plan, clinician_name, appointment_status, encounter_status, vitals, sensitivity_level, patient_signature_path, patient_signed_at')
             .eq('patient_id', id)
-            .order('created_at', { ascending: false });
+            .order('visit_date', { ascending: false });
           if (mounted) setEncounters(encData || []);
 
           // vitals history from encounters
@@ -181,6 +193,25 @@ const PatientProfile = () => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // One row per encounter for this patient; demographics go into the header so
+  // a printed record identifies who it belongs to.
+  const exporter = useTableExport({
+    config: patientProfileExportConfig,
+    getRows: () => encounters,
+    getFilterLines: () => (patient
+      ? [
+          `Patient: ${patient.name || '—'} (${patient.id || '—'})`,
+          `Year Level: ${patient.year ?? '—'}`,
+          `Sensitivity: ${patient.sensitivity_level || 'normal'}`,
+          `Allergies: ${patient.allergies || 'none recorded'}`,
+          `Medications: ${patient.medications || 'none recorded'}`,
+        ]
+      : []),
+    itemLabel: 'encounters',
+    count: encounters.length,
+    onMessage: showToast,
+  });
 
   const saveData = async (field, value) => {
     setSaving(true);
@@ -270,75 +301,6 @@ const PatientProfile = () => {
     navigate('/encounter', { state: { patientId: id, patientName: patient?.name } });
   };
 
-  // ------------------ PDF Export ------------------
-  const exportPdf = async () => {
-    if (!patient) return;
-    try {
-      const exportNode = pdfExportRef.current;
-      if (!exportNode) {
-        showToast('Export failed: export node missing', 'error');
-        return;
-      }
-
-      // wait for images (logo) to load
-      const imgs = Array.from(exportNode.querySelectorAll('img'));
-      await Promise.all(
-        imgs.map((img) => {
-          return new Promise((resolve) => {
-            if (img.complete) return resolve();
-            img.onload = img.onerror = () => resolve();
-          });
-        })
-      );
-
-      const scale = 2;
-      const canvas = await html2canvas(exportNode, {
-        scale,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        windowWidth: exportNode.scrollWidth,
-        windowHeight: exportNode.scrollHeight,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = pageWidth / canvasWidth;
-      const renderedHeight = canvasHeight * ratio;
-
-      if (renderedHeight <= pageHeight) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, renderedHeight);
-      } else {
-        let y = 0;
-        const pxPerPage = Math.floor(pageHeight / ratio);
-        while (y < canvasHeight) {
-          const pageCanvas = document.createElement('canvas');
-          pageCanvas.width = canvasWidth;
-          pageCanvas.height = Math.min(pxPerPage, canvasHeight - y);
-          const ctx = pageCanvas.getContext('2d');
-          ctx.drawImage(canvas, 0, y, canvasWidth, pageCanvas.height, 0, 0, canvasWidth, pageCanvas.height);
-          const pageData = pageCanvas.toDataURL('image/jpeg', 0.95);
-          if (y > 0) pdf.addPage();
-          const h = pageCanvas.height * ratio;
-          pdf.addImage(pageData, 'JPEG', 0, 0, pageWidth, h);
-          y += pxPerPage;
-        }
-      }
-
-      pdf.save(`patient_${patient.id}_profile.pdf`);
-      showToast('PDF exported');
-    } catch (err) {
-      console.error('Export error', err);
-      showToast('Export failed', 'error');
-    }
-  };
-  // ------------------ end PDF Export ------------------
 
   if (loading) return <main className="main"><div className="card">Loading...</div></main>;
   if (!patient) return <main className="main"><div className="card">Patient not found.</div></main>;
@@ -350,7 +312,7 @@ const PatientProfile = () => {
           {/* 1. PATIENT HERO CARD */}
           <div className="card patient-hero-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Top row: Patient Avatar + Identity + Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <img
                   src={patientAvatar || avatarPlaceholder}
@@ -369,28 +331,28 @@ const PatientProfile = () => {
                     e.target.src = avatarPlaceholder;
                   }}
                 />
-                <div>
+                <div className="page-header-title-block">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>
+                    <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
                       {patient.name}
                     </h1>
-                    <span className="badge badge-neutral" style={{ fontSize: 12, padding: '2px 8px', fontWeight: 600 }}>
+                    <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', fontWeight: 'var(--font-weight-semibold)' }}>
                       Student / Patient
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className="page-header-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>Clinical Record Profile</span>
                   </div>
                 </div>
               </div>
 
               {/* Action group */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="page-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button
                   type="button"
                   className="btn secondary"
                   onClick={() => navigate('/patients')}
-                  style={{ height: 38, padding: '0 16px', fontSize: 13, fontWeight: 600 }}
+                  style={{ height: 38, padding: '0 16px', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}
                 >
                   ← Back
                 </button>
@@ -403,7 +365,7 @@ const PatientProfile = () => {
                     aria-haspopup="true"
                     aria-expanded={showMore}
                     aria-label="More patient actions"
-                    style={{ height: 38, width: 38, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
+                    style={{ height: 38, width: 38, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-md)' }}
                   >
                     ⋯
                   </button>
@@ -439,14 +401,14 @@ const PatientProfile = () => {
                             borderRadius: 6,
                             textAlign: 'left',
                             color: 'var(--text)',
-                            fontSize: 13,
+                            fontSize: 'var(--font-size-sm)',
                             cursor: 'pointer',
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-raised)')}
                           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                           onClick={() => {
                             setShowMore(false);
-                            exportPdf();
+                            exporter.openExport();
                           }}
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -454,7 +416,7 @@ const PatientProfile = () => {
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                           </svg>
-                          <span>Export PDF</span>
+                          <span>Export</span>
                         </button>
                       )}
 
@@ -474,7 +436,7 @@ const PatientProfile = () => {
                               borderRadius: 6,
                               textAlign: 'left',
                               color: 'var(--danger)',
-                              fontSize: 13,
+                              fontSize: 'var(--font-size-sm)',
                               cursor: 'pointer',
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)')}
@@ -510,28 +472,28 @@ const PatientProfile = () => {
               }}
             >
               <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                   TUP ID
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
                   {patient.id}
                 </div>
               </div>
 
               <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                   Year Level
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
                   {patient.year ? `Year ${patient.year}` : 'Not Specified'}
                 </div>
               </div>
 
               <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                   Last Visit
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
                   {patient.last_visit_date ? new Date(patient.last_visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                 </div>
               </div>
@@ -546,19 +508,24 @@ const PatientProfile = () => {
               <div className="card" style={{ padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Encounters</h3>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Clinical visit history</div>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Encounters</h3>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Clinical visit history</div>
                   </div>
-                  <button type="button" className="btn" onClick={goToNewEncounter} style={{ fontSize: 13, padding: '7px 14px' }}>
+                  <button type="button" className="btn" onClick={goToNewEncounter} style={{ fontSize: 'var(--font-size-sm)', padding: '7px 14px' }}>
                     + New Encounter
                   </button>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 380, overflowY: 'auto', paddingRight: 2 }}>
                   {encounters.length > 0 ? (
-                    encounters.map((enc) => (
+                    encounters.map((enc) => {
+                      const isOpen = expandedVisit === enc.visit_id;
+                      const statusLabel = (enc.encounter_status || enc.appointment_status || '').toLowerCase() === 'completed'
+                        ? 'Completed'
+                        : enc.visit_source === 'appointment' ? 'Scheduled' : 'Recorded';
+                      return (
                       <div
-                        key={enc.id}
+                        key={enc.visit_id}
                         style={{
                           padding: '12px 14px',
                           background: 'var(--surface-raised, rgba(0,0,0,0.02))',
@@ -569,28 +536,66 @@ const PatientProfile = () => {
                           gap: 4,
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
-                            {new Date(enc.encounter_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)' }}>
+                            {enc.visit_date ? new Date(enc.visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                           </span>
-                          {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
-                            <span className="badge badge-warning" style={{ fontSize: 11, padding: '1px 6px' }}>
-                              Sensitivity: {getSensitivityLevel(enc)}
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px' }}>
+                              {statusLabel}
                             </span>
-                          )}
+                            {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
+                              <span className="badge badge-warning" style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px' }}>
+                                Sensitivity: {getSensitivityLevel(enc)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                        <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>
                           {enc.chief_complaint || 'No complaint recorded'}
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.45 }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 }}>
                           {canViewSensitiveField(user, 'assessment_plan', enc)
                             ? enc.assessment_plan || 'No assessment/plan details'
                             : '[Restricted for nurse access]'}
                         </div>
+
+                        {/* The form captures more than the summary above — without
+                            this the note cannot be read where it is reviewed. */}
+                        <button
+                          type="button"
+                          className="btn secondary small"
+                          onClick={() => setExpandedVisit(isOpen ? null : enc.visit_id)}
+                          aria-expanded={isOpen}
+                          style={{ alignSelf: 'flex-start', marginTop: 4, fontSize: 'var(--font-size-xs)', padding: '3px 10px' }}
+                        >
+                          {isOpen ? 'Hide details' : 'Show details'}
+                        </button>
+
+                        {isOpen && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {[
+                              ['Clinician', enc.clinician_name || '—'],
+                              ['History of present illness', enc.hpi || 'Not recorded'],
+                              ['Physical exam', enc.physical_exam || 'Not recorded'],
+                              ['Vitals', formatVisitVitals(enc.vitals)],
+                            ].map(([label, value]) => (
+                              <div key={label}>
+                                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                  {label}
+                                </div>
+                                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                                  {value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--surface-raised)', borderRadius: 8, border: '1px dashed var(--border)' }}>
+                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', background: 'var(--surface-raised)', borderRadius: 8, border: '1px dashed var(--border)' }}>
                       No encounters found — click New Encounter to record a visit.
                     </div>
                   )}
@@ -601,8 +606,8 @@ const PatientProfile = () => {
               <div className="card" style={{ padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Medications / Allergies</h3>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Active prescriptions & sensitivities</div>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Medications / Allergies</h3>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Active prescriptions & sensitivities</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
@@ -624,7 +629,7 @@ const PatientProfile = () => {
 
                 {/* Medications Subsection */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
+                  <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
                     Medications
                   </div>
                   {editingMedications ? (
@@ -634,7 +639,7 @@ const PatientProfile = () => {
                         value={newMedications}
                         onChange={(e) => setNewMedications(e.target.value)}
                         placeholder="List active medications..."
-                        style={{ width: '100%', minHeight: 80, fontSize: 14 }}
+                        style={{ width: '100%', minHeight: 80, fontSize: 'var(--font-size-base)' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -669,7 +674,7 @@ const PatientProfile = () => {
                         background: 'var(--surface-raised, rgba(0,0,0,0.02))',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         lineHeight: 1.5,
                       }}
                     >
@@ -682,7 +687,7 @@ const PatientProfile = () => {
 
                 {/* Allergies Subsection */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
+                  <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
                     Allergies
                   </div>
                   {editingAllergies ? (
@@ -692,7 +697,7 @@ const PatientProfile = () => {
                         value={newAllergies}
                         onChange={(e) => setNewAllergies(e.target.value)}
                         placeholder="List known allergies..."
-                        style={{ width: '100%', minHeight: 80, fontSize: 14 }}
+                        style={{ width: '100%', minHeight: 80, fontSize: 'var(--font-size-base)' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -727,7 +732,7 @@ const PatientProfile = () => {
                         background: 'var(--surface-raised, rgba(0,0,0,0.02))',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         lineHeight: 1.5,
                       }}
                     >
@@ -746,8 +751,8 @@ const PatientProfile = () => {
               <div className="card" style={{ padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Vitals</h3>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Recorded physiological indicators</div>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Vitals</h3>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Recorded physiological indicators</div>
                   </div>
                 </div>
 
@@ -786,7 +791,7 @@ const PatientProfile = () => {
                       }}
                     />
                   ) : (
-                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--surface-raised)', borderRadius: 8, border: '1px dashed var(--border)' }}>
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', background: 'var(--surface-raised)', borderRadius: 8, border: '1px dashed var(--border)' }}>
                       No vitals history recorded.
                     </div>
                   )}
@@ -795,7 +800,7 @@ const PatientProfile = () => {
                 {/* Vitals History Summary Rows */}
                 {vitalsHistory.length > 0 && (
                   <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Recent Measurements
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
@@ -814,15 +819,15 @@ const PatientProfile = () => {
                             gap: 6,
                           }}
                         >
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                             {new Date(vital.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                             {i === 0 && (
-                              <span className="badge badge-neutral" style={{ fontSize: 11, padding: '1px 5px', marginLeft: 6 }}>
+                              <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 5px', marginLeft: 6 }}>
                                 Latest
                               </span>
                             )}
                           </span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
                             Temp {vital.temp ? `${vital.temp}°C` : '—'} · Pulse {vital.pulse ? `${vital.pulse} bpm` : '—'} · BP {vital.bp || '—'} · Wt {vital.weight ? `${vital.weight} kg` : '—'}
                           </span>
                         </div>
@@ -836,8 +841,8 @@ const PatientProfile = () => {
               <div className="card" style={{ padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Notes</h3>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Clinical notes and observations</div>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Notes</h3>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Clinical notes and observations</div>
                   </div>
                   <button
                     type="button"
@@ -856,7 +861,7 @@ const PatientProfile = () => {
                         value={newNotes}
                         onChange={(e) => setNewNotes(e.target.value)}
                         placeholder="Add clinical observation notes..."
-                        style={{ width: '100%', minHeight: 120, fontSize: 14 }}
+                        style={{ width: '100%', minHeight: 120, fontSize: 'var(--font-size-base)' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button
@@ -892,7 +897,7 @@ const PatientProfile = () => {
                         border: '1px solid var(--border)',
                         minHeight: 100,
                         color: 'var(--text)',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         lineHeight: 1.6,
                       }}
                     >
@@ -907,6 +912,16 @@ const PatientProfile = () => {
           </div>
 
           {/* toast */}
+          <ExportDialog
+            open={exporter.exportOpen}
+            config={patientProfileExportConfig}
+            rowCount={exporter.rowCount}
+            itemLabel="encounters"
+            busy={exporter.exportBusy}
+            onClose={exporter.closeExport}
+            onExport={exporter.runExport}
+          />
+
           {toast && (
             <div
               style={{
@@ -917,10 +932,10 @@ const PatientProfile = () => {
                 zIndex: 2000,
                 padding: '10px 16px',
                 borderRadius: 8,
-                color: 'white',
-                fontWeight: 700,
-                backgroundColor: toast.type === 'error' ? '#dc3545' : '#28a745',
-                boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
+                color: 'var(--text-on-primary)',
+                fontWeight: 'var(--font-weight-bold)',
+                backgroundColor: toast.type === 'error' ? 'var(--danger)' : 'var(--success)',
+                boxShadow: 'var(--shadow-lg)',
               }}
             >
               {toast.text}
@@ -954,7 +969,7 @@ const PatientProfile = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <strong style={{ fontSize: 17, color: 'var(--text)' }}>Preview</strong>
+                  <strong style={{ fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>Preview</strong>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <button type="button" className="btn secondary small" onClick={() => download(previewSrc)}>
                       Download
@@ -1010,7 +1025,7 @@ const PatientProfile = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Patient Record</h3>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--danger)' }}>Delete Patient Record</h3>
                   <button
                     type="button"
                     className="modal-close-btn"
@@ -1024,12 +1039,12 @@ const PatientProfile = () => {
                     <CloseIcon size={18} />
                   </button>
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5, marginBottom: 14 }}>
                   Are you sure you want to delete <strong>{patient.name}</strong> ({patient.id})? This action cannot be undone.
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>
                     Enter your password to verify:
                   </label>
                   <input
@@ -1042,7 +1057,7 @@ const PatientProfile = () => {
                 </div>
 
                 {deleteMessage && (
-                  <div style={{ color: 'var(--danger)', fontSize: 12, fontWeight: 600, marginBottom: 14 }}>
+                  <div style={{ color: 'var(--danger)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 14 }}>
                     {deleteMessage}
                   </div>
                 )}
@@ -1069,152 +1084,6 @@ const PatientProfile = () => {
         </section>
       </main>
 
-      {/* Hidden export container for PDF */}
-      <div
-        id="pdf-export"
-        style={{ position: 'absolute', left: -9999, top: -9999, width: 794, padding: 24, background: '#fff' }}
-        aria-hidden
-        ref={pdfExportRef}
-      >
-        <div style={{ width: '100%', background: '#fff', color: '#111', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          {/* Header: logo + clinic title */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-            <img src={tupehrlogo} alt="TUP Clinic logo" style={{ width: 100, height: 'auto', objectFit: 'contain' }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>
-                Technological University of the Philippines (TUP) Manila – Clinic
-              </div>
-              <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700 }}>Patient's Profile</div>
-            </div>
-          </div>
-
-          <hr style={{ border: 'none', borderTop: '1px solid #ddd', marginBottom: 12 }} />
-
-          {/* Patient Summary Table */}
-          <section style={{ marginBottom: 14 }}>
-            <table className="export-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th colSpan="2" style={{ textAlign: 'left', paddingBottom: 8, fontSize: 14, fontWeight: 800 }}>
-                    Patient Summary
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>Name</td>
-                  <td style={{ padding: '8px 6px' }}>{patient.name}</td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>ID</td>
-                  <td style={{ padding: '8px 6px' }}>{patient.id}</td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>Year</td>
-                  <td style={{ padding: '8px 6px' }}>{patient.year}</td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>Last Visit</td>
-                  <td style={{ padding: '8px 6px' }}>{patient.last_visit_date || '—'}</td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>Medications</td>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'pre-wrap' }}>{patient.medications || 'None'}</td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, padding: '8px 6px' }}>Allergies</td>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'pre-wrap' }}>{patient.allergies || 'None'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-
-          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '12px 0' }} />
-
-          {/* Encounters Table */}
-          <section style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Encounters</div>
-            {encounters.length > 0 ? (
-              <table className="export-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Date</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Chief Complaint</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Assessment / Plan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {encounters.map((enc, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: '8px 6px' }}>{new Date(enc.encounter_date).toLocaleDateString()}</td>
-                      <td style={{ padding: '8px 6px', whiteSpace: 'pre-wrap' }}>{enc.chief_complaint || 'N/A'}</td>
-                      <td style={{ padding: '8px 6px', whiteSpace: 'pre-wrap' }}>
-                        {canViewSensitiveField(user, 'assessment_plan', enc)
-                          ? enc.assessment_plan || 'N/A'
-                          : '[Restricted for nurse access]'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ color: '#666' }}>No encounters recorded.</div>
-            )}
-          </section>
-
-          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '12px 0' }} />
-
-          {/* Vitals Table */}
-          <section style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Vitals History</div>
-            {vitalsHistory.length > 0 ? (
-              <table className="export-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Date</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Temp (°C)</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Pulse (bpm)</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>BP</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px' }}>Weight (kg)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vitalsHistory.map((v, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: '8px 6px' }}>{new Date(v.date).toLocaleDateString()}</td>
-                      <td style={{ padding: '8px 6px' }}>{v.temp ?? '—'}</td>
-                      <td style={{ padding: '8px 6px' }}>{v.pulse ?? '—'}</td>
-                      <td style={{ padding: '8px 6px' }}>{v.bp ?? '—'}</td>
-                      <td style={{ padding: '8px 6px' }}>{v.weight ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ color: '#666' }}>No vitals recorded.</div>
-            )}
-          </section>
-
-          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '12px 0' }} />
-
-          {/* Notes */}
-          <section style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Notes</div>
-            <div style={{ whiteSpace: 'pre-wrap', padding: '8px 6px', borderRadius: 4, background: '#fafafa' }}>
-              {patient.notes || 'No notes'}
-            </div>
-          </section>
-
-          {/* Exported timestamp & footer */}
-          <div style={{ marginTop: 20, fontSize: 12, color: '#666' }}>
-            Exported on: {new Date().toLocaleString()}
-          </div>
-
-          <div style={{ marginTop: 4, color: '#666', fontSize: 12 }}>
-            Exported from EHR system
-          </div>
-        </div>
-      </div>
     </>
   );
 };

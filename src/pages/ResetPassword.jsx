@@ -196,7 +196,7 @@ const ResetPassword = () => {
     color: '#333333',
     background: '#ffffff',
     outline: 'none',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-base)',
     transition: 'all 0.2s ease',
   };
 
@@ -263,8 +263,8 @@ const ResetPassword = () => {
           <h1
             style={{
               margin: 0,
-              fontSize: 18,
-              fontWeight: 800,
+              fontSize: 'var(--font-size-lg)',
+              fontWeight: 'var(--font-weight-extrabold)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
               textAlign: 'center',
@@ -272,14 +272,14 @@ const ResetPassword = () => {
           >
             TUP Manila Clinic
           </h1>
-          <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 500 }}>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 'var(--font-weight-medium)' }}>
             Patient Portal · Password Recovery
           </div>
         </div>
 
         {/* State 1: Checking Verification */}
         {recoveryState === 'checking' && (
-          <div style={{ textAlign: 'center', padding: '30px 10px', color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', padding: '30px 10px', color: 'rgba(255,255,255,0.9)', fontSize: 'var(--font-size-base)' }}>
             Verifying password reset authorization…
           </div>
         )}
@@ -297,16 +297,16 @@ const ResetPassword = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px auto',
-                fontSize: 24,
-                fontWeight: 800,
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 'var(--font-weight-extrabold)',
               }}
             >
               ✓
             </div>
-            <h2 style={{ margin: '0 0 10px 0', fontSize: 22, fontWeight: 800, fontFamily: '"Merriweather", serif' }}>
+            <h2 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', fontFamily: '"Merriweather", serif' }}>
               Password Updated
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+            <p style={{ fontSize: 'var(--font-size-base)', color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
               Your password has been successfully updated. You may now log in to the Patient Portal with your new credentials.
             </p>
             <button
@@ -316,12 +316,12 @@ const ResetPassword = () => {
                 width: '100%',
                 background: '#ffffff',
                 color: '#931b1b',
-                fontWeight: 700,
+                fontWeight: 'var(--font-weight-bold)',
                 padding: '11px 16px',
                 borderRadius: 10,
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: 'var(--font-size-base)',
                 boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
                 transition: 'all 0.15s ease',
               }}
@@ -334,10 +334,10 @@ const ResetPassword = () => {
         {/* State 3: Invalid or Expired Recovery Context */}
         {recoveryState === 'invalid' && (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <h2 style={{ margin: '0 0 10px 0', fontSize: 20, fontWeight: 800, fontFamily: '"Merriweather", serif' }}>
+            <h2 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', fontFamily: '"Merriweather", serif' }}>
               Password Reset Link Expired
             </h2>
-            <p style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 22px 0' }}>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255, 255, 255, 0.92)', lineHeight: 1.5, margin: '0 0 22px 0' }}>
               This password reset link has expired or is no longer valid. Please request a new password reset email to continue.
             </p>
             <button
@@ -347,12 +347,12 @@ const ResetPassword = () => {
                 width: '100%',
                 background: '#ffffff',
                 color: '#931b1b',
-                fontWeight: 700,
+                fontWeight: 'var(--font-weight-bold)',
                 padding: '11px 16px',
                 borderRadius: 10,
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: 'var(--font-size-base)',
                 boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
                 transition: 'all 0.15s ease',
               }}
@@ -369,20 +369,20 @@ const ResetPassword = () => {
               style={{
                 textAlign: 'center',
                 margin: '0 0 6px 0',
-                fontSize: 22,
-                fontWeight: 800,
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-extrabold)',
                 fontFamily: '"Merriweather", serif',
               }}
             >
               Reset Password
             </h2>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 18px 0' }}>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 18px 0' }}>
               Enter your new password below.
             </p>
 
             {/* New Password Field */}
             <div style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label htmlFor="new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>
+              <label htmlFor="new-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
                 New Password
               </label>
               <div style={{ position: 'relative', width: '100%' }}>
@@ -423,7 +423,7 @@ const ResetPassword = () => {
 
             {/* Confirm New Password Field */}
             <div style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label htmlFor="confirm-new-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>
+              <label htmlFor="confirm-new-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
                 Confirm New Password
               </label>
               <div style={{ position: 'relative', width: '100%' }}>
@@ -461,7 +461,7 @@ const ResetPassword = () => {
                 </button>
               </div>
               {newPass && confirmNewPass && !passwordsMatch && (
-                <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
+                <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
                   Passwords do not match.
                 </div>
               )}
@@ -477,12 +477,12 @@ const ResetPassword = () => {
                   width: '100%',
                   background: isSubmitDisabled ? 'rgba(255,255,255,0.35)' : '#ffffff',
                   color: isSubmitDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                  fontWeight: 700,
+                  fontWeight: 'var(--font-weight-bold)',
                   padding: '11px 14px',
                   borderRadius: 10,
                   border: 'none',
                   cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
-                  fontSize: 14,
+                  fontSize: 'var(--font-size-base)',
                   boxShadow: isSubmitDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.12)',
                   transition: 'all 0.15s ease',
                 }}
@@ -492,7 +492,7 @@ const ResetPassword = () => {
             </div>
 
             {/* Back to Login */}
-            <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+            <div style={{ marginTop: 18, textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.92)' }}>
               <button
                 type="button"
                 onClick={handleBackToLogin}
@@ -500,11 +500,11 @@ const ResetPassword = () => {
                   background: 'none',
                   border: 'none',
                   color: '#ffffff',
-                  fontWeight: 700,
+                  fontWeight: 'var(--font-weight-bold)',
                   textDecoration: 'underline',
                   cursor: 'pointer',
                   padding: 0,
-                  fontSize: 13,
+                  fontSize: 'var(--font-size-sm)',
                 }}
               >
                 Back to Login
@@ -541,10 +541,10 @@ const ResetPassword = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: '#0f172a' }}>
               {msg.toLowerCase().includes('success') ? 'Success' : 'Notice'}
             </h3>
-            <div style={{ color: msg.toLowerCase().includes('error') || msg.toLowerCase().includes('unable') ? '#dc2626' : '#334155', fontSize: 14, lineHeight: 1.5 }}>
+            <div style={{ color: msg.toLowerCase().includes('error') || msg.toLowerCase().includes('unable') ? 'var(--danger, #dc2626)' : 'var(--text-secondary, #334155)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
               {msg}
             </div>
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
@@ -554,8 +554,8 @@ const ResetPassword = () => {
                 style={{
                   padding: '8px 18px',
                   borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)',
                   cursor: 'pointer',
                   background: '#f1f5f9',
                   color: '#0f172a',

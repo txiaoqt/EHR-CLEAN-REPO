@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { ChevronDownIcon } from '../components/icons/Icons.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
+import { useTablePagination } from '../hooks/useTablePagination.js';
 
 const CATEGORIES = ['All', 'Blood Drive', 'Vaccination', 'Health Seminar', 'Medical Mission', 'General'];
 const STATUSES = ['All', 'published', 'draft', 'cancelled', 'archived'];
@@ -88,6 +90,10 @@ const Events = () => {
       return matchesSearch && matchesCat && matchesStatus;
     });
   }, [events, searchQuery, categoryFilter, statusFilter]);
+
+  const eventPagination = useTablePagination(filteredEvents, {
+    resetKey: `${searchQuery}|${categoryFilter}|${statusFilter}`,
+  });
 
   // KPI calculations
   const stats = useMemo(() => {
@@ -397,35 +403,37 @@ const Events = () => {
     <main className="main">
       <section className="page events-page">
         {/* Header */}
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Clinic Events & Announcements</h2>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+        <div className="page-header">
+          <div className="page-header-title-block">
+            <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)' }}>Clinic Events & Announcements</h1>
+            <p className="page-header-subtitle" style={{ margin: '4px 0 0 0', fontSize: 'var(--font-size-base)', color: 'var(--muted)' }}>
               Schedule university health drives, medical missions, and notify registered students.
-            </div>
+            </p>
           </div>
-          <button className="btn primary" onClick={openCreateModal}>
-            + Create Event
-          </button>
+          <div className="page-header-actions">
+            <button className="btn primary" onClick={openCreateModal}>
+              + Create Event
+            </button>
+          </div>
         </div>
 
         {/* KPI Cards */}
         <div className="events-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
           <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Total Events</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{stats.total}</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Total Events</div>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 4 }}>{stats.total}</div>
           </div>
           <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Published Events</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--success, #16a34a)', marginTop: 4 }}>{stats.published}</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Published Events</div>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--success, #16a34a)', marginTop: 4 }}>{stats.published}</div>
           </div>
           <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Upcoming Events</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary, #8b0000)', marginTop: 4 }}>{stats.upcoming}</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Upcoming Events</div>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--primary, #8b0000)', marginTop: 4 }}>{stats.upcoming}</div>
           </div>
           <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Drafts & Inactive</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--muted)', marginTop: 4 }}>{stats.drafts}</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Drafts & Inactive</div>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--muted)', marginTop: 4 }}>{stats.drafts}</div>
           </div>
         </div>
 
@@ -440,7 +448,7 @@ const Events = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Category:</span>
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Category:</span>
               <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                 <select
                   className="input"
@@ -456,7 +464,7 @@ const Events = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Status:</span>
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Status:</span>
               <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                 <select
                   className="input"
@@ -498,39 +506,39 @@ const Events = () => {
                 ) : filteredEvents.length === 0 ? (
                   <tr>
                     <td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>No events found</div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>Create a new clinic event or adjust your filters.</div>
+                      <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-md)' }}>No events found</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 4 }}>Create a new clinic event or adjust your filters.</div>
                     </td>
                   </tr>
                 ) : (
-                  filteredEvents.map((ev) => (
+                  eventPagination.pageRows.map((ev) => (
                     <tr key={ev.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 15 }}>{ev.title}</div>
+                        <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', fontSize: 'var(--font-size-base)' }}>{ev.title}</div>
                         {ev.description && (
-                          <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4, maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ color: 'var(--muted)', fontSize: 'var(--font-size-sm)', marginTop: 4, maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {ev.description}
                           </div>
                         )}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <span className={`badge ${getCategoryBadgeClass(ev.category)}`} style={{ fontWeight: 600 }}>
+                        <span className={`badge ${getCategoryBadgeClass(ev.category)}`} style={{ fontWeight: 'var(--font-weight-semibold)' }}>
                           {ev.category || 'General'}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 14 }}>
-                        <div style={{ fontWeight: 600 }}>{ev.event_date}</div>
+                      <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-base)' }}>
+                        <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{ev.event_date}</div>
                         {(ev.start_time || ev.end_time) && (
-                          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 2 }}>
+                          <div style={{ color: 'var(--muted)', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
                             {ev.start_time || ''} {ev.end_time ? `– ${ev.end_time}` : ''}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 14, color: 'var(--muted)' }}>
+                      <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-base)', color: 'var(--muted)' }}>
                         {ev.location || '—'}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <span className={`badge ${getStatusBadgeClass(ev.status)}`} style={{ fontWeight: 600, textTransform: 'capitalize' }}>
+                        <span className={`badge ${getStatusBadgeClass(ev.status)}`} style={{ fontWeight: 'var(--font-weight-semibold)', textTransform: 'capitalize' }}>
                           {ev.status}
                         </span>
                       </td>
@@ -568,6 +576,16 @@ const Events = () => {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            page={eventPagination.page}
+            totalPages={eventPagination.totalPages}
+            startIndex={eventPagination.startIndex}
+            endIndex={eventPagination.endIndex}
+            total={eventPagination.total}
+            onPageChange={eventPagination.goToPage}
+            itemLabel="events"
+          />
         </div>
 
         {/* Create / Edit Modal */}
@@ -600,12 +618,12 @@ const Events = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 16px 0', fontSize: 20, fontWeight: 700 }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)' }}>
                 {modalMode === 'create' ? 'Create New Event' : 'Edit Event'}
               </h3>
               <form onSubmit={handleSaveEvent} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                     Event Title *
                   </label>
                   <input
@@ -620,7 +638,7 @@ const Events = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                       Category
                     </label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -638,7 +656,7 @@ const Events = () => {
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                       Event Date *
                     </label>
                     <input
@@ -654,7 +672,7 @@ const Events = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                       Start Time
                     </label>
                     <input
@@ -666,7 +684,7 @@ const Events = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                       End Time
                     </label>
                     <input
@@ -680,7 +698,7 @@ const Events = () => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                     Location
                   </label>
                   <input
@@ -693,7 +711,7 @@ const Events = () => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                     Description & Instructions
                   </label>
                   <textarea
@@ -706,7 +724,7 @@ const Events = () => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4 }}>
                     Publication Status
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -768,15 +786,15 @@ const Events = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 21, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 Email Registered Students
               </h3>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 18, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--font-size-base)', color: 'var(--text)', marginBottom: 18, lineHeight: 1.5 }}>
                 You are about to dispatch an email announcement for:
-                <div style={{ fontWeight: 700, fontSize: 16, marginTop: 4, color: 'var(--text)' }}>
+                <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)', marginTop: 4, color: 'var(--text)' }}>
                   {emailEvent.title}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
                   Scheduled: {emailEvent.event_date} {emailEvent.start_time ? `at ${emailEvent.start_time}` : ''} ({emailEvent.location || 'TUP Clinic'})
                 </div>
               </div>
@@ -785,8 +803,8 @@ const Events = () => {
               <div style={{ background: 'var(--bg, #f8fafc)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 18 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Recipient Audience</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Recipient Audience</div>
+                    <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 2 }}>
                       Eligible: {recipients.length} &bull; Selected: {selectedRecipientIds.size}
                     </div>
                   </div>
@@ -794,7 +812,7 @@ const Events = () => {
                     <button
                       type="button"
                       className="btn secondary"
-                      style={{ fontSize: 12, padding: '5px 12px', height: 'auto', borderRadius: 6 }}
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '5px 12px', height: 'auto', borderRadius: 6 }}
                       onClick={() => setShowFullRecipientModal(true)}
                     >
                       View All ({recipients.length})
@@ -817,7 +835,7 @@ const Events = () => {
                       borderRadius: 8,
                       border: '1px solid var(--border)',
                       background: 'var(--panel, #ffffff)',
-                      fontSize: 13,
+                      fontSize: 'var(--font-size-sm)',
                       color: 'var(--text)',
                       boxSizing: 'border-box',
                     }}
@@ -834,8 +852,8 @@ const Events = () => {
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         background: 'var(--panel)',
-                        fontSize: 13,
-                        fontWeight: 500,
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
                         color: 'var(--text)',
                         appearance: 'none',
                         WebkitAppearance: 'none',
@@ -882,8 +900,8 @@ const Events = () => {
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         background: 'var(--panel)',
-                        fontSize: 13,
-                        fontWeight: 500,
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
                         color: 'var(--text)',
                         appearance: 'none',
                         WebkitAppearance: 'none',
@@ -934,8 +952,8 @@ const Events = () => {
                     border: '1px solid var(--border)',
                     borderRadius: 8,
                     marginBottom: 10,
-                    fontSize: 13,
-                    fontWeight: 600,
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)',
                   }}
                 >
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
@@ -947,18 +965,18 @@ const Events = () => {
                     />
                     <span>Select All Visible</span>
                   </label>
-                  <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--font-size-xs)' }}>
                     {visibleSelectedCount} of {filteredRecipients.length} visible selected
                   </span>
                 </div>
 
                 {/* Recipient Preview List */}
                 {loadingRecipients ? (
-                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--muted)' }}>
+                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                     Loading eligible recipients...
                   </div>
                 ) : filteredRecipients.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--muted)' }}>
+                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                     No registered students match the selected filters.
                   </div>
                 ) : (
@@ -989,26 +1007,26 @@ const Events = () => {
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                 {r.name}
                               </span>
                               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                                 {r.blood_type && (
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                  <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-text, #fda4af)', padding: '2px 8px', background: 'var(--color-rose-bg, rgba(153, 27, 27, 0.08))', border: '1px solid var(--border)', borderRadius: 6 }}>
                                     {r.blood_type}
                                   </span>
                                 )}
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', padding: '2px 8px', background: 'var(--surface-raised)', borderRadius: 6 }}>
                                   Year {r.year}
                                 </span>
                               </div>
                             </div>
-                            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                               <span>{r.student_id}</span>
                               <span>&bull;</span>
                               <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.email}</span>
                               <span>&bull;</span>
-                              <span style={{ color: r.blood_type ? '#991b1b' : 'var(--muted)', fontWeight: r.blood_type ? 600 : 400 }}>
+                              <span style={{ color: r.blood_type ? 'var(--color-primary-text, #fda4af)' : 'var(--muted)', fontWeight: r.blood_type ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)' }}>
                                 Blood Type: {r.blood_type || 'Not specified'}
                               </span>
                             </div>
@@ -1024,9 +1042,9 @@ const Events = () => {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#991b1b',
-                            fontSize: 12,
-                            fontWeight: 600,
+                            color: 'var(--color-primary-text, #fda4af)',
+                            fontSize: 'var(--font-size-xs)',
+                            fontWeight: 'var(--font-weight-semibold)',
                             cursor: 'pointer',
                             textDecoration: 'underline',
                           }}
@@ -1052,7 +1070,7 @@ const Events = () => {
                       emailResult.error
                         ? 'var(--danger, #dc2626)'
                         : emailResult.partial
-                        ? '#eab308'
+                        ? 'var(--color-amber, #eab308)'
                         : 'var(--success, #16a34a)'
                     }`,
                     borderRadius: 10,
@@ -1061,24 +1079,24 @@ const Events = () => {
                   }}
                 >
                   {emailResult.error ? (
-                    <div style={{ color: 'var(--danger, #dc2626)', fontSize: 14 }}>
+                    <div style={{ color: 'var(--danger, #dc2626)', fontSize: 'var(--font-size-base)' }}>
                       <strong>Email Announcement Failed:</strong> {emailResult.error}
                     </div>
                   ) : emailResult.partial ? (
                     <div>
-                      <div style={{ fontWeight: 700, color: '#b45309', fontSize: 15 }}>
-                        ⚠️ Announcement Partially Sent
+                      <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--color-amber-text, #b45309)', fontSize: 'var(--font-size-base)' }}>
+                        Announcement Partially Sent
                       </div>
-                      <div style={{ fontSize: 13, marginTop: 4, color: 'var(--text)' }}>
+                      <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 4, color: 'var(--text)' }}>
                         <strong>{emailResult.success_count}</strong> of <strong>{emailResult.recipient_count}</strong> emails were sent successfully. (<strong>{emailResult.failed_count}</strong> failed)
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--success, #16a34a)', fontSize: 16 }}>
-                        ✓ Email sent successfully
+                      <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--success, #16a34a)', fontSize: 'var(--font-size-md)' }}>
+                        Email sent successfully
                       </div>
-                      <div style={{ fontSize: 13, marginTop: 4, color: 'var(--text)' }}>
+                      <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 4, color: 'var(--text)' }}>
                         {emailResult.success_count === 1
                           ? 'Email sent successfully to 1 selected recipient.'
                           : `Email sent successfully to all ${emailResult.success_count} selected recipients.`}
@@ -1086,7 +1104,7 @@ const Events = () => {
                     </div>
                   )}
                   {emailResult.warning && (
-                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.15)', color: '#b45309', fontSize: 12, lineHeight: 1.4 }}>
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed var(--border)', color: 'var(--color-amber-text, #b45309)', fontSize: 'var(--font-size-xs)', lineHeight: 1.4 }}>
                       <strong>Notice:</strong> {emailResult.warning}
                     </div>
                   )}
@@ -1152,19 +1170,19 @@ const Events = () => {
             >
               <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                     Select Recipients ({selectedRecipientIds.size} of {recipients.length} Selected)
                   </h3>
                   <button
                     type="button"
                     className="btn secondary"
-                    style={{ fontSize: 12, padding: '4px 8px' }}
+                    style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px' }}
                     onClick={() => setShowFullRecipientModal(false)}
                   >
                     ✕
                   </button>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 4 }}>
                   Filter and select students eligible to receive this clinic announcement.
                 </div>
 
@@ -1183,7 +1201,7 @@ const Events = () => {
                       borderRadius: 8,
                       border: '1px solid var(--border)',
                       background: 'var(--panel, #ffffff)',
-                      fontSize: 13,
+                      fontSize: 'var(--font-size-sm)',
                       color: 'var(--text)',
                       boxSizing: 'border-box',
                     }}
@@ -1200,8 +1218,8 @@ const Events = () => {
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         background: 'var(--panel)',
-                        fontSize: 13,
-                        fontWeight: 500,
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
                         color: 'var(--text)',
                         appearance: 'none',
                         WebkitAppearance: 'none',
@@ -1248,8 +1266,8 @@ const Events = () => {
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         background: 'var(--panel)',
-                        fontSize: 13,
-                        fontWeight: 500,
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
                         color: 'var(--text)',
                         appearance: 'none',
                         WebkitAppearance: 'none',
@@ -1300,8 +1318,8 @@ const Events = () => {
                     border: '1px solid var(--border)',
                     borderRadius: 8,
                     marginTop: 10,
-                    fontSize: 13,
-                    fontWeight: 600,
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)',
                   }}
                 >
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
@@ -1313,7 +1331,7 @@ const Events = () => {
                     />
                     <span>Select All Visible Students</span>
                   </label>
-                  <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--font-size-xs)' }}>
                     {visibleSelectedCount} of {filteredRecipients.length} visible selected
                   </span>
                 </div>
@@ -1322,7 +1340,7 @@ const Events = () => {
               {/* Scrollable Recipient Grid */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {filteredRecipients.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 14 }}>
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                     No registered students match the selected filters.
                   </div>
                 ) : (
@@ -1352,26 +1370,26 @@ const Events = () => {
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                            <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>
                               {r.name}
                             </span>
                             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                               {r.blood_type && (
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#991b1b', padding: '2px 8px', background: 'rgba(153, 27, 27, 0.08)', border: '1px solid rgba(153, 27, 27, 0.18)', borderRadius: 6 }}>
+                                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-text, #fda4af)', padding: '2px 8px', background: 'var(--color-rose-bg, rgba(153, 27, 27, 0.08))', border: '1px solid var(--border)', borderRadius: 6 }}>
                                   {r.blood_type}
                                 </span>
                               )}
-                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', padding: '2px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', padding: '2px 8px', background: 'var(--surface-raised)', borderRadius: 6 }}>
                                 Year {r.year}
                               </span>
                             </div>
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             <span><strong>ID:</strong> {r.student_id}</span>
                             <span>&bull;</span>
                             <span>{r.email}</span>
                             <span>&bull;</span>
-                            <span style={{ color: r.blood_type ? '#991b1b' : 'var(--muted)', fontWeight: r.blood_type ? 600 : 400 }}>
+                            <span style={{ color: r.blood_type ? 'var(--color-primary-text, #fda4af)' : 'var(--muted)', fontWeight: r.blood_type ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)' }}>
                               Blood Type: {r.blood_type || 'Not specified'}
                             </span>
                           </div>
@@ -1384,7 +1402,7 @@ const Events = () => {
 
               {/* Footer */}
               <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg, #f8fafc)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
                   Selected: <strong>{selectedRecipientIds.size}</strong> of {recipients.length} students
                 </div>
                 <button
@@ -1427,10 +1445,10 @@ const Events = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--danger)' }}>
                 Delete Event
               </h3>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--font-size-base)', color: 'var(--text)', marginBottom: 20 }}>
                 Are you sure you want to permanently delete event <strong>"{deleteEvent.title}"</strong>?
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

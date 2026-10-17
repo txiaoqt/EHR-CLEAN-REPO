@@ -1,6 +1,13 @@
 export const CLINIC_TIMEZONE = 'Asia/Manila';
 export const CLINIC_OPEN_HOUR = 7;
 export const CLINIC_CLOSE_HOUR = 19;
+
+// The no-show auto-cancel cutoff is deliberately SEPARATE from CLINIC_CLOSE_HOUR.
+// It is 17:00 Asia/Manila, enforced in the database by
+// public.expire_no_show_appointments() (migration 20261017150000, run every 15
+// minutes by pg_cron). A patient who has not arrived by 5pm is treated as a
+// no-show even though the clinic stays open until 7pm.
+export const NO_SHOW_CUTOFF_HOUR = 17;
 const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
 

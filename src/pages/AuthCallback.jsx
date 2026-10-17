@@ -158,10 +158,10 @@ const AuthCallback = () => {
           background: '#fff',
         }}
       />
-      <div style={{ fontSize: 16, fontWeight: 600, color: '#f8fafc', marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', color: '#f8fafc', marginBottom: 6 }}>
         Verifying Authentication
       </div>
-      <div style={{ fontSize: 13, color: '#94a3b8' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: '#94a3b8' }}>
         Please wait while we establish your secure session…
       </div>
     </div>

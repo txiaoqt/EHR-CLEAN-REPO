@@ -2,7 +2,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
-import { MessagesIcon, SearchIcon, SendIcon, ChevronLeftIcon, CheckIcon, CloseIcon } from '../components/icons/Icons.jsx';
+import { MessagesIcon, SearchIcon, SendIcon, ChevronLeftIcon, CheckIcon, CloseIcon, PlusIcon } from '../components/icons/Icons.jsx';
+import MessageAttachment from '../components/MessageAttachment.jsx';
+import MessageReactions from '../components/MessageReactions.jsx';
+import {
+  uploadMessageAttachment,
+  deleteMessageAttachments,
+  validateAttachmentFile,
+  formatFileSize,
+  RESOLVED_PHOTO_NOTICE,
+} from '../utils/messageAttachments.js';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 
 // Date/time formatting helpers
@@ -58,9 +67,15 @@ const StaffPatientMessages = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
+  // messageId -> [{ id, emoji, reactor_auth_user_id, reactor_name }]
+  const [reactions, setReactions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  // Photo attached to the next reply.
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef(null);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [msgNotice, setMsgNotice] = useState('');
@@ -68,6 +83,8 @@ const StaffPatientMessages = () => {
 
   // Resolve Confirmation Modal State
   const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [resolving, setResolving] = useState(false);
 
   const chatScrollRef = useRef(null);
@@ -348,6 +365,26 @@ const StaffPatientMessages = () => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'patient_message_reactions' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const r = payload.new;
+            setReactions((prev) =>
+              (prev[r.message_id] || []).some((x) => x.id === r.id)
+                ? prev
+                : { ...prev, [r.message_id]: [...(prev[r.message_id] || []), r] }
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const r = payload.old;
+            setReactions((prev) => ({
+              ...prev,
+              [r.message_id]: (prev[r.message_id] || []).filter((x) => x.id !== r.id),
+            }));
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -394,24 +431,116 @@ const StaffPatientMessages = () => {
     return groups;
   }, [messages]);
 
+  // ---- Reactions -----------------------------------------------------------
+  // Fetched for whichever messages are on screen, so a long history is not
+  // pulled down just to draw a few chips.
+  const reactionMessageKey = useMemo(
+    () => messages.map((m) => m.id).filter(Boolean).join(','),
+    [messages]
+  );
+
+  useEffect(() => {
+    const ids = reactionMessageKey ? reactionMessageKey.split(',') : [];
+    if (ids.length === 0) { setReactions({}); return undefined; }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('patient_message_reactions')
+        .select('id, message_id, emoji, reactor_auth_user_id, reactor_name')
+        .in('message_id', ids);
+      if (cancelled || error) return;
+
+      const map = {};
+      for (const r of data || []) (map[r.message_id] ||= []).push(r);
+      setReactions(map);
+    })();
+
+    return () => { cancelled = true; };
+  }, [reactionMessageKey]);
+
+  // Tapping the same emoji twice removes it, which is what a chat expects.
+  const toggleReaction = async (messageId, emoji) => {
+    // A resolved inquiry is a closed record. The database enforces this too —
+    // this guard just avoids a pointless round-trip.
+    if (isCurrentConversationResolved) return;
+
+    const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id;
+    if (!authUid) return;
+
+    const mine = (reactions[messageId] || []).find(
+      (r) => r.emoji === emoji && r.reactor_auth_user_id === authUid
+    );
+
+    if (mine) {
+      setReactions((prev) => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).filter((r) => r.id !== mine.id),
+      }));
+      await supabase.from('patient_message_reactions').delete().eq('id', mine.id);
+      return;
+    }
+
+    const optimistic = {
+      id: `pending-${Date.now()}`,
+      message_id: messageId,
+      emoji,
+      reactor_auth_user_id: authUid,
+      reactor_name: user?.name || null,
+    };
+    setReactions((prev) => ({ ...prev, [messageId]: [...(prev[messageId] || []), optimistic] }));
+
+    const { data } = await supabase
+      .from('patient_message_reactions')
+      .insert([{
+        message_id: messageId,
+        emoji,
+        reactor_auth_user_id: authUid,
+        reactor_name: user?.name || null,
+        reactor_role: userRole || 'physician',
+      }])
+      .select();
+
+    if (data?.[0]) {
+      setReactions((prev) => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).map((r) => (r.id === optimistic.id ? data[0] : r)),
+      }));
+    }
+  };
+
   // Handle staff clinical reply
   const handleSendReply = async (e) => {
     if (e) e.preventDefault();
-    if (!reply.trim() || !activeConversationId || sending || isCurrentConversationResolved) return;
+    const textToSend = reply.trim();
+    const hasPhoto = Boolean(pendingPhoto);
+    if ((!textToSend && !hasPhoto) || !activeConversationId || sending || isCurrentConversationResolved) return;
 
     setSending(true);
     setMsgNotice('');
-    const textToSend = reply.trim();
+    setPhotoError('');
 
     try {
-      // 1. Try atomic send_patient_message RPC
-      const { data: rpcData, error: rpcError } = await supabase.rpc('send_patient_message', {
-        p_conversation_id: activeConversationId,
-        p_message_text: textToSend,
-      });
+      // Upload the photo first: a failed upload must not leave a message that
+      // claims an attachment it does not have.
+      let attachmentFields = {};
+      if (hasPhoto) {
+        attachmentFields = await uploadMessageAttachment(pendingPhoto, activeConversationId);
+      }
 
-      if (rpcError) {
-        // Fallback: Direct insert
+      // The send RPC takes no attachment parameters, so a message carrying a
+      // photo is written directly.
+      let rpcError = null;
+      if (!hasPhoto) {
+        const { error } = await supabase.rpc('send_patient_message', {
+          p_conversation_id: activeConversationId,
+          p_message_text: textToSend,
+        });
+        rpcError = error;
+      }
+
+      if (rpcError || hasPhoto) {
+        // Direct insert (also the fallback when the RPC is unavailable)
         const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
         const staffRole = userRole || 'physician';
         const staffName = user?.name || (staffRole === 'physician' ? 'Dr. Rivera' : 'Nurse Santos');
@@ -425,6 +554,7 @@ const StaffPatientMessages = () => {
           recipient_name: activeConversation?.patient_name || 'Student',
           concern_type: activeConversation?.concern_type || 'General clinic inquiry',
           message_text: textToSend,
+          ...attachmentFields,
           status: 'sent',
         };
 
@@ -472,6 +602,8 @@ const StaffPatientMessages = () => {
       }
 
       setReply('');
+      setPendingPhoto(null);
+      if (photoInputRef.current) photoInputRef.current.value = '';
       setTimeout(() => {
         if (chatScrollRef.current) {
           chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -479,7 +611,13 @@ const StaffPatientMessages = () => {
       }, 50);
     } catch (err) {
       console.error('Send staff reply error:', err);
-      setMsgNotice('Unable to send reply right now. Please try again.');
+      // Surface a photo problem against the photo, not as a generic send failure.
+      const message = err?.message || '';
+      if (/photo|file type|limit|upload/i.test(message)) {
+        setPhotoError(message);
+      } else {
+        setMsgNotice('Unable to send reply right now. Please try again.');
+      }
     } finally {
       setSending(false);
     }
@@ -491,6 +629,47 @@ const StaffPatientMessages = () => {
 
     setResolving(true);
     try {
+      // Remove any photographs in this thread BEFORE closing it. The bucket is
+      // private and clinical photos should not outlive the inquiry, so this
+      // happens on resolve rather than being left behind.
+      const attachmentMessages = messages.filter(
+        (m) => m.conversation_id === activeConversationId && m.attachment_path
+      );
+      const paths = attachmentMessages.map((m) => m.attachment_path);
+
+      let removalFailed = false;
+      if (paths.length > 0) {
+        const { removed, failed } = await deleteMessageAttachments(paths);
+        removalFailed = failed.length > 0;
+
+        // Clear the path on each row and record that it is gone, so the thread
+        // can say so instead of showing a broken image.
+        //
+        // This goes through a SECURITY DEFINER RPC: patient_messages has no
+        // UPDATE policy (messages are immutable), so a direct update was
+        // silently rejected and the path was never cleared.
+        const removedSet = new Set(removed);
+        const bookkeeping = await Promise.all(
+          attachmentMessages
+            .filter((m) => removedSet.has(m.attachment_path))
+            .map((m) => supabase.rpc('clear_message_attachment', { p_message_id: m.id }))
+        );
+
+        // A failed bookkeeping write leaves the thread showing "no longer
+        // available" instead of the notice, so treat it as a failed removal.
+        if (bookkeeping.some((r) => r.error || r.data === false)) {
+          removalFailed = true;
+        }
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            removedSet.has(m.attachment_path)
+              ? { ...m, attachment_path: null, attachment_removed_at: new Date().toISOString() }
+              : m
+          )
+        );
+      }
+
       if (!activeConversation?.isFallback) {
         const { error } = await supabase
           .from('patient_message_conversations')
@@ -498,6 +677,36 @@ const StaffPatientMessages = () => {
           .eq('id', activeConversationId);
 
         if (error) throw error;
+      }
+
+      // Post the notice into the thread so both sides can see what happened.
+      // Only when a photo was actually removed — otherwise the line would be a
+      // claim about nothing.
+      if (paths.length > 0 && !removalFailed) {
+        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
+        const noticeRow = {
+          patient_id: activeConversation?.patient_id,
+          auth_user_id: authUid,
+          patient_name: activeConversation?.patient_name || 'Student',
+          sender_role: 'system',
+          sender_name: 'Clinic System',
+          recipient_name: activeConversation?.patient_name || 'Student',
+          concern_type: activeConversation?.concern_type || 'General clinic inquiry',
+          message_text: RESOLVED_PHOTO_NOTICE,
+          status: 'sent',
+        };
+        if (!activeConversation?.isFallback) noticeRow.conversation_id = activeConversationId;
+
+        const { data: noticeData } = await supabase
+          .from('patient_messages')
+          .insert([noticeRow])
+          .select();
+
+        if (noticeData?.[0]) {
+          setMessages((prev) =>
+            prev.some((m) => m.id === noticeData[0].id) ? prev : [...prev, noticeData[0]]
+          );
+        }
       }
 
       // Optimistically update local state
@@ -508,6 +717,9 @@ const StaffPatientMessages = () => {
       );
 
       setResolveModalOpen(false);
+      if (removalFailed) {
+        setMsgNotice('Inquiry resolved, but a photo could not be removed. Please try again.');
+      }
     } catch (err) {
       console.error('Resolve conversation error:', err);
       setMsgNotice('Failed to resolve inquiry. Please try again.');
@@ -516,23 +728,81 @@ const StaffPatientMessages = () => {
     }
   };
 
+  // Delete a resolved inquiry.
+  //
+  // Photos go first: a plpgsql function cannot remove a Storage object, so if
+  // the files cannot be cleared the whole deletion is aborted rather than
+  // leaving a clinical photo orphaned in storage with no record pointing at it.
+  const handleDeleteConversation = async () => {
+    if (!activeConversationId || deleting || !isCurrentConversationResolved) return;
+
+    setDeleting(true);
+    setMsgNotice('');
+
+    try {
+      const paths = messages
+        .filter((m) => m.conversation_id === activeConversationId && m.attachment_path)
+        .map((m) => m.attachment_path);
+
+      if (paths.length > 0) {
+        const { failed } = await deleteMessageAttachments(paths);
+        if (failed.length > 0) {
+          setMsgNotice('The photos in this inquiry could not be removed, so it was not deleted. Please try again.');
+          setDeleteModalOpen(false);
+          return;
+        }
+      }
+
+      const { data, error } = await supabase.rpc('delete_resolved_conversation', {
+        p_conversation_id: activeConversationId,
+      });
+      if (error) throw error;
+
+      // RLS-blocked writes report success with nothing done, so confirm the RPC
+      // actually deleted rather than trusting the absence of an error.
+      if (data !== true) {
+        setMsgNotice('This inquiry could not be deleted.');
+        setDeleteModalOpen(false);
+        return;
+      }
+
+      setConversations((prev) => prev.filter((c) => c.id !== activeConversationId));
+      setMessages([]);
+      setReactions({});
+      setActiveConversationId(null);
+      setDeleteModalOpen(false);
+    } catch (err) {
+      console.error('Delete conversation error:', err);
+      setMsgNotice(
+        /open inquiry/i.test(err?.message || '')
+          ? 'An open inquiry must be resolved before it can be deleted.'
+          : 'Could not delete this inquiry. Please try again.'
+      );
+      setDeleteModalOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <main className="main">
       <section className="page patient-messages-staff-page" style={{ maxWidth: '1440px', margin: '0 auto' }}>
         {/* Page Header */}
-        <div className="page-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>
+        <div className="page-header" style={{ marginBottom: 16 }}>
+          <div className="page-header-title-block">
+            <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
               Patient Messages
             </h1>
-            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+            <p className="page-header-subtitle" style={{ margin: '4px 0 0 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
               Manage incoming student inquiries, clinical follow-ups, and consultation threads.
-            </div>
+            </p>
           </div>
-          <span className="badge badge-neutral" style={{ fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success, #10b981)' }} />
-            Realtime Connected
-          </span>
+          <div className="page-header-actions">
+            <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success, #10b981)' }} />
+              Realtime Connected
+            </span>
+          </div>
         </div>
 
         {/* Tab Navigation: Active Inquiries vs History */}
@@ -541,7 +811,7 @@ const StaffPatientMessages = () => {
             type="button"
             className={`btn ${activeTab === 'active' ? 'primary' : 'secondary'}`}
             onClick={() => setActiveTab('active')}
-            style={{ fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 8 }}
+            style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', padding: '7px 16px', borderRadius: 8 }}
           >
             Active Inquiries ({openConversations.length})
           </button>
@@ -549,7 +819,7 @@ const StaffPatientMessages = () => {
             type="button"
             className={`btn ${activeTab === 'history' ? 'primary' : 'secondary'}`}
             onClick={() => setActiveTab('history')}
-            style={{ fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 8 }}
+            style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', padding: '7px 16px', borderRadius: 8 }}
           >
             History / Resolved ({historyConversations.length})
           </button>
@@ -557,16 +827,16 @@ const StaffPatientMessages = () => {
 
         {/* Messaging Workspace */}
         {loadingConversations ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '360px', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '360px', background: 'var(--panel)', borderRadius: 14, border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
             Loading conversations...
           </div>
         ) : currentTabConversations.length === 0 ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: 14, border: '1px dashed var(--border)', color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: 14, border: '1px dashed var(--border)', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
             <MessagesIcon size={36} style={{ opacity: 0.5, marginBottom: 10 }} />
-            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
+            <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>
               {activeTab === 'active' ? 'No active inquiries' : 'No resolved inquiry history'}
             </div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 4 }}>
               {activeTab === 'active'
                 ? 'When patients send new messages or inquiries, they will appear here live.'
                 : 'Conversations resolved by medical personnel will be archived here for reference.'}
@@ -578,7 +848,7 @@ const StaffPatientMessages = () => {
             <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
               <div className="tup-inbox-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                     {activeTab === 'active' ? 'Active Inquiries' : 'Resolved Inquiries'} ({currentTabConversations.length})
                   </span>
                 </div>
@@ -595,7 +865,7 @@ const StaffPatientMessages = () => {
 
               <div className="tup-inbox-list">
                 {filteredConversations.length === 0 ? (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
                     No matching inquiries
                   </div>
                 ) : (
@@ -623,19 +893,19 @@ const StaffPatientMessages = () => {
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.patient_name || 'Patient'}
                             </div>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
                             </span>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {c.patient_id} · <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.concern_type}</span>
+                          <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)' }}>
+                            {c.patient_id} · <span style={{ color: 'var(--color-primary-text, #fda4af)', fontWeight: 'var(--font-weight-semibold)' }}>{c.concern_type}</span>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>To: {c.recipient_name}</span>
-                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 11, padding: '1px 6px', textTransform: 'capitalize' }}>
+                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px', textTransform: 'capitalize' }}>
                               {c.status || 'open'}
                             </span>
                           </div>
@@ -672,10 +942,10 @@ const StaffPatientMessages = () => {
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                    <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                       {activeConversation?.patient_name || 'Patient'}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>ID: {activeConversation?.patient_id}</span>
                       <span>•</span>
                       <span>Addressed: {activeConversation?.recipient_name}</span>
@@ -684,7 +954,7 @@ const StaffPatientMessages = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="badge badge-neutral" style={{ fontSize: 12, fontWeight: 600 }}>
+                  <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
                     {activeConversation?.concern_type}
                   </span>
 
@@ -694,16 +964,28 @@ const StaffPatientMessages = () => {
                       type="button"
                       className="btn small secondary"
                       onClick={() => setResolveModalOpen(true)}
-                      style={{ fontSize: 12, padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--success, #10b981)', borderColor: 'var(--border)' }}
                       title="Mark inquiry as resolved and move to history"
                     >
-                      <CheckIcon size={14} />
                       <span>Resolve</span>
                     </button>
                   ) : (
-                    <span className="badge badge-neutral" style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }}>
-                      ✓ Resolved
-                    </span>
+                    <>
+                      <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', background: 'var(--color-emerald-bg)', color: 'var(--success, #10b981)' }}>
+                        Resolved
+                      </span>
+                      {/* Only a closed inquiry can be deleted. */}
+                      <button
+                        type="button"
+                        className="btn small secondary"
+                        onClick={() => setDeleteModalOpen(true)}
+                        disabled={deleting}
+                        style={{ fontSize: 'var(--font-size-xs)', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--danger)', borderColor: 'var(--border)' }}
+                        title="Delete this resolved inquiry and its messages"
+                      >
+                        <span>Delete</span>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -711,11 +993,11 @@ const StaffPatientMessages = () => {
               {/* Messages Stream */}
               <div ref={chatScrollRef} className="tup-chat-messages-area">
                 {loadingMessages ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                     Loading message thread...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                     No messages in this conversation.
                   </div>
                 ) : (
@@ -734,19 +1016,40 @@ const StaffPatientMessages = () => {
                           >
                             <div className="tup-chat-sender-label">
                               <span>{msg.sender_name || (isPatient ? 'Student' : 'Clinician')}</span>
-                              <span style={{ fontSize: 11, opacity: 0.75, textTransform: 'capitalize' }}>
+                              <span style={{ fontSize: 'var(--font-size-2xs)', opacity: 0.75, textTransform: 'capitalize' }}>
                                 ({msg.sender_role})
                               </span>
                             </div>
 
-                            <div className={`tup-chat-bubble ${isPatient ? 'incoming' : 'outgoing'}`}>
-                              {msg.message_text}
-                            </div>
+                            {/* A photo-only message has no text, so no bubble is
+                                drawn — otherwise an empty blue box sits above
+                                the image. */}
+                            {msg.message_text ? (
+                              <div className={`tup-chat-bubble ${isPatient ? 'incoming' : 'outgoing'}`}>
+                                {msg.message_text}
+                              </div>
+                            ) : null}
+
+                            {(msg.attachment_path || msg.attachment_removed_at) && (
+                              <MessageAttachment
+                                path={msg.attachment_path}
+                                name={msg.attachment_name}
+                                removedAt={msg.attachment_removed_at}
+                              />
+                            )}
+
+                            <MessageReactions
+                              reactions={reactions[msg.id] || []}
+                              currentUserId={user?.auth_user_id}
+                              onToggle={(emoji) => toggleReaction(msg.id, emoji)}
+                              align={isPatient ? 'left' : 'right'}
+                              disabled={isCurrentConversationResolved}
+                            />
 
                             <div className="tup-chat-time">
                               <span>{formatMessageTime(msg.created_at)}</span>
                               {!isPatient && (
-                                <span style={{ fontSize: 11, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
+                                <span style={{ fontSize: 'var(--font-size-2xs)', opacity: 0.8 }}>• {msg.status || 'sent'}</span>
                               )}
                             </div>
                           </div>
@@ -765,7 +1068,7 @@ const StaffPatientMessages = () => {
                     background: 'var(--surface-raised)',
                     borderTop: '1px solid var(--border)',
                     textAlign: 'center',
-                    fontSize: 13,
+                    fontSize: 'var(--font-size-sm)',
                     color: 'var(--muted)',
                     display: 'flex',
                     alignItems: 'center',
@@ -773,7 +1076,7 @@ const StaffPatientMessages = () => {
                     gap: 8,
                   }}
                 >
-                  <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span>
+                  <span style={{ color: 'var(--success, #10b981)', fontWeight: 'var(--font-weight-bold)' }}>•</span>
                   <span>
                     This consultation inquiry has been marked as <strong>Resolved</strong>. Complete historical messages are archived.
                   </span>
@@ -781,34 +1084,85 @@ const StaffPatientMessages = () => {
               ) : (
                 <>
                   {msgNotice && (
-                    <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: 12 }}>
+                    <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: 'var(--font-size-xs)' }}>
                       {msgNotice}
                     </div>
                   )}
-                  <form className="tup-chat-composer" onSubmit={handleSendReply}>
-                    <textarea
-                      className="tup-chat-input"
-                      rows={1}
-                      placeholder="Type your message..."
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendReply();
-                        }
-                      }}
-                      disabled={sending || !activeConversationId}
-                    />
-                    <button
-                      type="submit"
-                      className="tup-chat-send-btn"
-                      disabled={sending || !reply.trim() || !activeConversationId}
-                    >
-                      <SendIcon size={16} />
-                      <span>{sending ? 'Sending...' : 'Reply'}</span>
-                    </button>
-                  </form>
+                  <div>
+                    {pendingPhoto && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', padding: '6px 10px', borderRadius: 10, background: 'var(--surface-raised)', border: '1px solid var(--border)', fontSize: 'var(--font-size-xs)' }}>
+                        <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{pendingPhoto.name}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(pendingPhoto.size)}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPendingPhoto(null);
+                            setPhotoError('');
+                            if (photoInputRef.current) photoInputRef.current.value = '';
+                          }}
+                          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-flex' }}
+                          aria-label="Remove the attached photo"
+                        >
+                          <CloseIcon size={14} />
+                        </button>
+                      </div>
+                    )}
+
+                    {photoError && (
+                      <div role="alert" style={{ margin: '0 0 8px', padding: '6px 10px', borderRadius: 10, background: 'var(--color-rose-bg)', color: 'var(--color-rose-text)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        {photoError}
+                      </div>
+                    )}
+
+                    <form className="tup-chat-composer" onSubmit={handleSendReply}>
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setPhotoError('');
+                          setPendingPhoto(file);
+                          const problem = validateAttachmentFile(file);
+                          if (problem) setPhotoError(problem);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="tup-chat-send-btn"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={sending || !activeConversationId || isCurrentConversationResolved}
+                        title="Attach a photo for assessment"
+                        aria-label="Attach a photo"
+                      >
+                        <PlusIcon size={16} />
+                        <span>Photo</span>
+                      </button>
+                      <textarea
+                        className="tup-chat-input"
+                        rows={1}
+                        placeholder="Type your message..."
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendReply();
+                          }
+                        }}
+                        disabled={sending || !activeConversationId}
+                      />
+                      <button
+                        type="submit"
+                        className="tup-chat-send-btn"
+                        disabled={sending || (!reply.trim() && !pendingPhoto) || !activeConversationId || Boolean(photoError)}
+                      >
+                        <SendIcon size={16} />
+                        <span>{sending ? 'Sending...' : 'Reply'}</span>
+                      </button>
+                    </form>
+                  </div>
                 </>
               )}
             </div>
@@ -843,7 +1197,7 @@ const StaffPatientMessages = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                   Resolve this inquiry?
                 </h3>
                 <button
@@ -855,8 +1209,8 @@ const StaffPatientMessages = () => {
                 </button>
               </div>
 
-              <p style={{ margin: '0 0 20px 0', fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
-                Once resolved, this consultation thread with <strong>{activeConversation?.patient_name}</strong> will be moved to <strong>History</strong> and will no longer appear in your active inquiries. All message records remain safely preserved.
+              <p style={{ margin: '0 0 20px 0', fontSize: 'var(--font-size-base)', color: 'var(--muted)', lineHeight: 1.5 }}>
+                Once resolved, this consultation thread with <strong>{activeConversation?.patient_name}</strong> will be moved to <strong>History</strong> and will no longer appear in your active inquiries. The message records are preserved, but <strong>any photos sent in this thread will be permanently deleted</strong>.
               </p>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -873,10 +1227,78 @@ const StaffPatientMessages = () => {
                   className="btn primary"
                   onClick={handleResolveConversation}
                   disabled={resolving}
-                  style={{ background: '#10b981', borderColor: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: 'var(--success, #10b981)', borderColor: 'var(--success, #10b981)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  <CheckIcon size={16} />
                   <span>{resolving ? 'Resolving...' : 'Resolve Inquiry'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal Dialog */}
+        {deleteModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'var(--overlay-bg, rgba(0, 0, 0, 0.65))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3500,
+              padding: 16,
+              backdropFilter: 'blur(2px)',
+            }}
+            onClick={() => { if (!deleting) setDeleteModalOpen(false); }}
+          >
+            <div
+              style={{
+                width: 'min(92vw, 440px)',
+                background: 'var(--panel)',
+                borderRadius: 14,
+                border: '1px solid var(--border)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                padding: 24,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
+                  Delete this inquiry?
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={deleting}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4 }}
+                  aria-label="Close"
+                >
+                  <CloseIcon size={18} />
+                </button>
+              </div>
+
+              <p style={{ margin: '0 0 20px 0', fontSize: 'var(--font-size-base)', color: 'var(--muted)', lineHeight: 1.5 }}>
+                This permanently removes the resolved inquiry with <strong>{activeConversation?.patient_name}</strong>, including <strong>every message in the thread</strong>. This cannot be undone.
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={handleDeleteConversation}
+                  disabled={deleting}
+                  style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                >
+                  <span>{deleting ? 'Deleting...' : 'Delete Inquiry'}</span>
                 </button>
               </div>
             </div>

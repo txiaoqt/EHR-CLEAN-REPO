@@ -244,7 +244,7 @@ const Settings = () => {
         }}>
           <form onSubmit={handleBackupSubmit} style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', width: 440, padding: 24, borderRadius: 16, boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Authorize Database Backup</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Authorize Database Backup</h3>
               <button
                 type="button"
                 className="modal-close-btn"
@@ -257,7 +257,7 @@ const Settings = () => {
                 <CloseIcon size={18} />
               </button>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5, marginTop: 0 }}>
               Enter your staff password to proceed with downloading the complete system backup archive.
             </p>
             <input
@@ -294,21 +294,20 @@ const Settings = () => {
           bottom: 24,
           right: 24,
           padding: '12px 20px',
-          color: 'white',
-          fontWeight: 700,
+          color: 'var(--text-on-primary)',
+          fontWeight: 'var(--font-weight-bold)',
           borderRadius: 12,
           background: messageType === 'error'
-            ? '#dc2626'
+            ? 'var(--danger)'
             : messageType === 'success'
-            ? '#059669'
-            : '#2563eb',
+            ? 'var(--color-emerald)'
+            : 'var(--color-blue)',
           boxShadow: 'var(--shadow-lg)',
           zIndex: 2000,
           display: 'flex',
           alignItems: 'center',
           gap: 8
         }}>
-          <span>{messageType === 'error' ? '⚠️' : '✓'}</span>
           <span>{message}</span>
         </div>
       )}
@@ -336,78 +335,117 @@ const Settings = () => {
         {/* 2. Configuration Grid: Account & Security + Preferences & Appearance */}
         <div className="settings-main-grid" style={{ marginBottom: 20 }}>
           {/* Left Column: Account & Security */}
-          <div className="card" style={{ padding: '20px 22px' }}>
-            <div className="card-header" style={{ marginBottom: 14 }}>
+          <div className="card" style={{ padding: '22px 24px' }}>
+            <div className="card-header" style={{ marginBottom: 16 }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Account & Security</h3>
-                <span className="card-subtitle">Authenticated staff identity and credential management</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Account & Security</h3>
+                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
+                  Authenticated staff identity and credential management
+                </span>
               </div>
               <span className="badge badge-info">{authUser?.role || 'Staff'}</span>
             </div>
 
             {/* Active Account Identity Block */}
-            <div style={{ padding: '14px 16px', background: 'var(--grey-100)', borderRadius: 10, marginBottom: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Active Account User</div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', marginTop: 2 }}>
+            <div style={{ padding: '16px 18px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>
+                  Active Account User
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--success)' }}>
+                  <span className="status-dot" style={{ width: 6, height: 6 }}></span> Active Session
+                </span>
+              </div>
+              <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)', marginTop: 2 }}>
                 {authUser?.name || authUser?.email || 'Logged In Staff'}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Role: <strong style={{ color: 'var(--text)' }}>{authUser?.role}</strong> • Email: <strong style={{ color: 'var(--text)' }}>{authUser?.email || 'N/A'}</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--panel)', border: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
+                  {authUser?.role || 'Staff'}
+                </span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
+                  {authUser?.email || 'N/A'}
+                </span>
               </div>
             </div>
 
             {/* Password Update Section */}
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
-              <h4 style={{ margin: '0 0 4px 0', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Change Password</h4>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Update your staff portal security credentials</div>
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 18 }}>
+              <h4 style={{ margin: '0 0 2px 0', fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Change Password</h4>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginBottom: 14 }}>Update your staff portal security credentials</div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                <input
-                  type="password"
-                  placeholder="New password"
-                  className="input"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  aria-label="New password"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm password"
-                  className="input"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  aria-label="Confirm password"
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 6 }}>New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter new password"
+                    className="input"
+                    style={{ width: '100%' }}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    aria-label="New password"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 6 }}>Confirm Password</label>
+                  <input
+                    type="password"
+                    placeholder="Confirm new password"
+                    className="input"
+                    style={{ width: '100%' }}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    aria-label="Confirm password"
+                  />
+                </div>
               </div>
-              <button
-                type="button"
-                className="btn secondary small"
-                onClick={changePassword}
-                disabled={!newPassword || !confirmPassword}
-              >
-                Update Password
-              </button>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
+                  Minimum 8 characters with at least one letter and number.
+                </span>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={changePassword}
+                  disabled={!newPassword || !confirmPassword}
+                >
+                  Update Password
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Right Column: Preferences & Interface Appearance */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Preferences & Auto-Sync Card */}
-            <div className="card" style={{ padding: '20px 22px' }}>
-              <div className="card-header" style={{ marginBottom: 14 }}>
+            <div className="card" style={{ padding: '22px 24px' }}>
+              <div className="card-header" style={{ marginBottom: 12 }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: 16 }}>Preferences & Auto-Sync</h3>
-                  <span className="card-subtitle">Automated workflows and notification parameters</span>
+                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Preferences & Auto-Sync</h3>
+                  <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
+                    Automated workflows and notification parameters
+                  </span>
                 </div>
                 <span className="badge badge-neutral">Configuration</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {/* Auto-Save Drafts */}
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Auto-Save Drafts</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Automatically preserve encounter SOAP drafts</div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 2px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ paddingRight: 16 }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Auto-Save Drafts</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Automatically preserve encounter SOAP drafts</div>
                   </div>
                   <div className="settings-switch">
                     <input
@@ -417,15 +455,26 @@ const Settings = () => {
                       aria-label="Auto-Save Drafts"
                     />
                     <span className="settings-switch-slider" />
-                    <span className="settings-switch-text">{settings.auto_save ? 'ON' : 'OFF'}</span>
+                    <span className="settings-switch-text" style={{ color: settings.auto_save ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
+                      {settings.auto_save ? 'ON' : 'OFF'}
+                    </span>
                   </div>
                 </label>
 
                 {/* Email Notifications */}
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Email Notifications</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Receive emergency triage and appointment alerts</div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 2px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ paddingRight: 16 }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Email Notifications</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Receive emergency triage and appointment alerts</div>
                   </div>
                   <div className="settings-switch">
                     <input
@@ -435,15 +484,25 @@ const Settings = () => {
                       aria-label="Email Notifications"
                     />
                     <span className="settings-switch-slider" />
-                    <span className="settings-switch-text">{settings.notifications_email ? 'ON' : 'OFF'}</span>
+                    <span className="settings-switch-text" style={{ color: settings.notifications_email ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
+                      {settings.notifications_email ? 'ON' : 'OFF'}
+                    </span>
                   </div>
                 </label>
 
                 {/* Low Stock Warning Banners */}
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--grey-100)', borderRadius: 10, cursor: 'pointer' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Low Stock Warning Banners</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Show inventory reorder alerts in dashboard header</div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 2px 4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ paddingRight: 16 }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Low Stock Warning Banners</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Show inventory reorder alerts in dashboard header</div>
                   </div>
                   <div className="settings-switch">
                     <input
@@ -453,26 +512,51 @@ const Settings = () => {
                       aria-label="Low Stock Warning Banners"
                     />
                     <span className="settings-switch-slider" />
-                    <span className="settings-switch-text">{settings.notifications_stock ? 'ON' : 'OFF'}</span>
+                    <span className="settings-switch-text" style={{ color: settings.notifications_stock ? 'var(--color-emerald-text)' : 'var(--muted)' }}>
+                      {settings.notifications_stock ? 'ON' : 'OFF'}
+                    </span>
                   </div>
                 </label>
               </div>
             </div>
 
             {/* Interface Appearance Card */}
-            <div className="card" style={{ padding: '20px 22px' }}>
-              <div className="card-header" style={{ marginBottom: 12 }}>
+            <div className="card" style={{ padding: '22px 24px' }}>
+              <div className="card-header" style={{ marginBottom: 14 }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: 16 }}>Interface Appearance</h3>
-                  <span className="card-subtitle">Select daylight or contrast display mode</span>
+                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Interface Appearance</h3>
+                  <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
+                    Select daylight or contrast display mode
+                  </span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  padding: 4,
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 10,
+                }}
+              >
                 <button
                   type="button"
                   className={globalTheme === 'light' ? 'btn' : 'btn secondary'}
-                  style={{ flex: 1 }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 16px',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: globalTheme === 'light' ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: globalTheme === 'light' ? 'var(--panel)' : 'transparent',
+                    color: globalTheme === 'light' ? 'var(--text)' : 'var(--muted)',
+                    boxShadow: globalTheme === 'light' ? 'var(--shadow-sm)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
                   onClick={() => {
                     setGlobalTheme('light');
                     handleSettingChange('theme', 'light');
@@ -485,7 +569,19 @@ const Settings = () => {
                 <button
                   type="button"
                   className={globalTheme === 'dark' ? 'btn' : 'btn secondary'}
-                  style={{ flex: 1 }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 16px',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: globalTheme === 'dark' ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: globalTheme === 'dark' ? 'var(--panel)' : 'transparent',
+                    color: globalTheme === 'dark' ? 'var(--text)' : 'var(--muted)',
+                    boxShadow: globalTheme === 'dark' ? 'var(--shadow-sm)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
                   onClick={() => {
                     setGlobalTheme('dark');
                     handleSettingChange('theme', 'dark');
@@ -504,20 +600,22 @@ const Settings = () => {
           <div
             className="card"
             ref={backupCardRef}
-            style={{ padding: '20px 22px', borderLeft: '4px solid var(--color-primary)' }}
+            style={{ padding: '22px 24px' }}
           >
             <div className="card-header" style={{ marginBottom: 8 }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Database Backup & Comprehensive Archive</h3>
-                <span className="card-subtitle">Generate an offline JSON backup of all clinical tables, patient profiles, encounters, and audit records</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', margin: 0, color: 'var(--text)' }}>Database Backup & Comprehensive Archive</h3>
+                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2, display: 'block' }}>
+                  Generate an offline JSON backup of all clinical tables, patient profiles, encounters, and audit records
+                </span>
               </div>
-              <span className="badge badge-neutral">Offline Snapshot</span>
+              <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', fontWeight: 'var(--font-weight-semibold)' }}>Offline Snapshot</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Last Backup Performed:</div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginTop: 2 }}>{lastBackup}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)' }}>Last Backup Performed:</div>
+                <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{lastBackup}</div>
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>

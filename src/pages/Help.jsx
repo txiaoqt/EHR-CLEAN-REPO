@@ -33,7 +33,7 @@ const Help = () => {
     },
     {
       question: "How are patient appointments triaged?",
-      answer: "Students book appointments through the Patient Portal or on-site kiosk. Medical personnel review upcoming queues in the Appointments page, where status can be updated from Booked to Checked-In, In-Consultation, and Completed."
+      answer: "Students book appointments through the Patient Portal or on-site kiosk and receive a queue number for same-day visits. Medical personnel review upcoming queues in the Appointments page, where each appointment is Scheduled, Completed once the visit is done, or Cancelled. Completing an appointment frees the slot and moves the visit into the patient's records."
     }
   ];
 
@@ -44,7 +44,7 @@ const Help = () => {
     },
     {
       title: "How to record clinical vitals & encounters",
-      content: "Go to Encounters → 'Create New Encounter' → select the patient → record vital signs (BP, PR, RR, Temp, BMI), physical findings, diagnoses, and medical prescriptions. Finalize the encounter to lock the clinical record."
+      content: "Open the patient from Patients or Appointments, then use '+ New Encounter' on their profile. Record vital signs (BP, PR, RR, Temp, BMI), physical findings, diagnoses and prescriptions. A visit recorded without a booking is closed immediately; for a booked visit, mark the appointment Completed — that closes the clinical note at the same time."
     },
     {
       title: "How to manage pharmaceutical inventory",
@@ -61,11 +61,13 @@ const Help = () => {
       <section className="page help-page" style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: 20 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>
-            Help & Campus Clinic Support
-          </h1>
-          <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
-            Frequently asked questions, clinical guides, technical specifications, and campus clinic helpdesk resources.
+          <div className="page-header-title-block">
+            <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
+              Help & Campus Clinic Support
+            </h1>
+            <p className="page-header-subtitle" style={{ margin: '4px 0 0 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
+              Frequently asked questions, clinical guides, technical specifications, and campus clinic helpdesk resources.
+            </p>
           </div>
         </div>
 
@@ -96,7 +98,7 @@ const Help = () => {
                 height: 40,
                 borderRadius: 10,
                 background: 'var(--color-primary-tint)',
-                color: 'var(--color-primary)',
+                color: 'var(--color-primary-text, #fda4af)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -106,9 +108,9 @@ const Help = () => {
               <PhoneIcon size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Clinic Hotline</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>(02) 8301-3001 loc. 605</div>
-              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Direct line for urgent clinic inquiries</div>
+              <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Clinic Hotline</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>(02) 8301-3001 loc. 605</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', marginTop: 2 }}>Direct line for urgent clinic inquiries</div>
             </div>
           </div>
 
@@ -140,9 +142,9 @@ const Help = () => {
               <MailIcon size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Support Email</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>clinic@tup.edu.ph</div>
-              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Medical & portal technical support</div>
+              <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Support Email</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>clinic@tup.edu.ph</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', marginTop: 2 }}>Medical & portal technical support</div>
             </div>
           </div>
 
@@ -163,8 +165,8 @@ const Help = () => {
                 width: 40,
                 height: 40,
                 borderRadius: 10,
-                background: 'rgba(16, 185, 129, 0.1)',
-                color: '#10b981',
+                background: 'var(--color-emerald-bg, rgba(16, 185, 129, 0.1))',
+                color: 'var(--success, #10b981)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -174,9 +176,9 @@ const Help = () => {
               <ClockIcon size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Clinic Operating Hours</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Monday – Friday · 7:00 AM – 7:00 PM</div>
-              <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Ayala Blvd, Ermita, Manila</div>
+              <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>Clinic Operating Hours</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>Monday – Friday · 7:00 AM – 7:00 PM</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', marginTop: 2 }}>Ayala Blvd, Ermita, Manila</div>
             </div>
           </div>
         </div>
@@ -189,13 +191,13 @@ const Help = () => {
             borderRadius: 12,
             padding: '18px 22px',
             marginBottom: 26,
-            fontSize: 13,
+            fontSize: 'var(--font-size-sm)',
             lineHeight: 1.6,
             color: 'var(--muted)',
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 6, fontSize: 14 }}>
+          <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginBottom: 6, fontSize: 'var(--font-size-base)' }}>
             Electronic Health Records & Compliance Overview
           </div>
           <div>
@@ -205,7 +207,7 @@ const Help = () => {
 
         {/* User Guides Accordion */}
         <div style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginBottom: 12 }}>
             Standard Operating Guides
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -234,12 +236,12 @@ const Help = () => {
                     alignItems: 'center',
                     cursor: 'pointer',
                     color: 'var(--text)',
-                    fontWeight: 600,
-                    fontSize: 14
+                    fontWeight: 'var(--font-weight-semibold)',
+                    fontSize: 'var(--font-size-base)'
                   }}
                 >
                   <span>{g.title}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: 16 }}>
+                  <span style={{ color: 'var(--muted)', fontSize: 'var(--font-size-md)' }}>
                     {expandedGuide === idx ? '−' : '+'}
                   </span>
                 </button>
@@ -248,7 +250,7 @@ const Help = () => {
                     style={{
                       padding: '0 18px 14px 18px',
                       color: 'var(--muted)',
-                      fontSize: 14,
+                      fontSize: 'var(--font-size-base)',
                       lineHeight: 1.5,
                       borderTop: '1px solid var(--border-subtle)'
                     }}
@@ -263,7 +265,7 @@ const Help = () => {
 
         {/* FAQ Section Accordion */}
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginBottom: 12 }}>
             Frequently Asked Questions
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -292,12 +294,12 @@ const Help = () => {
                     alignItems: 'center',
                     cursor: 'pointer',
                     color: 'var(--text)',
-                    fontWeight: 600,
-                    fontSize: 14
+                    fontWeight: 'var(--font-weight-semibold)',
+                    fontSize: 'var(--font-size-base)'
                   }}
                 >
                   <span>{f.question}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: 16 }}>
+                  <span style={{ color: 'var(--muted)', fontSize: 'var(--font-size-md)' }}>
                     {expandedFaq === idx ? '−' : '+'}
                   </span>
                 </button>
@@ -306,7 +308,7 @@ const Help = () => {
                     style={{
                       padding: '0 18px 14px 18px',
                       color: 'var(--muted)',
-                      fontSize: 14,
+                      fontSize: 'var(--font-size-base)',
                       lineHeight: 1.5,
                       borderTop: '1px solid var(--border-subtle)'
                     }}

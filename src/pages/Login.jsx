@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { logAudit } from '../utils.js';
+import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import {
   getClinicHoursMessage,
   getLockoutMessage,
@@ -26,6 +27,19 @@ export { ALLOWED_USER_EMAIL_DOMAIN, STUDENT_ID_REGEX, isValidTupEmail, isValidSt
 const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
 const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
+
+// Degree programmes offered by the College of Science. Captured at sign-up
+// because the Medical Log prints DEPT./COURSE on every visit row.
+const SIGNUP_COURSES = [
+  'BS Computer Science',
+  'BS Information Technology',
+  'BS Information Systems',
+  'BS Mathematics',
+  'BS Biology',
+  'BS Chemistry',
+  'BS Food Technology',
+  'BS Environmental Science',
+];
 
 const USER_TEST_ACCOUNT = {
   email: 'patient.test@tup.edu.ph',
@@ -57,8 +71,12 @@ const Login = () => {
   // Sign-up State
   const [signupData, setSignupData] = useState({
     studentId: '',
-    fullName: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     year: '1',
+    sex: '',
+    course: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -296,7 +314,11 @@ const Login = () => {
         password: signupData.password || 'TupPatientTempPass@2026',
         options: {
           data: {
-            name: signupData.fullName.trim() || 'Patient',
+            name: composeFullName({
+              firstName: signupData.firstName,
+              middleName: signupData.middleName,
+              lastName: signupData.lastName,
+            }) || 'Patient',
             role: 'patient',
             patient_id: studentId || targetEmail.split('@')[0],
           },
@@ -367,10 +389,20 @@ const Login = () => {
   };
 
   const handlePatientSignup = async () => {
+    // Composed from the PSA-style name parts and normalised, so a SHOUTED or
+    // all-lowercase entry can never reach the record.
+    const fullName = composeFullName({
+      firstName: signupData.firstName,
+      middleName: signupData.middleName,
+      lastName: signupData.lastName,
+    });
+
     const payload = {
       studentId: signupData.studentId.trim().toUpperCase(),
-      fullName: signupData.fullName.trim(),
+      fullName,
       year: Number(signupData.year || 1),
+      sex: signupData.sex,
+      course: signupData.course,
       email: signupData.email.trim().toLowerCase(),
       password: signupData.password,
       confirmPassword: signupData.confirmPassword,
@@ -379,6 +411,10 @@ const Login = () => {
 
     if (!payload.studentId || !payload.fullName || !payload.email || !payload.password || !payload.confirmPassword) {
       setMsg('Please fill in all required fields.');
+      return;
+    }
+    if (!payload.sex || !payload.course) {
+      setMsg('Please select your sex and degree program.');
       return;
     }
     if (!isValidStudentId(payload.studentId)) {
@@ -448,6 +484,19 @@ const Login = () => {
         return;
       }
 
+      // Store the Medical Log demographics (SEX and DEPT./COURSE) on the profile
+      // the RPC just created. Kept out of complete_patient_registration — a
+      // 184-line SECURITY DEFINER function — so extending it cannot disturb the
+      // anti-overwrite logic. The patient owns this row, so RLS permits it.
+      try {
+        await supabase
+          .from('patient_profiles')
+          .update({ sex: payload.sex || null, course: payload.course || null })
+          .eq('patient_id', String(payload.studentId || '').trim().toUpperCase());
+      } catch (profileErr) {
+        console.warn('Could not store sex/course on the patient profile:', profileErr);
+      }
+
       setMsg('Account created and verified successfully! You can now log in.');
       setAuthMode('login');
       setEmail(payload.email);
@@ -456,8 +505,12 @@ const Login = () => {
       setOtpCode('');
       setSignupData({
         studentId: '',
-        fullName: '',
+        firstName: '',
+        middleName: '',
+        lastName: '',
         year: '1',
+        sex: '',
+        course: '',
         email: '',
         password: '',
         confirmPassword: '',
@@ -521,8 +574,11 @@ const Login = () => {
   const isSignupDisabled =
     loading ||
     !isStudentIdValid ||
-    !signupData.fullName.trim() ||
+    !signupData.firstName.trim() ||
+    !signupData.lastName.trim() ||
     !signupData.year ||
+    !signupData.sex ||
+    !signupData.course ||
     !isSignupEmailValid ||
     !signupData.password ||
     signupData.password.length < 6 ||
@@ -544,7 +600,7 @@ const Login = () => {
     border: 'none',
     padding: isMobile ? '10px 12px' : '11px 12px',
     borderRadius: isMobile ? 8 : 10,
-    fontSize: 14,
+    fontSize: 'var(--font-size-base)',
     color: '#111',
     outline: 'none',
     width: '100%',
@@ -565,7 +621,7 @@ const Login = () => {
         backgroundAttachment: isMobile ? 'scroll' : 'fixed',
         backgroundColor: '#f6f7f8',
         filter: 'brightness(0.98)',
-        fontFamily: `"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial`,
+        fontFamily: `"Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -634,9 +690,9 @@ const Login = () => {
                   <h1
                     style={{
                       margin: 0,
-                      fontSize: isTabletLandscape ? 26 : 32,
+                      fontSize: isTabletLandscape ? 'var(--font-size-page-title)' : 'var(--font-size-4xl)',
                       lineHeight: 1.15,
-                      fontWeight: 900,
+                      fontWeight: 'var(--font-weight-extrabold)',
                       fontFamily: `"Merriweather", serif`,
                       color: '#111',
                       letterSpacing: '-0.4px',
@@ -648,9 +704,9 @@ const Login = () => {
                   <h1
                     style={{
                       margin: 0,
-                      fontSize: isTabletLandscape ? 26 : 32,
+                      fontSize: isTabletLandscape ? 'var(--font-size-page-title)' : 'var(--font-size-4xl)',
                       lineHeight: 1.15,
-                      fontWeight: 900,
+                      fontWeight: 'var(--font-weight-extrabold)',
                       fontFamily: `"Merriweather", serif`,
                       color: '#111',
                       letterSpacing: '-0.4px',
@@ -670,9 +726,9 @@ const Login = () => {
                 marginTop: 20,
                 color: 'rgba(51,51,51,1)',
                 maxWidth: 680,
-                fontSize: isTabletLandscape ? 14.5 : 16,
+                fontSize: isTabletLandscape ? 'var(--font-size-base)' : 'var(--font-size-md)',
                 lineHeight: 1.8,
-                fontWeight: 400,
+                fontWeight: 'var(--font-weight-normal)',
                 opacity: 0.95,
                 textAlign: 'left',
               }}
@@ -688,7 +744,7 @@ const Login = () => {
                 marginTop: 20,
                 fontStyle: 'italic',
                 color: '#444',
-                fontSize: 14,
+                fontSize: 'var(--font-size-base)',
                 textAlign: 'left',
                 width: '100%',
               }}
@@ -765,8 +821,8 @@ const Login = () => {
                   />
                   <div
                     style={{
-                      fontSize: isMobile ? 15 : 17,
-                      fontWeight: 800,
+                      fontSize: isMobile ? 'var(--font-size-base)' : 'var(--font-size-md)',
+                      fontWeight: 'var(--font-weight-extrabold)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
                       textAlign: 'center',
@@ -775,7 +831,7 @@ const Login = () => {
                   >
                     TUP Manila Clinic
                   </div>
-                  <div style={{ fontSize: isMobile ? 11.5 : 12.5, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 500 }}>
+                  <div style={{ fontSize: isMobile ? 'var(--font-size-2xs)' : 'var(--font-size-xs)', color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 'var(--font-weight-medium)' }}>
                     {IS_USER_SURFACE ? 'Online Patient Portal' : 'Clinic Staff Portal'}
                   </div>
                 </div>
@@ -791,8 +847,8 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 16px 0',
-                      fontSize: isMobile ? 21 : 24,
-                      fontWeight: 800,
+                      fontSize: isMobile ? 'var(--font-size-xl)' : 'var(--font-size-2xl)',
+                      fontWeight: 'var(--font-weight-extrabold)',
                       fontFamily: `"Merriweather", serif`,
                     }}
                   >
@@ -801,7 +857,7 @@ const Login = () => {
 
                   {/* 1. Student ID */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-student-id" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Student ID</label>
+                    <label htmlFor="signup-student-id" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Student ID</label>
                     <input
                       id="signup-student-id"
                       className="input"
@@ -811,28 +867,61 @@ const Login = () => {
                       onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
                     />
                     {showStudentIdError && (
-                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
                         Format must be TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).
                       </div>
                     )}
                   </div>
 
-                  {/* 2. Full Name */}
+                  {/* 2. Name — PSA registration layout: First / Middle / Last.
+                      Normalised to Proper Case on blur so no record is stored
+                      SHOUTED or all-lowercase. */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-full-name" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Full Name</label>
+                    <label htmlFor="signup-first-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>First Name</label>
                     <input
-                      id="signup-full-name"
+                      id="signup-first-name"
                       className="input"
                       style={authInputStyle}
-                      placeholder="Full legal name"
-                      value={signupData.fullName}
-                      onChange={(e) => setSignupData((p) => ({ ...p, fullName: e.target.value }))}
+                      placeholder="e.g. Juan"
+                      value={signupData.firstName}
+                      onChange={(e) => setSignupData((p) => ({ ...p, firstName: e.target.value }))}
+                      onBlur={() => setSignupData((p) => ({ ...p, firstName: toProperName(p.firstName) }))}
                     />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
+                    <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label htmlFor="signup-middle-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        Middle Name <span style={{ fontWeight: 'var(--font-weight-normal)', opacity: 0.75 }}>(optional)</span>
+                      </label>
+                      <input
+                        id="signup-middle-name"
+                        className="input"
+                        style={authInputStyle}
+                        placeholder="e.g. Santos"
+                        value={signupData.middleName}
+                        onChange={(e) => setSignupData((p) => ({ ...p, middleName: e.target.value }))}
+                        onBlur={() => setSignupData((p) => ({ ...p, middleName: toProperName(p.middleName) }))}
+                      />
+                    </div>
+
+                    <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label htmlFor="signup-last-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Last Name</label>
+                      <input
+                        id="signup-last-name"
+                        className="input"
+                        style={authInputStyle}
+                        placeholder="e.g. Dela Cruz"
+                        value={signupData.lastName}
+                        onChange={(e) => setSignupData((p) => ({ ...p, lastName: e.target.value }))}
+                        onBlur={() => setSignupData((p) => ({ ...p, lastName: toProperName(p.lastName) }))}
+                      />
+                    </div>
                   </div>
 
                   {/* 3. Year */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-year" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Year</label>
+                    <label htmlFor="signup-year" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Year</label>
                     <select
                       id="signup-year"
                       className="input"
@@ -848,9 +937,44 @@ const Login = () => {
                     </select>
                   </div>
 
+                  {/* 3b. Sex + Degree Program — the Medical Log prints both, so
+                      they are captured at account creation. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
+                    <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label htmlFor="signup-sex" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Sex</label>
+                      <select
+                        id="signup-sex"
+                        className="input"
+                        style={{ ...authInputStyle, cursor: 'pointer' }}
+                        value={signupData.sex}
+                        onChange={(e) => setSignupData((p) => ({ ...p, sex: e.target.value }))}
+                        required
+                      >
+                        <option value="">Select…</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+
+                    <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label htmlFor="signup-course" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Degree Program</label>
+                      <select
+                        id="signup-course"
+                        className="input"
+                        style={{ ...authInputStyle, cursor: 'pointer' }}
+                        value={signupData.course}
+                        onChange={(e) => setSignupData((p) => ({ ...p, course: e.target.value }))}
+                        required
+                      >
+                        <option value="">Select…</option>
+                        {SIGNUP_COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
                   {/* 4. Email with Send/Resend Button */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
+                    <label htmlFor="signup-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Email</label>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input
                         id="signup-email"
@@ -875,12 +999,12 @@ const Login = () => {
                         style={{
                           background: isSendDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                           color: isSendDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                          fontWeight: 700,
+                          fontWeight: 'var(--font-weight-bold)',
                           padding: '10px 14px',
                           borderRadius: 10,
                           border: 'none',
                           cursor: isSendDisabled ? 'not-allowed' : 'pointer',
-                          fontSize: 13,
+                          fontSize: 'var(--font-size-sm)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                           boxShadow: isSendDisabled ? 'none' : '0 2px 6px rgba(0,0,0,0.1)',
@@ -891,12 +1015,12 @@ const Login = () => {
                       </button>
                     </div>
                     {showSignupEmailError && (
-                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2, lineHeight: 1.35 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
                         Please use your official TUP email address ending in @tup.edu.ph.
                       </div>
                     )}
                     {otpSent && (
-                      <div style={{ color: '#c6f6d5', fontSize: 12, marginTop: 2, fontWeight: 600 }}>
+                      <div style={{ color: '#c6f6d5', fontSize: 'var(--font-size-xs)', marginTop: 2, fontWeight: 'var(--font-weight-semibold)' }}>
                         If the provided information is eligible for registration, you will receive a verification code by email.
                       </div>
                     )}
@@ -905,7 +1029,7 @@ const Login = () => {
                   {/* 5. Verification Code (OTP) Field — DIRECTLY BENEATH EMAIL */}
                   {otpSent && (
                     <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <label htmlFor="signup-otp" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Verification Code</label>
+                      <label htmlFor="signup-otp" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Verification Code</label>
                       <input
                         id="signup-otp"
                         className="input"
@@ -921,7 +1045,7 @@ const Login = () => {
 
                   {/* 6. Password with Eye Toggle */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
+                    <label htmlFor="signup-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Password</label>
                     <div style={{ position: 'relative', width: '100%' }}>
                       <input
                         id="signup-password"
@@ -958,7 +1082,7 @@ const Login = () => {
 
                   {/* 7. Confirm Password with Eye Toggle */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-confirm-password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Confirm Password</label>
+                    <label htmlFor="signup-confirm-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Confirm Password</label>
                     <div style={{ position: 'relative', width: '100%' }}>
                       <input
                         id="signup-confirm-password"
@@ -992,7 +1116,7 @@ const Login = () => {
                       </button>
                     </div>
                     {signupData.password && signupData.confirmPassword && !passwordsMatch && (
-                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
                         Passwords do not match.
                       </div>
                     )}
@@ -1007,13 +1131,13 @@ const Login = () => {
                         width: '100%',
                         background: isSignupDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isSignupDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                        fontWeight: 700,
+                        fontWeight: 'var(--font-weight-bold)',
                         padding: '11px 14px',
                         minHeight: 44,
                         borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isSignupDisabled ? 'not-allowed' : 'pointer',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         boxShadow: isSignupDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
                         transition: 'all 0.15s ease',
                       }}
@@ -1022,7 +1146,7 @@ const Login = () => {
                     </button>
                   </div>
 
-                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.92)' }}>
                     Already have an account?{' '}
                     <button
                       type="button"
@@ -1034,11 +1158,11 @@ const Login = () => {
                         background: 'none',
                         border: 'none',
                         color: '#fff',
-                        fontWeight: 700,
+                        fontWeight: 'var(--font-weight-bold)',
                         textDecoration: 'underline',
                         cursor: 'pointer',
                         padding: 0,
-                        fontSize: 13,
+                        fontSize: 'var(--font-size-sm)',
                       }}
                     >
                       Log in
@@ -1057,19 +1181,19 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 12px 0',
-                      fontSize: isMobile ? 20 : 24,
-                      fontWeight: 800,
+                      fontSize: isMobile ? 'var(--font-size-xl)' : 'var(--font-size-2xl)',
+                      fontWeight: 'var(--font-weight-extrabold)',
                       fontFamily: `"Merriweather", serif`,
                     }}
                   >
                     Reset Password
                   </h2>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.45 }}>
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.9)', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.45 }}>
                     Enter your official TUP email address to receive password recovery instructions.
                   </p>
 
                   <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label htmlFor="forgot-email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>TUP Email</label>
+                    <label htmlFor="forgot-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>TUP Email</label>
                     <input
                       id="forgot-email"
                       className="input"
@@ -1080,7 +1204,7 @@ const Login = () => {
                       onChange={(e) => setForgotEmail(e.target.value)}
                     />
                     {forgotEmail.length > 0 && !isValidTupEmail(forgotEmail) && (
-                      <div style={{ color: '#fed7d7', fontSize: 12, marginTop: 2 }}>
+                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
                         Please use your official TUP email address ending in @tup.edu.ph.
                       </div>
                     )}
@@ -1095,13 +1219,13 @@ const Login = () => {
                         width: '100%',
                         background: isForgotDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isForgotDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                        fontWeight: 700,
+                        fontWeight: 'var(--font-weight-bold)',
                         padding: '11px 14px',
                         minHeight: 44,
                         borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isForgotDisabled ? 'not-allowed' : 'pointer',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         boxShadow: isForgotDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
                         transition: 'all 0.15s ease',
                       }}
@@ -1110,7 +1234,7 @@ const Login = () => {
                     </button>
                   </div>
 
-                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.92)' }}>
                     Remember your password?{' '}
                     <button
                       type="button"
@@ -1122,11 +1246,11 @@ const Login = () => {
                         background: 'none',
                         border: 'none',
                         color: '#fff',
-                        fontWeight: 700,
+                        fontWeight: 'var(--font-weight-bold)',
                         textDecoration: 'underline',
                         cursor: 'pointer',
                         padding: 0,
-                        fontSize: 13,
+                        fontSize: 'var(--font-size-sm)',
                       }}
                     >
                       Log in
@@ -1145,8 +1269,8 @@ const Login = () => {
                     style={{
                       textAlign: 'center',
                       margin: '0 0 16px 0',
-                      fontSize: isMobile ? 22 : isTabletLandscape ? 24 : 26,
-                      fontWeight: 800,
+                      fontSize: isMobile ? 'var(--font-size-xl)' : isTabletLandscape ? 'var(--font-size-2xl)' : 'var(--font-size-page-title)',
+                      fontWeight: 'var(--font-weight-extrabold)',
                       fontFamily: `"Merriweather", serif`,
                     }}
                   >
@@ -1155,7 +1279,7 @@ const Login = () => {
 
                   {/* Email Field */}
                   <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label htmlFor="email" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Email</label>
+                    <label htmlFor="email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Email</label>
                     <input
                       id="email"
                       className="input"
@@ -1171,7 +1295,7 @@ const Login = () => {
                   {/* Password Header with Forgot Password above input (User Surface) */}
                   <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label htmlFor="password" style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Password</label>
+                      <label htmlFor="password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Password</label>
                       {IS_USER_SURFACE && (
                         <button
                           type="button"
@@ -1184,7 +1308,7 @@ const Login = () => {
                             background: 'none',
                             border: 'none',
                             color: 'rgba(255,255,255,0.92)',
-                            fontSize: 12,
+                            fontSize: 'var(--font-size-xs)',
                             cursor: 'pointer',
                             textDecoration: 'underline',
                             padding: 0,
@@ -1240,13 +1364,13 @@ const Login = () => {
                         width: '100%',
                         background: isLoginDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
                         color: isLoginDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                        fontWeight: 700,
+                        fontWeight: 'var(--font-weight-bold)',
                         padding: '11px 14px',
                         minHeight: 44,
                         borderRadius: isMobile ? 8 : 10,
                         border: 'none',
                         cursor: isLoginDisabled ? 'not-allowed' : 'pointer',
-                        fontSize: 14,
+                        fontSize: 'var(--font-size-base)',
                         boxShadow: isLoginDisabled ? 'none' : '0 6px 14px rgba(0,0,0,0.08)',
                         transition: 'all 0.15s ease',
                       }}
@@ -1257,7 +1381,7 @@ const Login = () => {
 
                   {/* Create Account Link (User Surface Only) */}
                   {IS_USER_SURFACE && (
-                    <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+                    <div style={{ marginTop: 18, textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.92)' }}>
                       Don't have an account?{' '}
                       <button
                         type="button"
@@ -1269,11 +1393,11 @@ const Login = () => {
                           background: 'none',
                           border: 'none',
                           color: '#fff',
-                          fontWeight: 700,
+                          fontWeight: 'var(--font-weight-bold)',
                           textDecoration: 'underline',
                           cursor: 'pointer',
                           padding: 0,
-                          fontSize: 13,
+                          fontSize: 'var(--font-size-sm)',
                         }}
                       >
                         Create one
@@ -1283,7 +1407,7 @@ const Login = () => {
                 </>
               )}
 
-              <div className="footer-note" style={{ marginTop: 16, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: isMobile ? 11.5 : 12.5, lineHeight: 1.4 }}>
+              <div className="footer-note" style={{ marginTop: 16, color: 'rgba(255,255,255,0.92)', textAlign: 'center', fontSize: isMobile ? 'var(--font-size-2xs)' : 'var(--font-size-xs)', lineHeight: 1.4 }}>
                 © Technological University of the Philippines
               </div>
             </form>
@@ -1317,7 +1441,7 @@ const Login = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#111' }}>Notice</div>
+            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 8, color: '#111' }}>Notice</div>
             <div
               style={{
                 color:
@@ -1330,7 +1454,7 @@ const Login = () => {
                     ? 'var(--danger)'
                     : '#111',
                 lineHeight: 1.45,
-                fontSize: 14,
+                fontSize: 'var(--font-size-base)',
               }}
             >
               {msg}
@@ -1343,8 +1467,8 @@ const Login = () => {
                   background: '#ffffff',
                   color: '#172033',
                   border: '1px solid var(--border, #cbd5e1)',
-                  fontWeight: 600,
-                  fontSize: 13,
+                  fontWeight: 'var(--font-weight-semibold)',
+                  fontSize: 'var(--font-size-sm)',
                   padding: '8px 18px',
                   borderRadius: 8,
                   cursor: 'pointer',

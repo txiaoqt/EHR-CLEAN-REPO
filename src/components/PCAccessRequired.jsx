@@ -45,10 +45,10 @@ const PCAccessRequired = ({ onLogout }) => {
             }}
           />
           <div style={{ textAlign: 'left' }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
               TUP CLINIC
             </div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-primary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Staff Portal
             </div>
           </div>
@@ -76,8 +76,8 @@ const PCAccessRequired = ({ onLogout }) => {
         <h1
           style={{
             margin: '0 0 14px',
-            fontSize: 22,
-            fontWeight: 800,
+            fontSize: 'var(--font-size-xl)',
+            fontWeight: 'var(--font-weight-extrabold)',
             color: 'var(--text)',
             letterSpacing: '-0.02em'
           }}
@@ -89,10 +89,10 @@ const PCAccessRequired = ({ onLogout }) => {
         <p
           style={{
             margin: '0 0 10px',
-            fontSize: 14,
+            fontSize: 'var(--font-size-base)',
             lineHeight: 1.55,
             color: 'var(--text)',
-            fontWeight: 500
+            fontWeight: 'var(--font-weight-medium)'
           }}
         >
           This Staff Portal is designed for desktop and laptop computers.
@@ -101,7 +101,7 @@ const PCAccessRequired = ({ onLogout }) => {
         <p
           style={{
             margin: '0 0 12px',
-            fontSize: 14,
+            fontSize: 'var(--font-size-base)',
             lineHeight: 1.5,
             color: 'var(--text)'
           }}
@@ -112,7 +112,7 @@ const PCAccessRequired = ({ onLogout }) => {
         <p
           style={{
             margin: '0 0 4px',
-            fontSize: 13,
+            fontSize: 'var(--font-size-sm)',
             lineHeight: 1.5,
             color: 'var(--text-muted)'
           }}
@@ -130,8 +130,8 @@ const PCAccessRequired = ({ onLogout }) => {
               style={{
                 width: '100%',
                 justifyContent: 'center',
-                fontWeight: 600,
-                fontSize: 14,
+                fontWeight: 'var(--font-weight-semibold)',
+                fontSize: 'var(--font-size-base)',
                 padding: '9px 16px'
               }}
             >

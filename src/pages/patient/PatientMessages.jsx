@@ -4,6 +4,13 @@ import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon, AlertIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
+import MessageAttachment from '../../components/MessageAttachment.jsx';
+import MessageReactions from '../../components/MessageReactions.jsx';
+import {
+  uploadMessageAttachment,
+  validateAttachmentFile,
+  formatFileSize,
+} from '../../utils/messageAttachments.js';
 
 const CONCERN_TYPES = [
   'General clinic inquiry',
@@ -63,10 +70,16 @@ const PatientMessages = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
+  // messageId -> [{ id, emoji, reactor_auth_user_id, reactor_name }]
+  const [reactions, setReactions] = useState({});
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  // Photo attached to the next message, so staff can assess it remotely.
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef(null);
   const [composerText, setComposerText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileViewingChat, setMobileViewingChat] = useState(false);
@@ -337,6 +350,26 @@ const PatientMessages = () => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'patient_message_reactions' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const r = payload.new;
+            setReactions((prev) =>
+              (prev[r.message_id] || []).some((x) => x.id === r.id)
+                ? prev
+                : { ...prev, [r.message_id]: [...(prev[r.message_id] || []), r] }
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const r = payload.old;
+            setReactions((prev) => ({
+              ...prev,
+              [r.message_id]: (prev[r.message_id] || []).filter((x) => x.id !== r.id),
+            }));
+          }
+        }
+      )
       .subscribe();
 
     // Realtime for Messages (Live conversation messaging)
@@ -438,22 +471,112 @@ const PatientMessages = () => {
   }, [messages]);
 
   // Send message in existing open conversation
+  // ---- Reactions -----------------------------------------------------------
+  const reactionMessageKey = useMemo(
+    () => messages.map((m) => m.id).filter(Boolean).join(','),
+    [messages]
+  );
+
+  useEffect(() => {
+    const ids = reactionMessageKey ? reactionMessageKey.split(',') : [];
+    if (ids.length === 0) { setReactions({}); return undefined; }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('patient_message_reactions')
+        .select('id, message_id, emoji, reactor_auth_user_id, reactor_name')
+        .in('message_id', ids);
+      if (cancelled || error) return;
+
+      const map = {};
+      for (const r of data || []) (map[r.message_id] ||= []).push(r);
+      setReactions(map);
+    })();
+
+    return () => { cancelled = true; };
+  }, [reactionMessageKey]);
+
+  // Tapping the same emoji twice removes it, which is what a chat expects.
+  const toggleReaction = async (messageId, emoji) => {
+    // A resolved inquiry is a closed record. The database enforces this too —
+    // this guard just avoids a pointless round-trip.
+    if (isCurrentConversationResolved) return;
+
+    const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id;
+    if (!authUid) return;
+
+    const mine = (reactions[messageId] || []).find(
+      (r) => r.emoji === emoji && r.reactor_auth_user_id === authUid
+    );
+
+    if (mine) {
+      setReactions((prev) => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).filter((r) => r.id !== mine.id),
+      }));
+      await supabase.from('patient_message_reactions').delete().eq('id', mine.id);
+      return;
+    }
+
+    const optimistic = {
+      id: `pending-${Date.now()}`,
+      message_id: messageId,
+      emoji,
+      reactor_auth_user_id: authUid,
+      reactor_name: user?.name || null,
+    };
+    setReactions((prev) => ({ ...prev, [messageId]: [...(prev[messageId] || []), optimistic] }));
+
+    const { data } = await supabase
+      .from('patient_message_reactions')
+      .insert([{
+        message_id: messageId,
+        emoji,
+        reactor_auth_user_id: authUid,
+        reactor_name: user?.name || null,
+        reactor_role: 'patient',
+      }])
+      .select();
+
+    if (data?.[0]) {
+      setReactions((prev) => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).map((r) => (r.id === optimistic.id ? data[0] : r)),
+      }));
+    }
+  };
+
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
-    if (!composerText.trim() || !activeConversationId || sending || isCurrentConversationResolved) return;
+    const textToSend = composerText.trim();
+    const hasPhoto = Boolean(pendingPhoto);
+    if ((!textToSend && !hasPhoto) || !activeConversationId || sending || isCurrentConversationResolved) return;
 
     setSending(true);
-    const textToSend = composerText.trim();
+    setPhotoError('');
 
     try {
-      // 1. Try atomic send_patient_message RPC
-      const { data: rpcData, error: rpcError } = await supabase.rpc('send_patient_message', {
-        p_conversation_id: activeConversationId,
-        p_message_text: textToSend,
-      });
+      // Upload the photo first: a failed upload must not leave a message that
+      // claims an attachment it does not have.
+      let attachmentFields = {};
+      if (hasPhoto) {
+        attachmentFields = await uploadMessageAttachment(pendingPhoto, activeConversationId);
+      }
 
-      if (rpcError) {
-        // Fallback to direct verified insert if RPC unavailable
+      // The send RPC takes no attachment parameters, so a message carrying a
+      // photo is written directly.
+      let rpcError = null;
+      if (!hasPhoto) {
+        const { error } = await supabase.rpc('send_patient_message', {
+          p_conversation_id: activeConversationId,
+          p_message_text: textToSend,
+        });
+        rpcError = error;
+      }
+
+      if (rpcError || hasPhoto) {
+        // Direct verified insert (also the fallback when the RPC is unavailable)
         const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
         const insertPayload = {
           patient_id: user.patient_id,
@@ -464,6 +587,7 @@ const PatientMessages = () => {
           recipient_name: activeConversation?.recipient_name || 'Clinic Personnel (General)',
           concern_type: activeConversation?.concern_type || 'General clinic inquiry',
           message_text: textToSend,
+          ...attachmentFields,
           status: 'sent',
         };
 
@@ -487,11 +611,19 @@ const PatientMessages = () => {
       }
 
       setComposerText('');
+      setPendingPhoto(null);
+      if (photoInputRef.current) photoInputRef.current.value = '';
       setTimeout(() => scrollToBottom('smooth'), 50);
     } catch (err) {
       console.error('Send message error:', err);
-      setNotice('Unable to send your message right now. Please try again later.');
-      setNoticeOpen(true);
+      // Surface a photo problem against the photo, not as a generic send failure.
+      const message = err?.message || '';
+      if (/photo|file type|limit|upload/i.test(message)) {
+        setPhotoError(message);
+      } else {
+        setNotice('Unable to send your message right now. Please try again later.');
+        setNoticeOpen(true);
+      }
     } finally {
       setSending(false);
     }
@@ -634,8 +766,8 @@ const PatientMessages = () => {
           {/* Page Header */}
           <div className="patient-messages-header">
             <div>
-              <h2 className="patient-messages-title patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Messages</h2>
-              <div className="patient-messages-sub patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+              <h2 className="patient-messages-title patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>Messages</h2>
+              <div className="patient-messages-sub patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                 Direct non-emergency inquiries and follow-ups with university clinic personnel.
               </div>
             </div>
@@ -653,7 +785,7 @@ const PatientMessages = () => {
                 type="button"
                 className="btn primary tup-header-inquiry-btn"
                 onClick={() => setInquiryModalOpen(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '8px 16px', fontSize: 13 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 'var(--font-weight-semibold)', padding: '8px 16px', fontSize: 'var(--font-size-sm)' }}
               >
                 <PlusIcon size={16} />
                 <span>Start New Inquiry</span>
@@ -724,7 +856,7 @@ const PatientMessages = () => {
         {/* Two-Panel Messenger Workspace */}
         <div className="patient-main-layout-grid" style={{ display: 'block' }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
               Loading conversations...
             </div>
           ) : currentTabConversations.length === 0 ? (
@@ -758,7 +890,7 @@ const PatientMessages = () => {
               <div className={`tup-inbox-panel ${mobileViewingChat ? 'hidden-mobile' : ''}`}>
               <div className="tup-inbox-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                     {activeTab === 'active' ? 'Active Inquiries' : 'Past Inquiries'} ({currentTabConversations.length})
                   </span>
                   {activeTab === 'active' && (
@@ -789,7 +921,7 @@ const PatientMessages = () => {
 
               <div className="tup-inbox-list">
                 {filteredConversations.length === 0 ? (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
                     No matching conversations
                   </div>
                 ) : (
@@ -818,18 +950,18 @@ const PatientMessages = () => {
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.recipient_name}
                             </div>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
                             </span>
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginTop: 1 }}>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-medium)', marginTop: 1 }}>
                             {c.concern_type}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 11, padding: '1px 6px', textTransform: 'capitalize' }}>
+                            <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px', textTransform: 'capitalize' }}>
                               {c.status || 'open'}
                             </span>
                           </div>
@@ -870,10 +1002,10 @@ const PatientMessages = () => {
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {activeConversation?.recipient_name || 'Clinic Personnel (General)'}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
                       <span className="tup-status-dot" style={{ flexShrink: 0 }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         Clinic Staff · {activeConversation?.concern_type || 'General inquiry'}
@@ -883,17 +1015,17 @@ const PatientMessages = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <span className="badge badge-neutral tup-chat-header-concern-badge" style={{ fontSize: 12, fontWeight: 600 }}>
+                  <span className="badge badge-neutral tup-chat-header-concern-badge" style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
                     {activeConversation?.concern_type || 'General clinic inquiry'}
                   </span>
                   {isCurrentConversationResolved ? (
                     <span
                       style={{
                         background: 'rgba(16, 185, 129, 0.1)',
-                        color: '#059669',
+                        color: 'var(--color-emerald)',
                         border: '1px solid rgba(16, 185, 129, 0.2)',
-                        fontWeight: 600,
-                        fontSize: '12px',
+                        fontWeight: 'var(--font-weight-semibold)',
+                        fontSize: 'var(--font-size-xs)',
                         borderRadius: '9999px',
                         padding: '3px 10px',
                         display: 'inline-flex',
@@ -909,7 +1041,7 @@ const PatientMessages = () => {
                       type="button"
                       className="btn small secondary tup-chat-header-inquiry-btn"
                       onClick={() => setInquiryModalOpen(true)}
-                      style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
                     >
                       <PlusIcon size={13} />
                       New Inquiry
@@ -921,11 +1053,11 @@ const PatientMessages = () => {
               {/* Message History for this specific conversation */}
               <div className="tup-chat-messages-area" ref={messagesContainerRef}>
                 {messagesLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                     Loading messages...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                     No messages in this inquiry thread yet.
                   </div>
                 ) : (
@@ -946,20 +1078,41 @@ const PatientMessages = () => {
                               {!isStudent && (
                                 <div className="tup-chat-sender-label">
                                   <span>{msg.sender_name || 'Clinic Personnel'}</span>
-                                  <span style={{ fontSize: 11, opacity: 0.75, textTransform: 'capitalize' }}>
+                                  <span style={{ fontSize: 'var(--font-size-2xs)', opacity: 0.75, textTransform: 'capitalize' }}>
                                     ({msg.sender_role || 'Staff'})
                                   </span>
                                 </div>
                               )}
 
-                              <div className={`tup-chat-bubble ${isStudent ? 'outgoing' : 'incoming'}`}>
-                                {msg.message_text}
-                              </div>
+                              {/* A photo-only message has no text, so no bubble
+                                  is drawn — otherwise an empty box sits above
+                                  the image. */}
+                              {msg.message_text ? (
+                                <div className={`tup-chat-bubble ${isStudent ? 'outgoing' : 'incoming'}`}>
+                                  {msg.message_text}
+                                </div>
+                              ) : null}
+
+                              {(msg.attachment_path || msg.attachment_removed_at) && (
+                                <MessageAttachment
+                                  path={msg.attachment_path}
+                                  name={msg.attachment_name}
+                                  removedAt={msg.attachment_removed_at}
+                                />
+                              )}
+
+                              <MessageReactions
+                                reactions={reactions[msg.id] || []}
+                                currentUserId={user?.auth_user_id}
+                                onToggle={(emoji) => toggleReaction(msg.id, emoji)}
+                                align={isStudent ? 'right' : 'left'}
+                                disabled={isCurrentConversationResolved}
+                              />
 
                               <div className="tup-chat-time">
                                 <span>{formatMessageTime(msg.created_at)}</span>
                                 {isStudent && (
-                                  <span style={{ fontSize: 11, opacity: 0.8 }}>• {msg.status || 'sent'}</span>
+                                  <span style={{ fontSize: 'var(--font-size-2xs)', opacity: 0.8 }}>• {msg.status || 'sent'}</span>
                                 )}
                               </div>
                             </div>
@@ -994,28 +1147,79 @@ const PatientMessages = () => {
                   </button>
                 </div>
               ) : (
-                <form className="tup-chat-composer" onSubmit={handleSendMessage}>
-                  <textarea
-                    ref={textareaRef}
-                    className="tup-chat-input"
-                    rows={1}
-                    placeholder="Type your message..."
-                    value={composerText}
-                    onChange={(e) => setComposerText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={sending || !activeConversationId}
-                    aria-label="Message content input"
-                  />
-                  <button
-                    type="submit"
-                    className="tup-chat-send-btn"
-                    disabled={sending || !composerText.trim() || !activeConversationId}
-                    aria-label="Send Message"
-                  >
-                    <SendIcon size={16} />
-                    <span>{sending ? 'Sending...' : 'Send Message'}</span>
-                  </button>
-                </form>
+                <div>
+                  {pendingPhoto && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', padding: '6px 10px', borderRadius: 10, background: 'var(--surface-raised)', border: '1px solid var(--border)', fontSize: 'var(--font-size-xs)' }}>
+                      <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{pendingPhoto.name}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(pendingPhoto.size)}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingPhoto(null);
+                          setPhotoError('');
+                          if (photoInputRef.current) photoInputRef.current.value = '';
+                        }}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-flex' }}
+                        aria-label="Remove the attached photo"
+                      >
+                        <CloseIcon size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {photoError && (
+                    <div role="alert" style={{ margin: '0 0 8px', padding: '6px 10px', borderRadius: 10, background: 'var(--color-rose-bg)', color: 'var(--color-rose-text)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                      {photoError}
+                    </div>
+                  )}
+
+                  <form className="tup-chat-composer" onSubmit={handleSendMessage}>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setPhotoError('');
+                        setPendingPhoto(file);
+                        const problem = validateAttachmentFile(file);
+                        if (problem) setPhotoError(problem);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="tup-chat-send-btn"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={sending || !activeConversationId || isCurrentConversationResolved}
+                      title="Attach a photo for the clinic to assess"
+                      aria-label="Attach a photo"
+                    >
+                      <PlusIcon size={16} />
+                      <span>Photo</span>
+                    </button>
+                    <textarea
+                      ref={textareaRef}
+                      className="tup-chat-input"
+                      rows={1}
+                      placeholder="Type your message..."
+                      value={composerText}
+                      onChange={(e) => setComposerText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={sending || !activeConversationId}
+                      aria-label="Message content input"
+                    />
+                    <button
+                      type="submit"
+                      className="tup-chat-send-btn"
+                      disabled={sending || (!composerText.trim() && !pendingPhoto) || !activeConversationId || Boolean(photoError)}
+                      aria-label="Send Message"
+                    >
+                      <SendIcon size={16} />
+                      <span>{sending ? 'Sending...' : 'Send Message'}</span>
+                    </button>
+                  </form>
+                </div>
               )}
             </div>
           </div>
@@ -1063,7 +1267,7 @@ const PatientMessages = () => {
                     <div className="patient-select-wrapper">
                       <select
                         className="input"
-                        style={{ width: '100%', fontSize: '16px' }}
+                        style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
                         value={inquiryForm.recipient_staff_id}
                         onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }))}
                       >
@@ -1087,7 +1291,7 @@ const PatientMessages = () => {
                     <div className="patient-select-wrapper">
                       <select
                         className="input"
-                        style={{ width: '100%', fontSize: '16px' }}
+                        style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
                         value={inquiryForm.concern_type}
                         onChange={(e) => setInquiryForm((p) => ({ ...p, concern_type: e.target.value }))}
                         required
@@ -1108,7 +1312,7 @@ const PatientMessages = () => {
                     </label>
                     <textarea
                       className="input"
-                      style={{ width: '100%', minHeight: 120, lineHeight: 1.4, fontSize: '16px' }}
+                      style={{ width: '100%', minHeight: 120, lineHeight: 1.4, fontSize: 'var(--font-size-md)' }}
                       placeholder="Describe your inquiry, follow-up, or question in detail..."
                       value={inquiryForm.message_text}
                       onChange={(e) => setInquiryForm((p) => ({ ...p, message_text: e.target.value }))}
@@ -1168,10 +1372,10 @@ const PatientMessages = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 {notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'Notice' : 'Inquiry Sent'}
               </h3>
-              <div style={{ color: notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--text)', fontSize: 14, lineHeight: 1.5 }}>
+              <div style={{ color: notice.toLowerCase().includes('unable') || notice.toLowerCase().includes('failed') ? 'var(--danger)' : 'var(--text)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
                 {notice}
               </div>
               <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end' }}>

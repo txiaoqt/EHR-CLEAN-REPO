@@ -27,6 +27,7 @@ import {
   Filler,
 } from 'chart.js';
 import { logAudit } from '../utils.js';
+import { buildCsv, downloadBlob, exportFilename } from '../utils/export/csv.js';
 import { useAuth } from '../AuthContext.jsx';
 import { useTheme } from '../ThemeContext.jsx';
 
@@ -62,7 +63,7 @@ const Dashboard = () => {
   const { isDark } = useTheme();
 
   const [currentDateTime, setCurrentDateTime] = useState('');
-  const [checkedInToday, setCheckedInToday] = useState(0);
+  const [appointmentsToday, setAppointmentsToday] = useState(0);
   const [encountersToday, setEncountersToday] = useState(0);
   const [futureScheduledAppointments, setFutureScheduledAppointments] = useState(0);
   const [totalVisitsWeek, setTotalVisitsWeek] = useState(0);
@@ -70,9 +71,8 @@ const Dashboard = () => {
   const [todayAppointments, setTodayAppointments] = useState([]);
 
   const [recentEncounters, setRecentEncounters] = useState([]);
-  const [visitsData, setVisitsData] = useState(null);
-  const [complaintsData, setComplaintsData] = useState(null);
-  const [diagnosesData, setDiagnosesData] = useState(null);
+  const [rawVisitsDateCounts, setRawVisitsDateCounts] = useState({});
+  const [rawTopComplaints, setRawTopComplaints] = useState([]);
   const [totalComplaintsCount, setTotalComplaintsCount] = useState(0);
   const [topComplaintsList, setTopComplaintsList] = useState([]);
 
@@ -87,10 +87,6 @@ const Dashboard = () => {
   const [showWeatherModal, setShowWeatherModal] = useState(false);
 
   const [showExportSuccessModal, setShowExportSuccessModal] = useState(false);
-  const [showExportPasswordModal, setShowExportPasswordModal] = useState(false);
-  const [exportPasswordInput, setExportPasswordInput] = useState('');
-  const [exportPasswordError, setExportPasswordError] = useState('');
-  const EXPORT_CENSUS_PASSWORD = import.meta.env.VITE_EXPORT_CENSUS_PASSWORD || 'TUPCensus@2026';
 
   const [showNewApptModal, setShowNewApptModal] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
@@ -125,7 +121,7 @@ const Dashboard = () => {
 
     try {
       const results = await Promise.allSettled([
-        supabase.from('appointments').select('*').eq('appointment_date', todayIso).eq('status', 'Checked-in'),
+        supabase.from('appointments').select('*').eq('appointment_date', todayIso).neq('status', 'Cancelled'),
         supabase.from('encounters').select('*', { head: true, count: 'exact' }).gte('encounter_date', todayIso).lt('encounter_date', tomorrowIso),
         supabase.from('appointments').select('*', { head: true, count: 'exact' }).gt('appointment_date', todayIso).eq('status', 'Scheduled'),
         supabase.from('students').select('*', { head: true, count: 'exact' }),
@@ -134,11 +130,11 @@ const Dashboard = () => {
         supabase.from('encounters').select('chief_complaint').not('chief_complaint', 'is', null)
       ]);
 
-      const [checkedInRes, encTodayRes, futureApptsRes, patientsCountRes, recentEncRes, visitsRes, complaintsRes] = results.map(r => (r.status === 'fulfilled' ? r.value : { data: null, count: null }));
+      const [todayApptsRes, encTodayRes, futureApptsRes, patientsCountRes, recentEncRes, visitsRes, complaintsRes] = results.map(r => (r.status === 'fulfilled' ? r.value : { data: null, count: null }));
 
-      if (checkedInRes?.data) {
-        setCheckedInToday(checkedInRes.data.length);
-        setTodayAppointments(checkedInRes.data);
+      if (todayApptsRes?.data) {
+        setAppointmentsToday(todayApptsRes.data.length);
+        setTodayAppointments(todayApptsRes.data);
       }
       if (encTodayRes?.count !== undefined && encTodayRes?.count !== null) setEncountersToday(encTodayRes.count);
       if (futureApptsRes?.count !== undefined && futureApptsRes?.count !== null) setFutureScheduledAppointments(futureApptsRes.count);
@@ -152,24 +148,7 @@ const Dashboard = () => {
         const date = enc.encounter_date.split('T')[0];
         dateCounts[date] = (dateCounts[date] || 0) + 1;
       });
-      const labels = Object.keys(dateCounts).sort().slice(-7);
-      setVisitsData({
-        labels: labels.map(l => {
-          const d = new Date(l);
-          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        }),
-        datasets: [{
-          label: 'Visits',
-          data: labels.map(l => dateCounts[l]),
-          borderColor: '#c92a2a',
-          backgroundColor: 'rgba(201, 42, 42, 0.08)',
-          tension: 0.35,
-          fill: true,
-          pointBackgroundColor: '#c92a2a',
-          pointRadius: 4,
-          pointHoverRadius: 6
-        }]
-      });
+      setRawVisitsDateCounts(dateCounts);
 
       const now = new Date();
       const last7 = [];
@@ -191,31 +170,61 @@ const Dashboard = () => {
       });
       const top10 = Object.entries(compCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
       setTopComplaintsList(top10.map(([k, v]) => ({ label: k, value: v })));
-
-      setComplaintsData({
-        labels: top10.map(([k]) => k),
-        datasets: [{
-          label: 'Encounters',
-          data: top10.map(([, v]) => v),
-          backgroundColor: '#c92a2a',
-          borderRadius: 4,
-          borderSkipped: false
-        }]
-      });
-
-      setDiagnosesData({
-        labels: top10.map(([k]) => k),
-        datasets: [{
-          data: top10.map(([, v]) => v),
-          backgroundColor: DONUT_COLORS.slice(0, top10.length),
-          borderWidth: 2,
-          borderColor: '#ffffff'
-        }]
-      });
+      setRawTopComplaints(top10);
     } catch (err) {
       console.warn('Error fetching dashboard data:', err);
     }
   }, []);
+
+  const visitsData = useMemo(() => {
+    const dates = Object.keys(rawVisitsDateCounts).sort().slice(-7);
+    if (dates.length === 0) return null;
+    return {
+      labels: dates.map(l => {
+        const d = new Date(l);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }),
+      datasets: [{
+        label: 'Visits',
+        data: dates.map(l => rawVisitsDateCounts[l]),
+        borderColor: isDark ? '#f87171' : '#c92a2a',
+        backgroundColor: isDark ? 'rgba(248, 113, 113, 0.14)' : 'rgba(201, 42, 42, 0.08)',
+        tension: 0.35,
+        fill: true,
+        pointBackgroundColor: isDark ? '#f87171' : '#c92a2a',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    };
+  }, [rawVisitsDateCounts, isDark]);
+
+  const complaintsData = useMemo(() => {
+    if (rawTopComplaints.length === 0) return null;
+    return {
+      labels: rawTopComplaints.map(([k]) => k),
+      datasets: [{
+        label: 'Encounters',
+        data: rawTopComplaints.map(([, v]) => v),
+        backgroundColor: isDark ? 'rgba(248, 113, 113, 0.78)' : '#c92a2a',
+        hoverBackgroundColor: isDark ? '#f87171' : '#a61e1e',
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    };
+  }, [rawTopComplaints, isDark]);
+
+  const diagnosesData = useMemo(() => {
+    if (rawTopComplaints.length === 0) return null;
+    return {
+      labels: rawTopComplaints.map(([k]) => k),
+      datasets: [{
+        data: rawTopComplaints.map(([, v]) => v),
+        backgroundColor: DONUT_COLORS.slice(0, rawTopComplaints.length),
+        borderWidth: 2,
+        borderColor: isDark ? '#1e293b' : '#ffffff'
+      }]
+    };
+  }, [rawTopComplaints, isDark]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -310,12 +319,12 @@ const Dashboard = () => {
       datasets:[{
         label: weatherTab,
         data: dataPoints,
-        borderColor: '#c92a2a',
-        backgroundColor: 'rgba(201, 42, 42, 0.08)',
+        borderColor: isDark ? '#f87171' : '#c92a2a',
+        backgroundColor: isDark ? 'rgba(248, 113, 113, 0.14)' : 'rgba(201, 42, 42, 0.08)',
         tension: 0.35,
         fill: true,
         pointRadius: 2,
-        pointBackgroundColor: '#c92a2a'
+        pointBackgroundColor: isDark ? '#f87171' : '#c92a2a'
       }]
     };
   };
@@ -371,26 +380,37 @@ const Dashboard = () => {
       const { data: students } = await supabase.from('students').select('id, name');
       const studentMap = {};
       (students || []).forEach(s => studentMap[s.id] = s.name);
-      const csvContent = (encounters || []).map(enc => {
-        const name = studentMap[enc.patient_id] || enc.patient_id;
-        const date = enc.encounter_date ? new Date(enc.encounter_date).toLocaleDateString() : '';
-        const vitals = JSON.stringify(enc.vitals || {}).replace(/"/g, '""');
-        return `"${name}","${date}","${vitals}"`;
-      }).join('\n');
-      const csvData = `Name,Date,Vitals\n${csvContent}`;
-      if (window.exportCsv) {
-        window.exportCsv('census_report.csv', csvData);
-        setShowExportSuccessModal(true);
-      } else {
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'census_report.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-        setShowExportSuccessModal(true);
-      }
+
+      const rows = (encounters || []).map(enc => ({
+        name: studentMap[enc.patient_id] || enc.patient_id,
+        date: enc.encounter_date
+          ? new Date(enc.encounter_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
+          : '',
+        vitals: JSON.stringify(enc.vitals || {}),
+      }));
+
+      // Shared CSV builder: proper quoting (patient names were interpolated raw
+      // before, so a quote or comma broke the file), a formula-injection guard,
+      // and a UTF-8 BOM so Excel reads "ñ" correctly.
+      const csvData = buildCsv(
+        [
+          { label: 'Name', value: (r) => r.name },
+          { label: 'Date', value: (r) => r.date },
+          { label: 'Vitals', value: (r) => r.vitals },
+        ],
+        rows
+      );
+
+      downloadBlob(
+        new Blob([csvData], { type: 'text/csv;charset=utf-8;' }),
+        exportFilename('census-report', 'csv')
+      );
+      setShowExportSuccessModal(true);
+
+      await logAudit('EXPORT', `Exported census report — ${rows.length} encounters as CSV`, undefined, {
+        type: 'export',
+        meta: { entity: 'census', format: 'csv', rowCount: rows.length },
+      });
     } catch (err) {
       alert('Error exporting census.');
     }
@@ -461,7 +481,7 @@ const Dashboard = () => {
         return;
       }
       if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
-        alert('Failed to save appointment: This student already has an active (Scheduled or Checked-in) appointment.');
+        alert('Failed to save appointment: This student already has an active appointment.');
         setSavingAppt(false);
         return;
       }
@@ -483,16 +503,13 @@ const Dashboard = () => {
   const openAlertsModal = (e) => { e?.stopPropagation?.(); setShowAlertsModal(true); };
   const closeAlertsModal = () => setShowAlertsModal(false);
 
-  const confirmExportCensus = async () => {
-    if (exportPasswordInput.trim() !== EXPORT_CENSUS_PASSWORD) {
-      setExportPasswordError('Incorrect export password.');
-      return;
-    }
-    setShowExportPasswordModal(false);
-    await exportCensus();
+  // Exports are no longer password-gated. The portal is only reachable by
+  // signed-in staff, and every export is recorded in the audit trail with the
+  // staff member's name, the format and the row count.
+  const requestExportCensus = () => {
+    if (user?.role !== 'physician') return;
+    exportCensus();
   };
-
-  const requestExportCensus = () => { if (user?.role === 'physician') setShowExportPasswordModal(true); };
 
   const goToInventoryItem = (item) => {
     navigate('/inventory', { state: { focus: item.id } });
@@ -502,10 +519,10 @@ const Dashboard = () => {
   return (
     <main className="main">
       <div className="page">
-        <div className="dashboard-topbar">
-          <div className="dashboard-header-title-block">
-            <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.025em' }}>Dashboard</h1>
-            <div className="dashboard-header-meta">
+        <div className="page-header dashboard-topbar">
+          <div className="page-header-title-block dashboard-header-title-block">
+            <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.02em' }}>Dashboard</h1>
+            <div className="page-header-subtitle dashboard-header-meta">
               <span>{currentDateTime}</span>
               <span style={{ color: 'var(--border)' }}>•</span>
               <button
@@ -519,13 +536,13 @@ const Dashboard = () => {
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 20,
                   padding: '3px 10px',
-                  fontSize: 12,
-                  fontWeight: 600,
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 'var(--font-weight-semibold)',
                   color: 'var(--text)',
                   cursor: 'pointer',
                   transition: 'background 0.15s ease, border-color 0.15s ease'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = '#ffffff'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--panel)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--grey-100)'; }}
                 title="Click to view detailed weather forecast"
                 aria-label="View Weather Forecast Details"
@@ -562,7 +579,7 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
-            <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
+            <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', whiteSpace: 'nowrap' }}>
               New Appointment
             </button>
           </div>
@@ -571,20 +588,20 @@ const Dashboard = () => {
         <section className="dashboard-kpis-grid">
           {[
             { title: 'Encounters Today', val: encountersToday, sub: encountersToday === 0 ? 'No encounters today' : `${encountersToday} encounter${encountersToday > 1 ? 's' : ''}`, Icon: EncountersIcon },
-            { title: 'Appointments Today', val: checkedInToday, sub: checkedInToday === 0 ? 'No appointments today' : `${checkedInToday} checked-in`, Icon: CalendarIcon },
+            { title: 'Appointments Today', val: appointmentsToday, sub: appointmentsToday === 0 ? 'No appointments today' : `${appointmentsToday} scheduled`, Icon: CalendarIcon },
             { title: 'Future Appointments', val: futureScheduledAppointments, sub: futureScheduledAppointments === 0 ? 'No future appointments' : `${futureScheduledAppointments} scheduled`, Icon: ClockIcon },
             { title: 'Visits This Week', val: totalVisitsWeek, sub: totalVisitsWeek === 0 ? 'No visits this week' : `${totalVisitsWeek} total visits`, Icon: ReportsIcon },
             { title: 'Total Patients', val: totalPatients, sub: 'Registered patients', Icon: UsersIcon }
           ].map((kpi, i) => (
             <div className="kpi-card" key={i} style={{ padding: '16px 18px', minHeight: 98, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div className="kpi-title" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>{kpi.title}</div>
+                <div className="kpi-title" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)' }}>{kpi.title}</div>
                 <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
                   <kpi.Icon size={18} />
                 </span>
               </div>
-              <div className="kpi-value" style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, margin: '4px 0 2px', color: 'var(--text)' }}>{kpi.val}</div>
-              <div className="kpi-subtitle" style={{ fontSize: 12, color: 'var(--text-light)' }}>{kpi.sub}</div>
+              <div className="kpi-value" style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', lineHeight: 1.15, margin: '4px 0 2px', color: 'var(--text)' }}>{kpi.val}</div>
+              <div className="kpi-subtitle" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>{kpi.sub}</div>
             </div>
           ))}
         </section>
@@ -595,8 +612,8 @@ const Dashboard = () => {
               <div>
                 <div className="card-header" style={{ marginBottom: 14 }}>
                   <div>
-                    <h3 className="card-title" style={{ fontSize: 18 }}>Upcoming Schedule</h3>
-                    <span className="card-subtitle" style={{ fontSize: 13 }}>Next scheduled consultations</span>
+                    <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)' }}>Upcoming Schedule</h3>
+                    <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)' }}>Next scheduled consultations</span>
                   </div>
                   <button
                     type="button"
@@ -605,9 +622,9 @@ const Dashboard = () => {
                       background: 'none',
                       border: 'none',
                       padding: 0,
-                      color: 'var(--color-primary)',
-                      fontSize: 13,
-                      fontWeight: 600,
+                      color: 'var(--color-primary-text, #fda4af)',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 'var(--font-weight-semibold)',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -620,28 +637,28 @@ const Dashboard = () => {
 
                 {todayAppointments.length === 0 ? (
                   <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--grey-100)', borderRadius: 10, border: '1px solid var(--border-subtle)', margin: '8px 0' }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No upcoming appointments scheduled</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Check the Appointments page to view the full schedule and active queue.</div>
+                    <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginBottom: 4 }}>No upcoming appointments scheduled</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Check the Appointments page to view the full schedule and active queue.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
                     {todayAppointments.slice(0, 4).map((appt, idx) => (
-                      <div key={appt.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'var(--grey-100)', borderRadius: 8, fontSize: 13, gap: 8, minWidth: 0 }}>
+                      <div key={appt.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'var(--grey-100)', borderRadius: 8, fontSize: 'var(--font-size-sm)', gap: 8, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--text)', minWidth: 68, flexShrink: 0 }}>{appt.appointment_time || '09:00 AM'}</span>
-                          <span style={{ color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>{appt.patient_id}</span>
-                          <span style={{ color: 'var(--text-light)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appt.reason || 'Consultation'}</span>
+                          <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', minWidth: 68, flexShrink: 0 }}>{appt.appointment_time || '09:00 AM'}</span>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)', flexShrink: 0 }}>{appt.patient_id}</span>
+                          <span style={{ color: 'var(--text-light)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appt.reason || 'Consultation'}</span>
                         </div>
-                        <span className="badge badge-info" style={{ fontSize: 11, flexShrink: 0 }}>{appt.status || 'Scheduled'}</span>
+                        <span className="badge badge-info" style={{ fontSize: 'var(--font-size-2xs)', flexShrink: 0 }}>{appt.status || 'Scheduled'}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: 12, marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: 12, marginTop: 12, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
                 <span>Scheduled Consultations</span>
-                <span style={{ color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/appointments')}>
+                <span style={{ color: 'var(--color-primary-text, #fda4af)', fontWeight: 'var(--font-weight-semibold)', cursor: 'pointer' }} onClick={() => navigate('/appointments')}>
                   Manage Schedule & Queue →
                 </span>
               </div>
@@ -649,8 +666,8 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 310, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 18 }}>Diagnosis Distribution</h3>
-                <span className="card-subtitle" style={{ fontSize: 13 }}>Clinical Assessment Breakdown</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)' }}>Diagnosis Distribution</h3>
+                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)' }}>Clinical Assessment Breakdown</span>
               </div>
 
               <div className="diagnosis-card-body">
@@ -659,12 +676,12 @@ const Dashboard = () => {
                     <>
                       <Doughnut data={diagnosesData} options={donutOptions} />
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{totalComplaintsCount}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 4 }}>Total Encounters</div>
+                        <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1 }}>{totalComplaintsCount}</div>
+                        <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)', marginTop: 4 }}>Total Encounters</div>
                       </div>
                     </>
                   ) : (
-                    <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', paddingTop: 60 }}>No data</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', paddingTop: 60 }}>No data</div>
                   )}
                 </div>
 
@@ -675,12 +692,12 @@ const Dashboard = () => {
                   aria-label="Diagnosis distribution list"
                 >
                   {topComplaintsList.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text)', minWidth: 0 }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', color: 'var(--text)', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: DONUT_COLORS[idx % DONUT_COLORS.length], flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
                       </div>
-                      <span style={{ fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{item.value}</span>
+                      <span style={{ fontWeight: 'var(--font-weight-bold)', marginLeft: 6, flexShrink: 0 }}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -689,21 +706,21 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 18 }}>Visit Over Time</h3>
-                <span className="card-subtitle" style={{ fontSize: 13 }}>Monthly Consult Volume</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)' }}>Visit Over Time</h3>
+                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)' }}>Monthly Consult Volume</span>
               </div>
               <div className="dashboard-chart-wrapper">
-                {visitsData ? <Line data={visitsData} options={lineChartOptions} /> : <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: 75, fontSize: 13 }}>No visit trends available</div>}
+                {visitsData ? <Line data={visitsData} options={lineChartOptions} /> : <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: 75, fontSize: 'var(--font-size-sm)' }}>No visit trends available</div>}
               </div>
             </div>
 
             <div className="card" style={{ padding: '20px 22px', minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
-                <h3 className="card-title" style={{ fontSize: 18 }}>Top 10 Chief Complaints</h3>
-                <span className="card-subtitle" style={{ fontSize: 13 }}>Most Frequent Cases</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)' }}>Top 10 Chief Complaints</h3>
+                <span className="card-subtitle" style={{ fontSize: 'var(--font-size-sm)' }}>Most Frequent Cases</span>
               </div>
               <div className="dashboard-chart-wrapper">
-                {complaintsData ? <Bar data={complaintsData} options={horizontalBarOptions} /> : <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: 75, fontSize: 13 }}>No complaint data</div>}
+                {complaintsData ? <Bar data={complaintsData} options={horizontalBarOptions} /> : <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: 75, fontSize: 'var(--font-size-sm)' }}>No complaint data</div>}
               </div>
             </div>
           </div>
@@ -714,34 +731,34 @@ const Dashboard = () => {
                 <span style={{ color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
                   <AlertIcon size={18} />
                 </span>
-                <h3 className="card-title" style={{ fontSize: 18, margin: 0 }}>Alerts</h3>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>Alerts</h3>
               </div>
               {lowStockItems.length === 0 ? (
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>All systems normal</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>No alerts at this time.</div>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>All systems normal</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 3 }}>No alerts at this time.</div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--danger)' }}>{lowStockItems.length} Low Stock Alert{lowStockItems.length > 1 ? 's' : ''}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>Click to review and reorder low inventory items</div>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--danger)' }}>{lowStockItems.length} Low Stock Alert{lowStockItems.length > 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 3 }}>Click to review and reorder low inventory items</div>
                 </div>
               )}
             </div>
 
             <div className="card" style={{ padding: '18px 20px' }}>
-              <h3 className="card-title" style={{ fontSize: 18, marginBottom: 12 }}>Quick Actions</h3>
+              <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', marginBottom: 12 }}>Quick Actions</h3>
               <div className="quick-actions-grid">
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/patients')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/patients')}>
                   Register Patient
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/encounter')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/encounter')}>
                   New Encounter
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={requestExportCensus}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={requestExportCensus}>
                   Export Census
                 </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 13, fontWeight: 600, padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/reports')}>
+                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/reports')}>
                   View Reports
                 </button>
               </div>
@@ -749,17 +766,17 @@ const Dashboard = () => {
 
             <div className="card" style={{ padding: '18px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h3 className="card-title" style={{ fontSize: 18, margin: 0 }}>Recent Encounters</h3>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>Recent Encounters</h3>
                 <button
                   type="button"
-                  onClick={() => navigate('/encounters')}
+                  onClick={() => navigate('/medical-log')}
                   style={{
                     background: 'none',
                     border: 'none',
                     padding: 0,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--color-primary, #c92a2a)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: 'var(--color-primary-text, #fda4af)',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -774,16 +791,16 @@ const Dashboard = () => {
                 </button>
               </div>
               {recentEncounters.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>No recent encounters</div>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>No recent encounters</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {recentEncounters.slice(0, 4).map((enc, idx) => {
                     const timeStr = enc.encounter_date ? new Date(enc.encounter_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
                     return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: idx < Math.min(recentEncounters.length, 4) - 1 ? '1px solid var(--border-subtle)' : 'none', minWidth: 0, gap: 8 }}>
-                        <span style={{ fontWeight: 700, color: 'var(--text)', width: 90, flexShrink: 0 }}>{enc.patient_id || 'Unknown'}</span>
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', padding: '6px 0', borderBottom: idx < Math.min(recentEncounters.length, 4) - 1 ? '1px solid var(--border-subtle)' : 'none', minWidth: 0, gap: 8 }}>
+                        <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', width: 90, flexShrink: 0 }}>{enc.patient_id || 'Unknown'}</span>
                         <span style={{ color: 'var(--text-muted)', flex: 1, padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{enc.chief_complaint || 'General Checkup'}</span>
-                        <span style={{ color: 'var(--text-light)', fontSize: 12, flexShrink: 0 }}>{timeStr}</span>
+                        <span style={{ color: 'var(--text-light)', fontSize: 'var(--font-size-xs)', flexShrink: 0 }}>{timeStr}</span>
                       </div>
                     );
                   })}
@@ -793,7 +810,7 @@ const Dashboard = () => {
           </div>
         </section>
 
-        <footer style={{ marginTop: 28, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--text-light)' }}>
+        <footer style={{ marginTop: 28, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
           <div>© {new Date().getFullYear()} TUP Clinic. All rights reserved.</div>
           <div>Staff Portal v1.0.0</div>
         </footer>
@@ -803,19 +820,19 @@ const Dashboard = () => {
           <div style={{ position:'fixed', inset:0, zIndex:1300, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <div style={{ width: 560, maxWidth:'94%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>New Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>New Appointment</h3>
                 <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
 
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Search Patient (ID or Name)</label>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Search Patient (ID or Name)</label>
                 <input className="input" placeholder="Type name or student ID..." value={patientSearch} onChange={(e)=>setPatientSearch(e.target.value)} style={{ width: '100%' }} />
                 {patientSuggestions.length > 0 && (
                   <div style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 150, overflowY: 'auto', marginTop: 4 }}>
                     {patientSuggestions.map(p => (
-                      <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 'var(--font-size-xs)', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
                         <strong>{p.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.id})</span>
                       </div>
                     ))}
@@ -825,11 +842,11 @@ const Dashboard = () => {
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Date</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Date</label>
                   <input id="appointment_date" type="date" className="input" value={newAppt.appointment_date} onChange={(e) => setNewAppt(prev => ({ ...prev, appointment_date: e.target.value }))} style={{ width: '100%' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Time</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Time</label>
                   <input id="appointment_time" type="time" className="input" value={newAppt.appointment_time} onChange={(e) => setNewAppt(prev => ({ ...prev, appointment_time: e.target.value }))} style={{ width: '100%' }} />
                 </div>
               </div>
@@ -844,35 +861,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Export Password Modal */}
-        {showExportPasswordModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1400, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 420, maxWidth:'92%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Census Export Authorization</h3>
-                <button type="button" className="modal-close-btn" onClick={() => { setShowExportPasswordModal(false); setExportPasswordInput(''); setExportPasswordError(''); }} aria-label="Close modal">
-                  <CloseIcon size={18} />
-                </button>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 0 }}>Enter staff export password to download the clinic census report.</p>
-              <input
-                type="password"
-                className="input"
-                value={exportPasswordInput}
-                onChange={(e) => { setExportPasswordInput(e.target.value); if (exportPasswordError) setExportPasswordError(''); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') confirmExportCensus(); }}
-                placeholder="Enter password..."
-                style={{ width: '100%', marginBottom: 12 }}
-                autoFocus
-              />
-              {exportPasswordError && <div style={{ color: 'var(--danger)', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{exportPasswordError}</div>}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button className="btn secondary" onClick={() => { setShowExportPasswordModal(false); setExportPasswordInput(''); setExportPasswordError(''); }}>Cancel</button>
-                <button className="btn" onClick={confirmExportCensus}>Confirm & Export</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Export Success Modal */}
         {showExportSuccessModal && (
@@ -883,9 +871,9 @@ const Dashboard = () => {
                   <CloseIcon size={18} />
                 </button>
               </div>
-              <div style={{ fontSize: 32, marginBottom: 8, color: 'var(--color-emerald-text)' }}>✓</div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Census Exported</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 18 }}>The census CSV file has been generated and downloaded successfully.</p>
+              <div style={{ fontSize: 'var(--font-size-4xl)', marginBottom: 8, color: 'var(--color-emerald-text)' }}>✓</div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Census Exported</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 18 }}>The census CSV file has been generated and downloaded successfully.</p>
               <button className="btn" style={{ width: '100%' }} onClick={() => setShowExportSuccessModal(false)}>Done</button>
             </div>
           </div>
@@ -896,20 +884,20 @@ const Dashboard = () => {
           <div style={{ position:'fixed', inset:0, zIndex:1400, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <div style={{ width: 500, maxWidth:'94%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Low Stock Alert Items</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Low Stock Alert Items</h3>
                 <button type="button" className="modal-close-btn" onClick={closeAlertsModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
               {lowStockItems.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>All inventory levels are adequate.</div>
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>All inventory levels are adequate.</div>
               ) : (
                 <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {lowStockItems.map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border, var(--border))' }}>
                       <div>
-                        <strong style={{ fontSize: 13, color: 'var(--text)' }}>{item.item_name}</strong>
-                        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2 }}>
+                        <strong style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text)' }}>{item.item_name}</strong>
+                        <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--danger)', marginTop: 2 }}>
                           Remaining: {item.stock_quantity} {item.unit || 'units'} (Reorder at {item.reorder_level})
                         </div>
                       </div>
@@ -931,8 +919,8 @@ const Dashboard = () => {
             <div style={{ width: 680, maxWidth: '94%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }} role="dialog" aria-modal="true" aria-labelledby="weather-modal-title">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
-                  <h3 id="weather-modal-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Weather & Meteorological Outlook</h3>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Location: {weatherState.place || 'Asia/Manila'}</span>
+                  <h3 id="weather-modal-title" style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Weather & Meteorological Outlook</h3>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Location: {weatherState.place || 'Asia/Manila'}</span>
                 </div>
                 <button type="button" className="modal-close-btn" onClick={() => setShowWeatherModal(false)} aria-label="Close weather modal">
                   <CloseIcon size={18} />
@@ -941,30 +929,30 @@ const Dashboard = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ fontSize: 36 }}>{weatherState.current ? weatherCodeToEmoji(weatherState.current.weathercode) : '⛅'}</div>
+                  <div style={{ fontSize: 'var(--font-size-5xl)' }}>{weatherState.current ? weatherCodeToEmoji(weatherState.current.weathercode) : '⛅'}</div>
                   <div>
-                    <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
+                    <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {weatherState.current ? `${Math.round(weatherState.current.temperature)}°C` : '27°C'}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginTop: 4 }}>
                       {weatherState.current ? weatherCodeToText(weatherState.current.weathercode) : 'Light Rain'}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: 16, rowGap: 4, fontSize: 13, textAlign: 'right' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: 16, rowGap: 4, fontSize: 'var(--font-size-sm)', textAlign: 'right' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Precipitation</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.daily?.precipitation_sum?.[0] ? `${weatherState.daily.precipitation_sum[0]} mm` : '41.7 mm'}</span>
+                  <span style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>{weatherState.daily?.precipitation_sum?.[0] ? `${weatherState.daily.precipitation_sum[0]} mm` : '41.7 mm'}</span>
                   <span style={{ color: 'var(--text-muted)' }}>Wind Speed</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.current?.windspeed ? `${weatherState.current.windspeed} m/s` : '25.6 m/s'}</span>
+                  <span style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>{weatherState.current?.windspeed ? `${weatherState.current.windspeed} m/s` : '25.6 m/s'}</span>
                   <span style={{ color: 'var(--text-muted)' }}>Weather Status</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{weatherState.current ? weatherCodeToText(weatherState.current.weathercode) : 'Light rain'}</span>
+                  <span style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>{weatherState.current ? weatherCodeToText(weatherState.current.weathercode) : 'Light rain'}</span>
                 </div>
               </div>
 
               {/* 24-Hour Sparkline Chart */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>24-Hour Temperature Forecast</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 8 }}>24-Hour Temperature Forecast</div>
                 <div style={{ height: 110, minWidth: 0 }}>
                   {weatherState.hourly && <Line data={getWeatherSparkline()} options={sparkOptions} />}
                 </div>
@@ -973,7 +961,7 @@ const Dashboard = () => {
               {/* 7-Day Forecast Row */}
               {weatherState.daily && (
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>7-Day Weather Outlook</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 10 }}>7-Day Weather Outlook</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, textAlign: 'center' }}>
                     {(weatherState.daily.time || []).slice(0, 7).map((t, idx) => {
                       const dayName = new Date(t).toLocaleDateString(undefined, { weekday: 'short' });
@@ -982,9 +970,9 @@ const Dashboard = () => {
                       const code = weatherState.daily.weathercode?.[idx] || 0;
                       return (
                         <div key={idx} style={{ flex: 1, padding: '8px 4px', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{dayName}</div>
-                          <div style={{ fontSize: 18, margin: '4px 0' }}>{weatherCodeToEmoji(code)}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{maxT}° / {minT}°</div>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)' }}>{dayName}</div>
+                          <div style={{ fontSize: 'var(--font-size-lg)', margin: '4px 0' }}>{weatherCodeToEmoji(code)}</div>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text)', fontWeight: 'var(--font-weight-bold)' }}>{maxT}° / {minT}°</div>
                         </div>
                       );
                     })}

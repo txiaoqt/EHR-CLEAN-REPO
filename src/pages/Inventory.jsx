@@ -4,6 +4,11 @@ import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord } from '../accessControl.js';
 import { SearchIcon, AlertIcon, CloseIcon, ChevronDownIcon, HistoryIcon } from '../components/icons/Icons.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
+import ExportDialog from '../components/export/ExportDialog.jsx';
+import { useTablePagination } from '../hooks/useTablePagination.js';
+import { useTableExport } from '../hooks/useTableExport.js';
+import { inventoryExportConfig, inventoryTransactionsExportConfig } from '../utils/export/configs.js';
 
 const Inventory = () => {
   const { user } = useAuth();
@@ -133,10 +138,43 @@ const Inventory = () => {
     'First Aid / Disinfectants'
   ];
 
-  const filteredItems = items.filter(item =>
+  const filteredItems = React.useMemo(() => items.filter(item =>
     (search.trim() === '' || (item.item_name || '').toLowerCase().includes(search.toLowerCase())) &&
     (selectedCategory === 'All' || (item.category || 'Uncategorized') === selectedCategory)
-  );
+  ), [items, search, selectedCategory]);
+
+  const itemPagination = useTablePagination(filteredItems, {
+    resetKey: `${search}|${selectedCategory}`,
+  });
+  const transactionPagination = useTablePagination(transactions);
+
+  const [toast, setToast] = useState(null);
+  const showToast = (text, type = 'success') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const itemsExporter = useTableExport({
+    config: inventoryExportConfig,
+    getRows: () => filteredItems,
+    getFilterLines: () => {
+      const lines = [];
+      if (selectedCategory !== 'All') lines.push(`Category: ${selectedCategory}`);
+      if (search.trim()) lines.push(`Search: "${search.trim()}"`);
+      return lines;
+    },
+    itemLabel: 'items',
+    count: filteredItems.length,
+    onMessage: showToast,
+  });
+
+  const transactionsExporter = useTableExport({
+    config: inventoryTransactionsExportConfig,
+    getRows: () => transactions,
+    itemLabel: 'transactions',
+    count: transactions.length,
+    onMessage: showToast,
+  });
 
   const reorderItems = items.filter(item => Number(item.stock_quantity) <= Number(item.reorder_level));
   const actorName = (user?.name || user?.email || 'Unknown Staff').trim();
@@ -476,6 +514,9 @@ const Inventory = () => {
           </div>
 
           <div className="page-header-actions">
+            <button type="button" className="btn secondary" onClick={itemsExporter.openExport} disabled={filteredItems.length === 0}>
+              Export
+            </button>
             <button
               type="button"
               className="btn"
@@ -489,24 +530,24 @@ const Inventory = () => {
         {/* 2. Summary Metrics (4 Mini Cards) */}
         <div className="inventory-kpi-grid">
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Total Cataloged Items</div>
-            <div className="kpi-value" style={{ fontSize: 22 }}>{items.length}</div>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Total Cataloged Items</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Low Stock Alerts</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: reorderItems.length > 0 ? 'var(--danger)' : 'var(--color-emerald-text)' }}>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Low Stock Alerts</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: reorderItems.length > 0 ? 'var(--danger)' : 'var(--color-emerald-text)' }}>
               {reorderItems.length}
             </div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Adequate Stock</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-emerald-text)' }}>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>In Stock</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-emerald-text)' }}>
               {items.length - reorderItems.length}
             </div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Recent Log Entries</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-purple-text)' }}>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Recent Log Entries</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-purple-text)' }}>
               {transactions.length}
             </div>
           </div>
@@ -514,7 +555,7 @@ const Inventory = () => {
 
         {/* Reorder Alerts */}
         {reorderItems.length > 0 && (
-          <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--danger)', background: 'var(--color-rose-bg)' }}>
+          <div className="card" style={{ marginBottom: 20, background: 'var(--color-rose-bg)' }}>
             <div className="card-header" style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
@@ -526,8 +567,8 @@ const Inventory = () => {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
               {reorderItems.map(item => (
-                <div key={item.id} style={{ background: 'var(--panel)', color: 'var(--text)', padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
-                  <strong>{item.item_name}</strong>: Current stock <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{item.stock_quantity} {item.unit}</span> (Reorder threshold: {item.reorder_level})
+                <div key={item.id} style={{ background: 'var(--panel)', color: 'var(--text)', padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 'var(--font-size-sm)' }}>
+                  <strong>{item.item_name}</strong>: Current stock <span style={{ color: 'var(--danger)', fontWeight: 'var(--font-weight-bold)' }}>{item.stock_quantity} {item.unit}</span>
                 </div>
               ))}
             </div>
@@ -538,17 +579,13 @@ const Inventory = () => {
         <div className="card" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Stock Levels & Inventory Directory
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
                 Clinic medicine catalog and consumable supply status
               </div>
             </div>
-
-            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
-              Showing: <strong>{filteredItems.length}</strong> items
-            </span>
           </div>
 
           {/* Stock Toolbar: Fluid Search + All Categories Dropdown */}
@@ -622,20 +659,20 @@ const Inventory = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map(item => {
+                  itemPagination.pageRows.map(item => {
                     const isLow = Number(item.stock_quantity) < Number(item.reorder_level);
                     return (
                       <tr key={item.id}>
-                        <td style={{ fontWeight: 700, color: 'var(--text)' }}>{item.item_name}</td>
+                        <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{item.item_name}</td>
                         <td>
                           <span className="badge badge-info">{item.category || 'Supplies'}</span>
                         </td>
-                        <td style={{ fontWeight: 700, fontSize: 15 }}>{item.stock_quantity}</td>
+                        <td style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', fontVariantNumeric: 'tabular-nums' }}>{item.stock_quantity}</td>
                         <td style={{ color: 'var(--text-muted)' }}>{item.unit}</td>
                         <td style={{ color: 'var(--text-light)' }}>{item.reorder_level}</td>
                         <td>
                           <span className={isLow ? 'badge badge-danger' : 'badge badge-success'}>
-                            {isLow ? 'Low Stock' : 'Adequate'}
+                            {isLow ? 'Low Stock' : 'In Stock'}
                           </span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
@@ -662,6 +699,16 @@ const Inventory = () => {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            page={itemPagination.page}
+            totalPages={itemPagination.totalPages}
+            startIndex={itemPagination.startIndex}
+            endIndex={itemPagination.endIndex}
+            total={itemPagination.total}
+            onPageChange={itemPagination.goToPage}
+            itemLabel="items"
+          />
         </div>
 
         {/* 4. History Modal (On-Demand Transactions Log) */}
@@ -698,22 +745,32 @@ const Inventory = () => {
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
                     Inventory Transactions & Consumables Log
                   </h3>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
                     Total Logs: <strong>{transactions.length}</strong>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  id="inventory-history-close-btn"
-                  className="modal-close-btn"
-                  onClick={() => setShowHistoryModal(false)}
-                  aria-label="Close modal"
-                >
-                  <CloseIcon size={18} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn secondary small"
+                    onClick={transactionsExporter.openExport}
+                    disabled={transactions.length === 0}
+                  >
+                    Export
+                  </button>
+                  <button
+                    type="button"
+                    id="inventory-history-close-btn"
+                    className="modal-close-btn"
+                    onClick={() => setShowHistoryModal(false)}
+                    aria-label="Close modal"
+                  >
+                    <CloseIcon size={18} />
+                  </button>
+                </div>
               </div>
 
               {/* Modal Body: Scrollable Table */}
@@ -738,15 +795,15 @@ const Inventory = () => {
                           </td>
                         </tr>
                       ) : (
-                        transactions.map(t => (
+                        transactionPagination.pageRows.map(t => (
                           <tr key={t.id}>
-                            <td style={{ fontWeight: 700 }}>{t.item_name || '—'}</td>
+                            <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{t.item_name || '—'}</td>
                             <td>
                               <span className={`badge ${t.transaction_type === 'add' || t.transaction_type === 'restock' ? 'badge-success' : 'badge-danger'}`}>
                                 {t.transaction_type}
                               </span>
                             </td>
-                            <td style={{ fontWeight: 700 }}>{t.quantity}</td>
+                            <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{t.quantity}</td>
                             <td style={{ color: 'var(--text-muted)' }}>{t.reason || '—'}</td>
                             <td style={{ color: 'var(--text-muted)' }}>{t.performed_by || 'Staff'}</td>
                             <td style={{ color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleString()}</td>
@@ -756,6 +813,16 @@ const Inventory = () => {
                     </tbody>
                   </table>
                 </div>
+
+                <TablePagination
+                  page={transactionPagination.page}
+                  totalPages={transactionPagination.totalPages}
+                  startIndex={transactionPagination.startIndex}
+                  endIndex={transactionPagination.endIndex}
+                  total={transactionPagination.total}
+                  onPageChange={transactionPagination.goToPage}
+                  itemLabel="transactions"
+                />
               </div>
 
               {/* Modal Footer */}
@@ -794,7 +861,7 @@ const Inventory = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Add Inventory Item</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Add Inventory Item</h3>
                 <button type="button" className="modal-close-btn" onClick={() => setShowAddModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -802,7 +869,7 @@ const Inventory = () => {
 
               <form onSubmit={(e) => { e.preventDefault(); submitNewItem(); }}>
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Item Name</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Item Name</label>
                   <input
                     name="item_name"
                     type="text"
@@ -816,7 +883,7 @@ const Inventory = () => {
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Category</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Category</label>
                   <select
                     name="category"
                     className="input"
@@ -830,7 +897,7 @@ const Inventory = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '14px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Initial Stock</label>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Initial Stock</label>
                     <input
                       name="stock_quantity"
                       type="number"
@@ -844,7 +911,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Unit</label>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Unit</label>
                     <select
                       name="unit"
                       className="input"
@@ -861,7 +928,7 @@ const Inventory = () => {
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Reorder Threshold Level</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Reorder Threshold Level</label>
                   <input
                     name="reorder_level"
                     type="number"
@@ -880,10 +947,10 @@ const Inventory = () => {
                     padding: '10px 14px',
                     marginBottom: '14px',
                     borderRadius: '10px',
-                    color: modalMessageType === 'error' ? 'var(--danger)' : '#059669',
-                    background: modalMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
-                    fontSize: '13px',
-                    fontWeight: 600
+                    color: modalMessageType === 'error' ? 'var(--danger)' : 'var(--color-emerald-text)',
+                    background: modalMessageType === 'error' ? 'var(--color-rose-bg)' : 'var(--color-emerald-bg)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)'
                   }}>
                     {modalMessage}
                   </div>
@@ -921,19 +988,19 @@ const Inventory = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Adjust Stock: {adjustItem.item_name}</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Adjust Stock: {adjustItem.item_name}</h3>
                 <button type="button" className="modal-close-btn" onClick={() => setShowAdjustModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
 
-              <div style={{ padding: '10px 14px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16, fontSize: 13, color: 'var(--text)' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16, fontSize: 'var(--font-size-sm)', color: 'var(--text)' }}>
                 Current stock: <strong>{adjustItem.stock_quantity} {adjustItem.unit}</strong>
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); submitAdjust(); }}>
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Action</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Action</label>
                   <select
                     name="type"
                     className="input"
@@ -947,7 +1014,7 @@ const Inventory = () => {
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Quantity</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Quantity</label>
                   <input
                     name="quantity"
                     type="number"
@@ -962,7 +1029,7 @@ const Inventory = () => {
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Reason / Remarks</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Reason / Remarks</label>
                   <input
                     name="reason"
                     type="text"
@@ -980,10 +1047,10 @@ const Inventory = () => {
                     padding: '10px 14px',
                     marginBottom: '14px',
                     borderRadius: '10px',
-                    color: adjustModalMessageType === 'error' ? 'var(--danger)' : '#059669',
-                    background: adjustModalMessageType === 'error' ? 'var(--color-rose-bg)' : 'rgba(5, 150, 105, 0.1)',
-                    fontSize: '13px',
-                    fontWeight: 600
+                    color: adjustModalMessageType === 'error' ? 'var(--danger)' : 'var(--color-emerald-text)',
+                    background: adjustModalMessageType === 'error' ? 'var(--color-rose-bg)' : 'var(--color-emerald-bg)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)'
                   }}>
                     {adjustModalMessage}
                   </div>
@@ -1021,12 +1088,12 @@ const Inventory = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Item: {deleteItem.item_name}</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--danger)' }}>Delete Item: {deleteItem.item_name}</h3>
                 <button type="button" className="modal-close-btn" onClick={() => setShowDeleteModal(false)} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5, marginTop: 0 }}>
                 This will permanently remove the item from inventory catalog. To confirm, type the item name <strong>{deleteItem.item_name}</strong> below.
               </p>
 
@@ -1042,7 +1109,7 @@ const Inventory = () => {
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify:</label>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify:</label>
                 <input
                   type="password"
                   className="input"
@@ -1057,10 +1124,10 @@ const Inventory = () => {
                   padding: '10px 14px',
                   marginBottom: '14px',
                   borderRadius: '10px',
-                  color: deleteMessageType === 'error' ? 'var(--danger)' : '#059669',
-                  background: deleteMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
-                  fontSize: '13px',
-                  fontWeight: 600
+                  color: deleteMessageType === 'error' ? 'var(--danger)' : 'var(--color-emerald-text)',
+                  background: deleteMessageType === 'error' ? 'var(--color-rose-bg)' : 'var(--color-emerald-bg)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)'
                 }}>
                   {deleteMessage}
                 </div>
@@ -1076,6 +1143,46 @@ const Inventory = () => {
           </div>
         )}
       </div>
+
+      <ExportDialog
+        open={itemsExporter.exportOpen}
+        config={inventoryExportConfig}
+        rowCount={itemsExporter.rowCount}
+        itemLabel="items"
+        busy={itemsExporter.exportBusy}
+        onClose={itemsExporter.closeExport}
+        onExport={itemsExporter.runExport}
+      />
+
+      <ExportDialog
+        open={transactionsExporter.exportOpen}
+        config={inventoryTransactionsExportConfig}
+        rowCount={transactionsExporter.rowCount}
+        itemLabel="transactions"
+        busy={transactionsExporter.exportBusy}
+        onClose={transactionsExporter.closeExport}
+        onExport={transactionsExporter.runExport}
+      />
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 7000,
+          padding: '12px 20px',
+          borderRadius: 12,
+          color: 'var(--text-on-primary)',
+          fontWeight: 'var(--font-weight-bold)',
+          backgroundColor: toast.type === 'error' ? 'var(--danger)' : 'var(--color-emerald)',
+          boxShadow: 'var(--shadow-lg)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }}>
+          <span>{toast.text}</span>
+        </div>
+      )}
     </main>
   );
 };

@@ -23,11 +23,18 @@
           ? saved
           : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.setAttribute('data-theme', theme);
+
+        var density = localStorage.getItem('tup-clinic-density') || 'normal';
+        if (density === 'compact' || density === 'comfortable') {
+          document.documentElement.setAttribute('data-density', density);
+        } else {
+          document.documentElement.setAttribute('data-density', 'normal');
+        }
       } catch (e) {}
     })();
   </script>
-  <script type="module" crossorigin src="/assets/index-Clu1BqHr.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CRElUBPE.css">
+  <script type="module" crossorigin src="/assets/index-y9c-xs_6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DUqFiRCO.css">
 <link rel="manifest" href="/manifest.webmanifest"></head>
 <body>
   <div id="root"></div>

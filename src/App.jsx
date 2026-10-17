@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Appointments from './pages/Appointments.jsx';
 import Patients from './pages/Patients.jsx';
 import Encounter from './pages/Encounter.jsx';
-import Encounters from './pages/Encounters.jsx';
+import MedicalLog from './pages/MedicalLog.jsx';
 import PatientProfile from './pages/PatientProfile.jsx';
 import Reports from './pages/Reports.jsx';
 import Inventory from './pages/Inventory.jsx';
@@ -16,6 +16,7 @@ import StaffPatientMessages from './pages/StaffPatientMessages.jsx';
 import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
+import AuditTrail from './pages/AuditTrail.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import PatientDashboard from './pages/patient/PatientDashboard.jsx';
 import PatientEvents from './pages/patient/PatientEvents.jsx';
@@ -119,8 +120,19 @@ function AppShell() {
     };
   }, []);
 
-  // Initialize and synchronize text density preference (TASK-027)
+  // Text density is a PATIENT-PORTAL preference (set in PatientSettings). It was
+  // read from a single localStorage key on BOTH surfaces, so a patient choosing
+  // "compact" also changed the staff portal — and logging out did not undo it,
+  // because the stored key outlives the session.
+  //
+  // The staff portal pins its own density here rather than reading storage, so
+  // no patient's preference can change it. Currently: normal (a 14px baseline).
   useEffect(() => {
+    if (!IS_USER_SURFACE) {
+      document.documentElement.setAttribute('data-density', 'normal');
+      return undefined;
+    }
+
     try {
       const savedDensity = localStorage.getItem('tup-clinic-density') || 'normal';
       const normalized = savedDensity === 'compact' || savedDensity === 'comfortable' ? savedDensity : 'normal';
@@ -180,7 +192,7 @@ function AppShell() {
           minHeight: '100vh',
           color: 'var(--muted)',
           fontFamily: 'inherit',
-          fontSize: '15px'
+          fontSize: 'var(--font-size-base)'
         }}
       >
         Loading session...
@@ -256,7 +268,7 @@ function AppShell() {
             <Route path="/appointments" element={guard(<Appointments />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patients" element={guard(<Patients />, ['admin', 'physician', 'nurse'])} />
             <Route path="/encounter" element={guard(<Encounter />, ['admin', 'physician', 'nurse'])} />
-            <Route path="/encounters" element={guard(<Encounters />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/medical-log" element={guard(<MedicalLog />, ['admin', 'physician', 'nurse'])} />
             <Route path="/reports" element={guard(<Reports />, ['admin', 'physician', 'nurse'])} />
             <Route path="/inventory" element={guard(<Inventory />, ['admin', 'physician', 'nurse'])} />
             <Route path="/events" element={guard(<Events />, ['admin', 'physician', 'nurse'])} />
@@ -264,6 +276,7 @@ function AppShell() {
             <Route path="/messages" element={guard(<StaffPatientMessages />, ['admin', 'physician', 'nurse'])} />
             <Route path="/help" element={guard(<Help />, ['admin', 'physician', 'nurse'])} />
             <Route path="/settings" element={guard(<Settings />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/audit-trail" element={guard(<AuditTrail />, ['admin', 'physician'])} />
             <Route path="/my-profile" element={guard(<MyProfile />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patient-profile" element={guard(<PatientProfile />, ['admin', 'physician', 'nurse'])} />
           </>

@@ -6,6 +6,11 @@ import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, isOwnerOrPrivileged } from '../accessControl.js';
 import { SearchIcon, CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
+import ExportDialog from '../components/export/ExportDialog.jsx';
+import { useTablePagination } from '../hooks/useTablePagination.js';
+import { useTableExport } from '../hooks/useTableExport.js';
+import { appointmentsExportConfig } from '../utils/export/configs.js';
 
 const Appointments = () => {
   const navigate = useNavigate();
@@ -164,10 +169,10 @@ const Appointments = () => {
   };
 
   // 4-dimensional table filter: status + type + date + search
-  const filterTable = () => {
+  const filteredAppointments = React.useMemo(() => {
     let filtered = appointments || [];
 
-    // 1. Status filter: 'all' | 'Scheduled' | 'Checked-in' | 'Cancelled'
+    // 1. Status filter: 'all' | 'Scheduled' | 'Completed' | 'Cancelled'
     if (statusFilter && statusFilter !== 'all') {
       filtered = filtered.filter(a => a.status === statusFilter);
     }
@@ -194,7 +199,27 @@ const Appointments = () => {
       });
     }
     return filtered;
-  };
+  }, [appointments, statusFilter, typeFilter, selectedDate, tableSearch]);
+
+  const pagination = useTablePagination(filteredAppointments, {
+    resetKey: `${statusFilter}|${typeFilter}|${selectedDate}|${tableSearch}`,
+  });
+
+  const exporter = useTableExport({
+    config: appointmentsExportConfig,
+    getRows: () => filteredAppointments,
+    getFilterLines: () => {
+      const lines = [];
+      if (statusFilter !== 'all') lines.push(`Status: ${statusFilter}`);
+      if (typeFilter !== 'all') lines.push(`Type: ${typeFilter}`);
+      if (selectedDate) lines.push(`Date: ${selectedDate}`);
+      if (tableSearch.trim()) lines.push(`Search: "${tableSearch.trim()}"`);
+      return lines;
+    },
+    itemLabel: 'appointments',
+    count: filteredAppointments.length,
+    onMessage: showToast,
+  });
 
   // KPI counts
   const kpi_today_scheduled = (appointments || []).filter(a => a.appointment_date === todayKey && a.status === 'Scheduled').length;
@@ -275,7 +300,7 @@ const Appointments = () => {
           return;
         }
         if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
-          alert('Failed to save appointment: This student already has an active (Scheduled or Checked-in) appointment.');
+          alert('Failed to save appointment: This student already has an active appointment.');
           return;
         }
         throw error;
@@ -305,15 +330,29 @@ const Appointments = () => {
       }
 
       // allowed list adjusted to match DB spelling
-      const allowed = ['Scheduled', 'Checked-in', 'Cancelled', 'Completed'];
+      const allowed = ['Scheduled', 'Completed', 'Cancelled'];
       if (!allowed.includes(newStatus)) {
         console.warn('updateStatus: newStatus not in expected list', newStatus);
       }
 
-      const res = await supabase
-        .from('appointments')
-        .update({ status: newStatus })
-        .eq('id', appt.id);
+      // "Completed" is a VISIT-level action, not just a booking one: it must
+      // also close the clinical note, or the two records disagree about whether
+      // the visit happened. Cancelling is booking-only — the visit did not
+      // happen, so there is no note to close.
+      let res;
+      if (newStatus === 'Completed') {
+        const { data, error } = await supabase.rpc('complete_visit', {
+          p_appointment_id: appt.id,
+        });
+        if (error) res = { error };
+        else if (data?.success === false) res = { error: { message: data.error || 'Could not complete the visit.' } };
+        else res = { error: null };
+      } else {
+        res = await supabase
+          .from('appointments')
+          .update({ status: newStatus })
+          .eq('id', appt.id);
+      }
 
       if (res.error) {
         console.error('Supabase update error:', res.error);
@@ -326,7 +365,12 @@ const Appointments = () => {
 
       // success
       setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: newStatus } : a));
-      await logAudit('Appointment Status Change', `Appointment ${appt.patient_id} status changed to ${newStatus}`);
+      await logAudit(
+        'Appointment Status Change',
+        newStatus === 'Completed'
+          ? `Visit completed for ${appt.patient_id} (appointment and clinical note closed together)`
+          : `Appointment ${appt.patient_id} status changed to ${newStatus}`
+      );
     } catch (err) {
       console.error('updateStatus unexpected error:', err);
       alert('Unexpected error when updating status: ' + (err.message || JSON.stringify(err)));
@@ -545,19 +589,19 @@ const Appointments = () => {
           <button
             type="button"
             className="btn secondary small"
-            style={{ padding: '3px 8px', fontSize: 12 }}
+            style={{ padding: '3px 8px', fontSize: 'var(--font-size-xs)' }}
             onClick={() => setViewDate(new Date(year, month - 1, 1))}
             aria-label="Previous month"
           >
             ←
           </button>
-          <strong style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700 }}>
+          <strong style={{ fontSize: 'var(--font-size-base)', color: 'var(--text)', fontWeight: 'var(--font-weight-bold)' }}>
             {viewDate.toLocaleString(undefined, { month: 'short', year: 'numeric' })}
           </strong>
           <button
             type="button"
             className="btn secondary small"
-            style={{ padding: '3px 8px', fontSize: 12 }}
+            style={{ padding: '3px 8px', fontSize: 'var(--font-size-xs)' }}
             onClick={() => setViewDate(new Date(year, month + 1, 1))}
             aria-label="Next month"
           >
@@ -567,7 +611,7 @@ const Appointments = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, textAlign: 'center', marginBottom: 10 }}>
           {['S','M','T','W','T','F','S'].map((w, i) => (
-            <div key={`weekday-${i}-${w}`} style={{ fontSize: 11, fontWeight: 700, color:'var(--text-muted)', padding: '2px 0' }}>{w}</div>
+            <div key={`weekday-${i}-${w}`} style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', color:'var(--text-muted)', padding: '2px 0' }}>{w}</div>
           ))}
           {days.map((day, idx) => {
             if (!day) return <div key={`blank-${idx}`} style={{ height: 26 }}></div>;
@@ -580,17 +624,17 @@ const Appointments = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 12,
+              fontSize: 'var(--font-size-xs)',
               borderRadius: 6,
               cursor: 'pointer',
-              fontWeight: (isSelected || isToday) ? 700 : 500,
+              fontWeight: (isSelected || isToday) ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
               transition: 'all 0.1s ease',
               position: 'relative'
             };
             if (isSelected) {
               styles = { ...styles, background: 'var(--color-primary, #c92a2a)', color: '#ffffff' };
             } else if (isToday) {
-              styles = { ...styles, border: '1px solid var(--color-primary, #c92a2a)', color: 'var(--color-primary, #c92a2a)' };
+              styles = { ...styles, border: '1px solid var(--color-primary-text, #fda4af)', color: 'var(--color-primary-text, #fda4af)' };
             } else {
               styles = { ...styles, color: 'var(--text)' };
             }
@@ -614,11 +658,11 @@ const Appointments = () => {
           })}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', fontSize: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-xs)' }}>
           <button
             type="button"
             className="btn secondary small"
-            style={{ fontSize: 11, padding: '2px 8px' }}
+            style={{ fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}
             onClick={() => {
               setSelectedDate(todayKey);
               setViewDate(new Date());
@@ -631,7 +675,7 @@ const Appointments = () => {
             <button
               type="button"
               className="btn secondary small"
-              style={{ fontSize: 11, padding: '2px 8px' }}
+              style={{ fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}
               onClick={() => {
                 setSelectedDate(null);
                 setShowDatePicker(false);
@@ -662,9 +706,16 @@ const Appointments = () => {
         flex: 1,
         padding: '10px 8px',
         borderRadius: 8,
-        border: isSelected ? '2px solid var(--color-primary, #c92a2a)' : '1px solid var(--border-subtle)',
-        background: isToday ? 'var(--color-primary, #c92a2a)' : (isSelected ? 'var(--color-primary-tint, rgba(201, 42, 42, 0.08))' : 'var(--panel)'),
-        color: isToday ? '#ffffff' : 'var(--text)',
+        border: isSelected
+          ? '2px solid var(--color-primary, #c92a2a)'
+          : (isToday ? '1px solid var(--color-primary-border, rgba(201, 42, 42, 0.38))' : '1px solid var(--border-subtle)'),
+        background: isSelected
+          ? 'var(--color-primary, #c92a2a)'
+          : (isToday ? 'var(--color-primary-tint, rgba(201, 42, 42, 0.08))' : 'var(--panel)'),
+        color: isSelected
+          ? '#ffffff'
+          : (isToday ? 'var(--color-primary-text, #fda4af)' : 'var(--text)'),
+        fontWeight: (isSelected || isToday) ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -685,11 +736,11 @@ const Appointments = () => {
             }
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 600, opacity: isToday ? 0.9 : 0.7 }}>
+          <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-semibold)', opacity: isToday ? 0.9 : 0.7 }}>
             {d.toLocaleDateString(undefined, { weekday: 'short' })}
           </div>
-          <div style={{ fontWeight: 800, fontSize: 16, margin: '2px 0' }}>{d.getDate()}</div>
-          <div style={{ fontSize: 11, fontWeight: 700, opacity: isToday ? 0.95 : 0.8 }}>
+          <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', margin: '2px 0' }}>{d.getDate()}</div>
+          <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', opacity: isToday ? 0.95 : 0.8 }}>
             {count} {count === 1 ? 'visit' : 'visits'}
           </div>
         </button>
@@ -702,6 +753,16 @@ const Appointments = () => {
     <main className="main">
       <div className="page">
         {/* Toast Alert Notice */}
+        <ExportDialog
+          open={exporter.exportOpen}
+          config={appointmentsExportConfig}
+          rowCount={exporter.rowCount}
+          itemLabel="appointments"
+          busy={exporter.exportBusy}
+          onClose={exporter.closeExport}
+          onExport={exporter.runExport}
+        />
+
         {toast && (
           <div
             style={{
@@ -712,9 +773,9 @@ const Appointments = () => {
               zIndex: 5000,
               padding: '10px 18px',
               borderRadius: 8,
-              color: 'white',
-              fontWeight: 600,
-              fontSize: 14,
+              color: 'var(--text-on-primary)',
+              fontWeight: 'var(--font-weight-semibold)',
+              fontSize: 'var(--font-size-base)',
               backgroundColor: toast.type === 'error' ? 'var(--danger, #dc2626)' : 'var(--color-emerald-text, #16a34a)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             }}
@@ -734,6 +795,9 @@ const Appointments = () => {
           </div>
 
           <div className="page-header-actions">
+            <button type="button" className="btn secondary" onClick={exporter.openExport} disabled={filteredAppointments.length === 0}>
+              Export
+            </button>
             <button type="button" className="btn" onClick={openNewModal}>
               New Appointment
             </button>
@@ -743,20 +807,20 @@ const Appointments = () => {
         {/* 2. SUMMARY METRICS: 4 High-level status cards */}
         <div className="appointments-kpi-grid">
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Scheduled Today</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-blue-text)' }}>{kpi_today_scheduled}</div>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Scheduled Today</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-blue-text)' }}>{kpi_today_scheduled}</div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Cancelled Today</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--danger)' }}>{kpi_today_canceled}</div>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Cancelled Today</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--danger)' }}>{kpi_today_canceled}</div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>This Week</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-amber-text)' }}>{kpi_week_total}</div>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>This Week</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-amber-text)' }}>{kpi_week_total}</div>
           </div>
           <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 12 }}>Future Schedules</div>
-            <div className="kpi-value" style={{ fontSize: 22, color: 'var(--color-emerald-text)' }}>{kpi_future}</div>
+            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Future Schedules</div>
+            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-emerald-text)' }}>{kpi_future}</div>
           </div>
         </div>
 
@@ -764,18 +828,18 @@ const Appointments = () => {
         <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
           <div className="card-header" style={{ marginBottom: 10 }}>
             <div>
-              <h3 className="card-title" style={{ fontSize: 14 }}>Weekly Schedule</h3>
-              <span className="card-subtitle" style={{ fontSize: 12 }}>Current week volume & day quick-jump</span>
+              <h3 className="card-title" style={{ fontSize: 'var(--font-size-base)' }}>Weekly Schedule</h3>
+              <span className="card-subtitle" style={{ fontSize: 'var(--font-size-xs)' }}>Current week volume & day quick-jump</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="badge badge-neutral" style={{ fontSize: 11 }}>
+              <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)' }}>
                 {kpi_week_total} total week visits
               </span>
               {selectedDate && (
                 <button
                   type="button"
                   className="btn secondary small"
-                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  style={{ fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}
                   onClick={() => setSelectedDate(null)}
                 >
                   Show All Dates
@@ -791,17 +855,13 @@ const Appointments = () => {
           {/* Card Header & Dynamic Count */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Appointments Schedule
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
                 Live clinical queue and scheduled patient appointments
               </div>
             </div>
-
-            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
-              Showing: <strong>{filterTable().length}</strong>
-            </span>
           </div>
 
           {/* Table Toolbar: Fluid Search + Status Filter + Type Filter + Date Filter */}
@@ -843,7 +903,7 @@ const Appointments = () => {
                 >
                   <option value="all">All Appointments</option>
                   <option value="Scheduled">Scheduled</option>
-                  <option value="Checked-in">Checked-in</option>
+                  <option value="Completed">Completed</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
                 <span className="appointments-filter-chevron">
@@ -891,13 +951,13 @@ const Appointments = () => {
 
           {/* Active Date Filter Chip (if selected) */}
           {selectedDate && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, background: 'var(--panel)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 14 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-xs)', background: 'var(--panel)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 14 }}>
               <span style={{ color: 'var(--text-muted)' }}>Filtered date:</span>
-              <strong style={{ color: 'var(--color-primary, #c92a2a)' }}>{formatSelectedDateLabel(selectedDate)}</strong>
+              <strong style={{ color: 'var(--color-primary-text, #fda4af)' }}>{formatSelectedDateLabel(selectedDate)}</strong>
               <button
                 type="button"
                 onClick={() => setSelectedDate(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-bold)' }}
                 title="Clear date filter"
                 aria-label="Clear date filter"
               >
@@ -924,23 +984,35 @@ const Appointments = () => {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading appointments…</td></tr>
-                ) : filterTable().length === 0 ? (
+                ) : filteredAppointments.length === 0 ? (
                   <tr>
                     <td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No appointments found.</td>
                   </tr>
                 ) : (
-                  filterTable().map((appt, idx) => (
+                  pagination.pageRows.map((appt) => (
                     <tr key={appt.id} data-date={appt.appointment_date}>
                       <td>
-                        <span className="badge badge-neutral" style={{ fontWeight: 700 }}>#{appt.queue_number || (idx + 1)}</span>
+                        {/* A cancelled appointment holds no queue position, so the
+                            number is not shown even if one was assigned at booking. */}
+                        {appt.queue_number != null && appt.status !== 'Cancelled' ? (
+                          <span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>#{appt.queue_number}</span>
+                        ) : (
+                          <span
+                            className="badge badge-neutral"
+                            style={{ fontWeight: 'var(--font-weight-bold)', opacity: 0.7 }}
+                            title={appt.status === 'Cancelled' ? 'Queue position released — appointment cancelled' : 'No queue number assigned'}
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{appt.patient_id}</div>
-                        {appt.students?.name && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{appt.students.name}</div>}
+                        <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{appt.patient_id}</div>
+                        {appt.students?.name && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{appt.students.name}</div>}
                       </td>
                       <td>{appt.department || 'Medical Clinic'}</td>
                       <td>{appt.service_type || 'Consultation'}</td>
-                      <td style={{ fontWeight: 600 }}>{formatTime12(appt.appointment_time)}</td>
+                      <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{formatTime12(appt.appointment_time)}</td>
                       <td>
                         <span className="badge badge-neutral">{appt.type}</span>
                       </td>
@@ -954,15 +1026,15 @@ const Appointments = () => {
                             minWidth: 130,
                             minHeight: 34,
                             padding: '4px 8px',
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: appt.status === 'Checked-in' ? 'var(--color-emerald-bg)' : (appt.status === 'Cancelled' ? 'rgba(220, 38, 38, 0.08)' : 'var(--color-blue-bg)'),
-                            color: appt.status === 'Checked-in' ? 'var(--color-emerald-text)' : (appt.status === 'Cancelled' ? 'var(--danger)' : 'var(--color-blue-text)'),
+                            fontSize: 'var(--font-size-xs)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            background: appt.status === 'Completed' ? 'var(--color-emerald-bg)' : (appt.status === 'Cancelled' ? 'var(--color-rose-bg)' : 'var(--color-blue-bg)'),
+                            color: appt.status === 'Completed' ? 'var(--color-emerald-text)' : (appt.status === 'Cancelled' ? 'var(--color-rose-text)' : 'var(--color-blue-text)'),
                             borderColor: 'transparent'
                           }}
                         >
                           <option>Scheduled</option>
-                          <option>Checked-in</option>
+                          <option>Completed</option>
                           <option>Cancelled</option>
                         </select>
                       </td>
@@ -1007,6 +1079,16 @@ const Appointments = () => {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            total={pagination.total}
+            onPageChange={pagination.goToPage}
+            itemLabel="appointments"
+          />
         </div>
 
         {/* New Appointment modal */}
@@ -1017,7 +1099,7 @@ const Appointments = () => {
           }}>
             <div style={{ width: 640, maxWidth: '95%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>New Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>New Appointment</h3>
                 <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
@@ -1025,7 +1107,7 @@ const Appointments = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Patient</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Patient</label>
                   <input
                     type="text"
                     placeholder="Search patient name or student ID..."
@@ -1037,7 +1119,7 @@ const Appointments = () => {
                   {patientSuggestions.length > 0 && (
                     <div style={{ border: '1px solid var(--border)', borderRadius: 10, marginTop: 6, maxHeight: 160, overflowY: 'auto', background: 'var(--panel)', boxShadow: 'var(--shadow-md)' }}>
                       {patientSuggestions.map(s => (
-                        <div key={s.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, color: 'var(--text)' }} onClick={() => pickPatientSuggestion(s)}>
+                        <div key={s.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-sm)', color: 'var(--text)' }} onClick={() => pickPatientSuggestion(s)}>
                           <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
                         </div>
                       ))}
@@ -1046,17 +1128,17 @@ const Appointments = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Date</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Date</label>
                   <input id="appointment_date" type="date" className="input" value={newAppt.appointment_date} onChange={handleNewApptChange} style={{ width: '100%' }} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Time</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Time</label>
                   <input id="appointment_time" type="time" className="input" value={newAppt.appointment_time} onChange={handleNewApptChange} style={{ width: '100%' }} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Type</label>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Type</label>
                   <select id="type" className="input" value={newAppt.type} onChange={handleNewApptChange} style={{ width: '100%' }}>
                     <option>Consult</option>
                     <option>Follow-up</option>
@@ -1064,8 +1146,8 @@ const Appointments = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Clinician</label>
-                  <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', fontSize: 13, color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Clinician</label>
+                  <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
                     <strong>{newAppt.clinician_name || 'Staff Clinician'}</strong>
                   </div>
                 </div>
@@ -1104,17 +1186,17 @@ const Appointments = () => {
               width: '100%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Delete Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--danger)' }}>Delete Appointment</h3>
                 <button type="button" className="modal-close-btn" onClick={closeDeleteModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5, marginTop: 0 }}>
                 This will permanently remove the appointment for patient <strong>{deleteItem.patient_id}</strong> on <strong>{deleteItem.appointment_date}</strong> at <strong>{formatTime12(deleteItem.appointment_time)}</strong>.
               </p>
 
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Type the exact Patient ID to confirm</label>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Type the exact Patient ID to confirm</label>
                 <input
                   className="input"
                   type="text"
@@ -1126,7 +1208,7 @@ const Appointments = () => {
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify</label>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Enter your password to verify</label>
                 <input
                   className="input"
                   type="password"
@@ -1141,10 +1223,11 @@ const Appointments = () => {
                   padding: '10px 14px',
                   marginBottom: '14px',
                   borderRadius: '10px',
-                  color: deleteMessageType === 'error' ? 'var(--danger)' : '#059669',
-                  background: deleteMessageType === 'error' ? '#fef2f2' : 'rgba(5, 150, 105, 0.1)',
-                  fontSize: '13px',
-                  fontWeight: 600
+                  color: deleteMessageType === 'error' ? 'var(--danger)' : 'var(--color-emerald-text, #059669)',
+                  background: deleteMessageType === 'error' ? 'var(--color-rose-bg, rgba(248, 113, 113, 0.12))' : 'var(--color-emerald-bg, rgba(5, 150, 105, 0.1))',
+                  border: `1px solid ${deleteMessageType === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(5, 150, 105, 0.2)'}`,
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)'
                 }}>
                   {deleteMessage}
                 </div>

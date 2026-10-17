@@ -15,8 +15,25 @@
   --radius-xl: 20px;
   --radius-full: 9999px;
 
-  /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* ==========================================================================
+     Typography — Font Family
+     ========================================================================== */
+  /* Matches the reference admin (lydorg), whose interface is dominated by
+     `font-segoe` — "Segoe UI", system-ui, sans-serif (1349 uses in admin).
+     Segoe UI is a SYSTEM font, so nothing is fetched: it renders immediately
+     and works offline, which matters for a clinic terminal.
+
+     This stack previously led with 'Inter', which was never loaded anywhere
+     (no @font-face, no font package, no <link>), so the browser silently fell
+     through to system-ui anyway. Naming Segoe UI makes the intent explicit
+     instead of depending on a dead first entry. */
+  --font-sans: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* ==========================================================================
+     Typography — Font Size Scale
+     Mobile-first baseline. The PC / desktop standard (16px body) is applied
+     at >= 1024px in the media query below.
+     ========================================================================== */
   --font-size-2xs: 11px;
   --font-size-xs: 12px;
   --font-size-sm: 13px;
@@ -28,6 +45,24 @@
   --font-size-3xl: 28px;
   --font-size-4xl: 32px;
   --font-size-5xl: 36px;
+  /* Page / section title role */
+  --font-size-page-title: 26px;
+
+  /* Typography — Font Weight Scale */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* Typography — Line Height Scale */
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.4;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* Typography — Text Color Roles */
+  --text-on-primary: #ffffff;
 
   /* Primary Brand (TUP Red) */
   --color-primary: #c92a2a;
@@ -57,6 +92,14 @@
   --color-rose: #e11d48;
   --color-rose-bg: rgba(225, 29, 72, 0.08);
   --color-rose-text: #be123c;
+
+  --color-sky: #0ea5e9;
+  --color-sky-bg: rgba(14, 165, 233, 0.1);
+  --color-sky-text: #0284c7;
+
+  --color-indigo: #6366f1;
+  --color-indigo-bg: rgba(99, 102, 241, 0.1);
+  --color-indigo-text: #4338ca;
 
   /* Greys & Neutrals */
   --grey-50: #ffffff;
@@ -98,6 +141,30 @@
 }
 
 /* ==========================================================================
+   PC / Desktop Typography Standard (>= 1024px)
+   The staff portal is desktop-only and the patient portal desktop viewport
+   follows the same standard: a 14px body baseline, with the rest of the scale
+   stepped from it. (The earlier 16px baseline read as oversized in a dense
+   admin UI once the density leak stopped shrinking it.)
+   ========================================================================== */
+@media (min-width: 1024px) {
+  :root {
+    --font-size-2xs: 11px;
+    --font-size-xs: 12px;
+    --font-size-sm: 13px;
+    --font-size-base: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+    --font-size-3xl: 28px;
+    --font-size-4xl: 32px;
+    --font-size-5xl: 36px;
+    --font-size-page-title: 26px;
+  }
+}
+
+/* ==========================================================================
    Text & Layout Density Variables (TASK-027)
    ========================================================================== */
 
@@ -113,6 +180,9 @@ html[data-density="compact"],
   --font-size-xl: 18px;
   --font-size-2xl: 22px;
   --font-size-3xl: 24px;
+  --font-size-4xl: 28px;
+  --font-size-5xl: 32px;
+  --font-size-page-title: 24px;
   --space-xs: 6px;
   --space-sm: 10px;
   --space-md: 12px;
@@ -136,6 +206,9 @@ html[data-density="comfortable"],
   --font-size-xl: 22px;
   --font-size-2xl: 26px;
   --font-size-3xl: 30px;
+  --font-size-4xl: 34px;
+  --font-size-5xl: 38px;
+  --font-size-page-title: 28px;
   --space-xs: 10px;
   --space-sm: 14px;
   --space-md: 20px;
@@ -145,4 +218,55 @@ html[data-density="comfortable"],
 html[data-density="comfortable"] body {
   font-size: 15px;
   line-height: 1.65;
+}
+
+/* Desktop density variants: keep the density preference meaningful on PC
+   while still stepping from the 14px desktop baseline. */
+@media (min-width: 1024px) {
+  html[data-density="compact"],
+  :root[data-density="compact"] {
+    /* Matched to the reference admin (lydorg): a Tailwind 16px root, but its
+       interface renders at 12px because almost every element is `text-xs`
+       (1437 uses, 546 of them in admin), with `text-sm` 14px for emphasis.
+       These are the sizes its UI actually reads at, not its root. */
+    /* 11px is the floor the typography suite enforces — nothing smaller. */
+    --font-size-2xs: 11px;
+    --font-size-xs: 12px;
+    --font-size-sm: 12px;
+    --font-size-base: 12px;
+    --font-size-md: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 22px;
+    --font-size-3xl: 26px;
+    --font-size-4xl: 30px;
+    --font-size-5xl: 34px;
+    --font-size-page-title: 22px;
+  }
+
+  html[data-density="compact"] body {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  html[data-density="comfortable"],
+  :root[data-density="comfortable"] {
+    --font-size-2xs: 12px;
+    --font-size-xs: 13px;
+    --font-size-sm: 14px;
+    --font-size-base: 15px;
+    --font-size-md: 17px;
+    --font-size-lg: 19px;
+    --font-size-xl: 21px;
+    --font-size-2xl: 25px;
+    --font-size-3xl: 29px;
+    --font-size-4xl: 33px;
+    --font-size-5xl: 38px;
+    --font-size-page-title: 27px;
+  }
+
+  html[data-density="comfortable"] body {
+    font-size: 15px;
+    line-height: 1.65;
+  }
 }

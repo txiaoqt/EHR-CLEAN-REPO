@@ -241,8 +241,8 @@ const PatientEvents = () => {
       <section className="page patient-events-page" style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', boxSizing: 'border-box' }}>
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: 16 }}>
-          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Events</h2>
-          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>Events</h2>
+          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
             Stay informed about clinic activities, health missions, and university medical announcements.
           </div>
         </div>

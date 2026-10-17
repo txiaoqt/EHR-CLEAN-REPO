@@ -6,6 +6,11 @@ import { logAudit } from '../utils.js';
 import { getSensitivityLevel, isPhysician } from '../accessControl.js';
 import { useAuth } from '../AuthContext.jsx';
 import { SearchIcon, CloseIcon, ChevronDownIcon, ArrowUpIcon, ArrowDownIcon } from '../components/icons/Icons.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
+import ExportDialog from '../components/export/ExportDialog.jsx';
+import { useTablePagination } from '../hooks/useTablePagination.js';
+import { useTableExport } from '../hooks/useTableExport.js';
+import { patientsExportConfig } from '../utils/export/configs.js';
 
 const Patients = () => {
   const navigate = useNavigate();
@@ -185,6 +190,23 @@ const Patients = () => {
     return arr;
   }, [filteredPatients, sortField, sortDirection]);
 
+  const pagination = useTablePagination(sortedPatients, {
+    resetKey: `${search}|${sortField}|${sortDirection}`,
+  });
+
+  const exporter = useTableExport({
+    config: patientsExportConfig,
+    getRows: () => sortedPatients,
+    getFilterLines: () => {
+      const lines = [`Sort: ${sortField} ${sortDirection}`];
+      if (search.trim()) lines.push(`Search: "${search.trim()}"`);
+      return lines;
+    },
+    itemLabel: 'patients',
+    count: sortedPatients.length,
+    onMessage: showToast,
+  });
+
   // create student (manual tab) - insert into students table and select it automatically
   const submitCreateStudent = async () => {
     // VALIDATION: ensure name and id meet rules
@@ -316,6 +338,9 @@ const Patients = () => {
           </div>
 
           <div className="page-header-actions">
+            <button type="button" className="btn secondary" onClick={exporter.openExport} disabled={sortedPatients.length === 0}>
+              Export
+            </button>
             <button
               type="button"
               className="btn"
@@ -335,8 +360,8 @@ const Patients = () => {
             <div style={{ width: 880, maxWidth: '98%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: 'var(--shadow-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Register New Patient</h3>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Search existing student directory or create manual patient entry</div>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Register New Patient</h3>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Search existing student directory or create manual patient entry</div>
                 </div>
                 <button
                   type="button"
@@ -380,7 +405,7 @@ const Patients = () => {
                   {registerTab === 'search' && (
                     <>
                       <div style={{ marginBottom: 14 }}>
-                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Search students</label>
+                        <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Search students</label>
                         <input
                           placeholder="Type name or ID (min 2 chars)..."
                           value={studentSearch}
@@ -394,12 +419,12 @@ const Patients = () => {
                         {studentSuggestions.length > 0 ? (
                           studentSuggestions.map(s => (
                             <div key={s.id} onClick={() => { setSelectedStudent(s); setStudentSearch(`${s.name} (${s.id})`); setStudentSuggestions([]); }} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.12s' }}>
-                              <div style={{ fontWeight: 700, color: 'var(--text)' }}>{s.name}</div>
-                              <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.id} — Year {s.year}</div>
+                              <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{s.name}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{s.id} — Year {s.year}</div>
                             </div>
                           ))
                         ) : (
-                          <div style={{ padding: 18, color: 'var(--text-muted)', textAlign: 'center', fontSize: 13 }}>
+                          <div style={{ padding: 18, color: 'var(--text-muted)', textAlign: 'center', fontSize: 'var(--font-size-sm)' }}>
                             Type at least 2 characters to search students.
                           </div>
                         )}
@@ -407,9 +432,9 @@ const Patients = () => {
 
                       {selectedStudent && (
                         <div style={{ marginTop: 16, padding: 14, background: 'var(--color-primary-tint)', border: '1px solid var(--color-primary-border)', borderRadius: 10 }}>
-                          <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 12, textTransform: 'uppercase' }}>Selected Student</div>
-                          <div style={{ marginTop: 4, fontWeight: 700, color: 'var(--text)' }}>{selectedStudent.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedStudent.id} • Year {selectedStudent.year}</div>
+                          <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-text, #fda4af)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase' }}>Selected Student</div>
+                          <div style={{ marginTop: 4, fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{selectedStudent.name}</div>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{selectedStudent.id} • Year {selectedStudent.year}</div>
                         </div>
                       )}
                     </>
@@ -419,7 +444,7 @@ const Patients = () => {
                   {registerTab === 'manual' && (
                     <div style={{ display: 'grid', gap: 14 }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Full name</label>
+                        <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Full name</label>
                         <input
                           value={manualStudent.name}
                           onChange={(e) => setManualStudent(prev => ({ ...prev, name: e.target.value }))}
@@ -431,7 +456,7 @@ const Patients = () => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Student ID</label>
+                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Student ID</label>
                           <input
                             value={manualStudent.id}
                             onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value }))}
@@ -441,7 +466,7 @@ const Patients = () => {
                           />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Year</label>
+                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Year</label>
                           <input value={manualStudent.year} onChange={(e) => setManualStudent(prev => ({ ...prev, year: Number(e.target.value || 1) }))} type="number" min={1} max={5} className="input" style={{ width: '100%' }} />
                         </div>
                       </div>
@@ -458,18 +483,18 @@ const Patients = () => {
 
                 {/* Right column: preview */}
                 <div style={{ padding: 24, borderLeft: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Patient Preview</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Patient Preview</div>
 
                   {!previewStudent ? (
-                    <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5 }}>
                       No patient selected. Search or enter details on the left to preview the patient profile before registering.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div className="card" style={{ padding: 16, background: 'var(--panel)' }}>
-                        <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{previewStudent.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
-                        <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 12, color: 'var(--text-light)' }}>
+                        <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>{previewStudent.name}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
+                        <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
                           Clicking register will create an active EHR record and log the registration date.
                         </div>
                       </div>
@@ -504,17 +529,13 @@ const Patients = () => {
           {/* Card Header & Dynamic Count */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Registered Patients
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
                 Student directory and clinical patient registry
               </div>
             </div>
-
-            <span className="badge badge-neutral" style={{ fontSize: 12, padding: '4px 10px' }}>
-              Total: <strong>{sortedPatients.length}</strong>
-            </span>
           </div>
 
           {/* Table Toolbar: Fluid Search + Sort Field + Sort Direction */}
@@ -594,10 +615,10 @@ const Patients = () => {
                 ) : sortedPatients.length === 0 ? (
                   <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No patients found.</td></tr>
                 ) : (
-                  sortedPatients.map(pat => (
+                  pagination.pageRows.map(pat => (
                     <tr key={pat.id}>
                       <td>
-                        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{pat.name}</div>
+                        <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{pat.name}</div>
                         {isPhysician(user) && getSensitivityLevel(pat) && getSensitivityLevel(pat) !== 'normal' && (
                           <span className="badge badge-warning" style={{ marginTop: 4 }}>
                             Sensitivity: {getSensitivityLevel(pat)}
@@ -605,7 +626,7 @@ const Patients = () => {
                         )}
                       </td>
                       <td>
-                        <span className="badge badge-neutral" style={{ fontWeight: 700 }}>{pat.id}</span>
+                        <span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>{pat.id}</span>
                       </td>
                       <td>
                         <span className="badge badge-info">Year {pat.year}</span>
@@ -629,9 +650,29 @@ const Patients = () => {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            total={pagination.total}
+            onPageChange={pagination.goToPage}
+            itemLabel="patients"
+          />
         </div>
 
         {/* Toast */}
+        <ExportDialog
+          open={exporter.exportOpen}
+          config={patientsExportConfig}
+          rowCount={exporter.rowCount}
+          itemLabel="patients"
+          busy={exporter.exportBusy}
+          onClose={exporter.closeExport}
+          onExport={exporter.runExport}
+        />
+
         {toast && (
           <div style={{
             position: 'fixed',
@@ -640,9 +681,10 @@ const Patients = () => {
             zIndex: 6000,
             padding: '12px 20px',
             borderRadius: 12,
-            color: 'white',
-            fontWeight: 700,
-            backgroundColor: toast.type === 'error' ? '#dc2626' : '#059669',
+            color: 'var(--text-on-primary)',
+            fontWeight: 'var(--font-weight-semibold)',
+            fontSize: 'var(--font-size-base)',
+            backgroundColor: toast.type === 'error' ? 'var(--danger)' : 'var(--color-emerald, #059669)',
             boxShadow: 'var(--shadow-lg)',
             display: 'flex',
             alignItems: 'center',

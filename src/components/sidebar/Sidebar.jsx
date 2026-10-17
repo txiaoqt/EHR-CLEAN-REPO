@@ -13,7 +13,6 @@ import {
   DashboardIcon,
   CalendarIcon,
   UsersIcon,
-  EncountersIcon,
   InventoryIcon,
   ReportsIcon,
   MessagesIcon,
@@ -21,6 +20,7 @@ import {
   SettingsIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  HistoryIcon,
   LogoutIcon
 } from '../icons/Icons.jsx';
 
@@ -31,12 +31,12 @@ const NAV_GROUPS = [
       { page: 'dashboard', label: 'dashboard', icon: DashboardIcon },
       { page: 'appointments', label: 'appointments', icon: CalendarIcon },
       { page: 'patients', label: 'patients', icon: UsersIcon },
-      { page: 'encounters', label: 'encounters', icon: EncountersIcon },
     ]
   },
   {
     label: 'CLINICAL',
     items: [
+      { page: 'medical-log', label: 'Medical Log', icon: HistoryIcon },
       { page: 'inventory', label: 'inventory', icon: InventoryIcon },
       { page: 'reports', label: 'reports', icon: ReportsIcon },
     ]
@@ -57,6 +57,7 @@ const NAV_GROUPS = [
   {
     label: 'ADMINISTRATION',
     items: [
+      { page: 'audit-trail', label: 'Audit Trail', icon: HistoryIcon, roles: ['admin', 'physician'] },
       { page: 'settings', label: 'Settings', icon: SettingsIcon },
     ]
   }
@@ -181,8 +182,22 @@ const Sidebar = ({ collapsed = false, toggle }) => {
           </button>
         </div>
 
-        {/* User Identity Widget */}
-        <div className="sidebar-user-widget">
+        {/* User Identity Widget (Clickable to My Profile in both expanded and collapsed/compressed states) */}
+        <div
+          className="sidebar-user-widget"
+          onClick={() => navigate('/my-profile')}
+          title={collapsed ? `Profile: ${displayName || 'User'}` : "View My Profile"}
+          role="button"
+          tabIndex={0}
+          aria-label={`View My Profile for ${displayName || 'User'}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigate('/my-profile');
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        >
           <img src={user?.avatar || avatarPlaceholder} alt={displayName || 'User'} className="sidebar-user-avatar" />
           <div className="sidebar-user-info" style={{ minWidth: 0, flex: 1 }}>
             <div className="sidebar-user-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -191,7 +206,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
             <div className="sidebar-user-role">
               <span>{formattedRole}</span>
               <span className="status-dot"></span>
-              <span style={{ color: '#10b981', fontWeight: 600 }}>Online</span>
+              <span style={{ color: 'var(--success, #10b981)', fontWeight: 'var(--font-weight-semibold)' }}>Online</span>
             </div>
           </div>
         </div>
@@ -201,7 +216,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
           {NAV_GROUPS.map((group, gIdx) => (
             <div key={gIdx} className="nav-group">
               <div className="nav-group-label">{group.label}</div>
-              {group.items.map(({ page, label, icon: IconComponent }) => {
+              {group.items.filter((item) => !item.roles || item.roles.includes((user?.role || '').toString().trim().toLowerCase())).map(({ page, label, icon: IconComponent }) => {
                 const isActive = location.pathname === `/${page}` || (page === 'dashboard' && location.pathname === '/');
                 const navTitle = translate(label) || label;
                 return (
@@ -237,17 +252,17 @@ const Sidebar = ({ collapsed = false, toggle }) => {
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter') navigate('/my-profile'); }}
           >
-            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600 }}>Logged in as</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-light)', fontWeight: 'var(--font-weight-semibold)' }}>Logged in as</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
               {displayName || 'User'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)' }}>
               {formattedRole}
             </div>
 
             {isPhysician(user) && (
               <div
-                style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, cursor: 'pointer', borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}
+                style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', marginTop: 6, cursor: 'pointer', borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}
                 onClick={(e) => { e.stopPropagation(); openBackupSettings(); }}
                 title="Open backup settings"
               >

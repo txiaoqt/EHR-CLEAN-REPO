@@ -5,6 +5,8 @@ import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canEditField, sanitizeEncounterPayloadForRole } from '../accessControl.js';
+import { ChevronDownIcon, CloseIcon } from '../components/icons/Icons.jsx';
+import ResultDialog from '../components/ResultDialog.jsx';
 
 // simple student search (keeps your original query behaviour)
 // NOTE: we sanitize the query to remove % and _ before using ilike patterns.
@@ -44,6 +46,7 @@ const Encounter = () => {
   const [form, setForm] = useState({
     patient: '',                 // patient id (TUP id) — required
     patientNameVisible: '',      // text shown in search input
+    patientName: '',             // clean name, stored on the encounter
     complaint: '',
     hpi: '',
     exam: '',
@@ -61,7 +64,21 @@ const Encounter = () => {
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const searchTimer = useRef(null);
 
+  // Medicines dispensed during this consultation. Saved against the encounter,
+  // which is what makes the Medical Log dynamic: dispense here and the row
+  // appears there with no further work.
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [dispensed, setDispensed] = useState([]);
+  const [medPick, setMedPick] = useState('');
+  const [medQty, setMedQty] = useState('1');
+
+  // Drawn signature. Stored as a PNG against the encounter, with the signer's
+  // name and a timestamp so the record is verifiable, not just decorative.
+
   const [isSaving, setIsSaving] = useState(false);
+  // Replaces window.alert(): styled, non-blocking, and able to link to the
+  // record that was just created.
+  const [result, setResult] = useState(null);
 
   // Prefill patient when navigating from Appointments/Patients with state.
   useEffect(() => {
@@ -88,7 +105,7 @@ const Encounter = () => {
 
       if (!mounted) return;
       const visible = displayName ? `${displayName} (${incomingId})` : `${incomingId}`;
-      setForm(prev => ({ ...prev, patient: incomingId, patientNameVisible: visible }));
+      setForm(prev => ({ ...prev, patient: incomingId, patientNameVisible: visible, patientName: displayName || '' }));
       setPatientSearch(visible);
       setPatientSuggestions([]);
     };
@@ -237,6 +254,38 @@ const Encounter = () => {
   const setField = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
   // helper: ensure patient exists (insert from students if not)
+  // Dispensary list for the medicine picker.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('inventory')
+          .select('item_name, stock_quantity, unit')
+          .order('item_name');
+        setInventoryItems(data || []);
+      } catch (err) {
+        console.warn('Could not load the dispensary list:', err);
+      }
+    })();
+  }, []);
+
+  const addMedication = () => {
+    if (!medPick) return;
+    const qty = Math.max(1, Number(medQty) || 1);
+    setDispensed((prev) => {
+      const existing = prev.find((d) => d.item_name === medPick);
+      if (existing) {
+        return prev.map((d) => (d.item_name === medPick ? { ...d, quantity: d.quantity + qty } : d));
+      }
+      return [...prev, { item_name: medPick, quantity: qty }];
+    });
+    setMedPick('');
+    setMedQty('1');
+  };
+
+  const removeMedication = (itemName) =>
+    setDispensed((prev) => prev.filter((d) => d.item_name !== itemName));
+
   async function ensurePatientExists(patientId) {
     if (!patientId) throw new Error('Patient ID missing');
     const { data: existing, error: checkErr } = await supabase.from('patients').select('id').eq('id', patientId).maybeSingle();
@@ -278,7 +327,12 @@ const Encounter = () => {
     e.preventDefault();
     const validation = validateForm();
     if (validation) {
-      alert(validation);
+      setResult({
+        tone: 'error',
+        title: 'Please check the form',
+        message: validation,
+        actions: [{ label: 'Close', onClick: () => setResult(null) }],
+      });
       return;
     }
 
@@ -294,8 +348,29 @@ const Encounter = () => {
         weight: form.weight || null
       };
 
-      const { error } = await supabase.from('encounters').insert([{
+      // A visit recorded without a booking has no lifecycle to follow, and the
+      // note is written once the visit is over — so it is closed immediately.
+      // A booked visit stays 'active' until its appointment is marked
+      // Completed, which closes the note at the same time.
+      const manilaVisitDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Manila',
+      }).format(new Date(encDate));
+
+      const { data: sameDayBooking } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('patient_id', form.patient)
+        .eq('appointment_date', manilaVisitDate)
+        .neq('status', 'Cancelled')
+        .limit(1);
+
+      const encounterStatus = sameDayBooking?.length ? 'active' : 'completed';
+
+      const { data: inserted, error } = await supabase.from('encounters').insert([{
         patient_id: form.patient,
+        // Stored on the encounter so the column is authoritative. A trigger keeps
+        // it in step if the patient is later renamed.
+        patient_name: form.patientName || null,
         clinician_name: form.clinician,
         encounter_date: encDate,
         chief_complaint: form.complaint,
@@ -305,18 +380,62 @@ const Encounter = () => {
           assessment_plan: form.plan,
         }),
         vitals: vitalsJson,
+        status: encounterStatus,
         attachments: [] // attachments removed per request
-      }]);
+      }]).select('id').single();
 
       if (error) throw error;
+      const encounterId = inserted?.id;
+
+      // 1. Record the dispensing against this encounter, then draw the stock
+      //    down so the catalogue and the history agree.
+      if (encounterId && dispensed.length > 0) {
+        const { error: dispenseErr } = await supabase.from('inventory_transactions').insert(
+          dispensed.map((d) => ({
+            item_name: d.item_name,
+            transaction_type: 'out',
+            quantity: d.quantity,
+            reason: 'Dispensed during consultation',
+            performed_by: form.clinician,
+            patient_id: form.patient,
+            encounter_id: encounterId,
+          }))
+        );
+        if (dispenseErr) {
+          console.warn('Dispensing was not recorded:', dispenseErr);
+        } else {
+          for (const d of dispensed) {
+            const item = inventoryItems.find((i) => i.item_name === d.item_name);
+            if (!item) continue;
+            await supabase
+              .from('inventory')
+              .update({
+                stock_quantity: Math.max(0, Number(item.stock_quantity || 0) - d.quantity),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('item_name', d.item_name);
+          }
+        }
+      }
+
+      // 2. The patient signs their own acknowledgement from the patient portal;
+      //    staff do not sign the visit.
 
       await logAudit('Encounter Creation', `Encounter for ${form.patient} - ${form.complaint}`, form.clinician);
       window.dispatchEvent(new CustomEvent('encounterAdded'));
+
+      // Remember what was just recorded before the form is cleared, so the
+      // dialog can say something useful rather than just "saved".
+      const savedPatientId = form.patient;
+      const savedPatientName = form.patientName || form.patient;
+      const savedComplaint = form.complaint;
+      const savedMedCount = dispensed.length;
 
       // reset only encounter fields (keep clinician)
       setForm({
         patient: '',
         patientNameVisible: '',
+        patientName: '',
         complaint: '',
         hpi: '',
         exam: '',
@@ -331,17 +450,43 @@ const Encounter = () => {
       });
       setPatientSearch('');
       setPatientSuggestions([]);
-      alert('Encounter saved successfully.');
+      setDispensed([]);
+      setMedPick('');
+      setMedQty('1');
+
+      // Stay on the form only if the clinician chooses to; otherwise move on to
+      // the record they just created, which is what they actually want to see.
+      setResult({
+        tone: 'success',
+        title: 'Visit recorded',
+        message: `${savedPatientName}'s encounter has been saved.`,
+        details: [
+          `Patient: ${savedPatientName} (${savedPatientId})`,
+          `Chief complaint: ${savedComplaint || '—'}`,
+          savedMedCount > 0
+            ? `Medicines dispensed: ${dispensed.map((d) => `${d.item_name} ×${d.quantity}`).join(', ')}`
+            : 'No medicines dispensed',
+        ],
+        actions: [
+          { label: 'View patient record', variant: 'primaryTone', onClick: () => { setResult(null); navigate(`/patient-profile?id=${savedPatientId}`); } },
+          { label: 'Record another', variant: 'secondary', onClick: () => setResult(null) },
+        ],
+      });
     } catch (err) {
       console.error('Save error:', err);
-      alert(err?.message || 'Error saving encounter.');
+      setResult({
+        tone: 'error',
+        title: 'Could not save the encounter',
+        message: err?.message || 'Something went wrong. Nothing was recorded — please try again.',
+        actions: [{ label: 'Close', onClick: () => setResult(null) }],
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSelectSuggestion = (s) => {
-    setForm(prev => ({ ...prev, patient: s.id, patientNameVisible: `${s.name} (${s.id})` }));
+    setForm(prev => ({ ...prev, patient: s.id, patientNameVisible: `${s.name} (${s.id})`, patientName: s.name || '' }));
     setPatientSearch(`${s.name} (${s.id})`);
     setPatientSuggestions([]);
   };
@@ -349,28 +494,28 @@ const Encounter = () => {
   return (
     <main className="main">
       <section className="page">
-        <div className="card" style={{ maxWidth: 1100, margin: '12px auto', padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-            <div>
-              <h2 style={{ margin: 0 }}>New Encounter</h2>
-              <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 6 }}>
-                Create a new patient encounter. Required: Patient and Chief Complaint.
-              </div>
-            </div>
-
-            {/* BACK BUTTON (primary) */}
-            <div>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => navigate(-1)}
-                aria-label="Go back"
-              >
-                ←Back
-              </button>
-            </div>
+        <div className="page-header" style={{ maxWidth: 1100, margin: '12px auto' }}>
+          <div className="page-header-title-block">
+            <h1 className="page-header-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>New Encounter</h1>
+            <p className="page-header-subtitle" style={{ margin: '4px 0 0 0', fontSize: 'var(--font-size-base)', color: 'var(--muted)' }}>
+              Create a new patient encounter. Required: Patient and Chief Complaint.
+            </p>
           </div>
 
+          {/* BACK BUTTON (primary) */}
+          <div className="page-header-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => navigate(-1)}
+              aria-label="Go back"
+            >
+              ← Back
+            </button>
+          </div>
+        </div>
+
+        <div className="card" style={{ maxWidth: 1100, margin: '12px auto', padding: 16 }}>
           <form onSubmit={handleSubmit} className="encounter-form-grid">
             <div>
               {/* Patient selector */}
@@ -382,7 +527,7 @@ const Encounter = () => {
                     aria-label="Search patient by name or student #"
                     type="text"
                     placeholder="Search patient"
-                    style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }}
+                    style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
                     value={patientSearch}
                     onChange={e => {
                       setPatientSearch(e.target.value);
@@ -394,18 +539,18 @@ const Encounter = () => {
                   <button type="button" className="btn" onClick={() => alert('Patient selector modal not implemented')}>Select</button>
 
                   {patientSuggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #ddd', maxHeight: 180, overflowY: 'auto', zIndex: 20 }}>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--panel)', border: '1px solid var(--border)', maxHeight: 180, overflowY: 'auto', zIndex: 20 }}>
                       {patientSuggestions.map(s => (
                         <div key={s.id}
                           onClick={() => handleSelectSuggestion(s)}
-                          style={{ padding: 8, cursor: 'pointer', borderBottom: '1px solid #eee' }}>
+                          style={{ padding: 8, cursor: 'pointer', borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
                           {s.name} ({s.id}) • Year {s.year}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-                <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 13 }}>
+                <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 'var(--font-size-sm)' }}>
                   Selected ID: <strong>{form.patient || 'none'}</strong>
                 </div>
               </div>
@@ -424,7 +569,7 @@ const Encounter = () => {
                   required
 
                 />
-                <div style={{ marginTop: 10, fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ marginTop: 10, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                   Short statement of the main reason for visit. Keep it concise — location, duration, and key descriptor.
                 </div>
               </div>
@@ -446,7 +591,7 @@ const Encounter = () => {
 - Aggravating/relieving factors
 - Associated symptoms (nausea, cough, shortness of breath)`
                 } />
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ marginTop: 8, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                   Write a brief narrative focused on the current problem — timing, severity, modifiers, and associated symptoms.
                 </div>
               </div>
@@ -465,7 +610,7 @@ const Encounter = () => {
 - Vital signs summary (if relevant)
 - Focused systems: e.g., ENT: pharynx erythematous; Lungs: clear; Abdomen: soft, non-tender.`
                 } />
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ marginTop: 8, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                   Record objective findings from the physical exam — be concise and system-focused.
                 </div>
               </div>
@@ -484,15 +629,90 @@ const Encounter = () => {
 - Assessment: likely diagnoses (differentials if needed)
 - Plan: investigations, medications, advice, follow-up`
                 } />
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ marginTop: 8, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                   State your impression and the concrete next steps (tests, prescriptions, referrals, safety-netting).
                 </div>
                 {!canEditAssessmentPlan && (
-                  <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                  <div style={{ marginTop: 8, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                     Physician-only field: nurses cannot edit Assessment / Plan.
                   </div>
                 )}
               </div>
+
+              {/* Medicines dispensed — recorded against this encounter, and
+                  surfaced automatically in the Medical Log. */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="label-muted">Medicines Dispensed</label>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 260px' }}>
+                    <select
+                      className="input"
+                      style={{ width: '100%', appearance: 'none', WebkitAppearance: 'none', paddingRight: 34, cursor: 'pointer' }}
+                      value={medPick}
+                      onChange={(e) => setMedPick(e.target.value)}
+                      aria-label="Choose a medicine to dispense"
+                    >
+                      <option value="">Select a medicine…</option>
+                      {inventoryItems.map((i) => (
+                        <option key={i.item_name} value={i.item_name}>
+                          {i.item_name} — {i.stock_quantity} {i.unit} in stock
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon size={13} style={{ position: 'absolute', right: 14, pointerEvents: 'none', color: 'var(--muted)' }} />
+                  </div>
+
+                  <input
+                    type="number"
+                    min="1"
+                    className="input"
+                    style={{ width: 90 }}
+                    value={medQty}
+                    onChange={(e) => setMedQty(e.target.value)}
+                    aria-label="Quantity"
+                  />
+
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={addMedication}
+                    disabled={!medPick}
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {dispensed.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                    {dispensed.map((d) => (
+                      <span
+                        key={d.item_name}
+                        className="badge badge-neutral"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 'var(--font-weight-semibold)' }}
+                      >
+                        {d.item_name} ×{d.quantity}
+                        <button
+                          type="button"
+                          onClick={() => removeMedication(d.item_name)}
+                          aria-label={`Remove ${d.item_name}`}
+                          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'inline-flex', padding: 0 }}
+                        >
+                          <CloseIcon size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 6, fontSize: 'var(--font-size-2xs)', color: 'var(--muted)' }}>
+                  Dispensing is recorded against this visit and shown in the Medical Log.
+                </div>
+              </div>
+
+              {/* No clinician signature here: the Medical Log's signature column
+                  belongs to the PATIENT, who signs from their own portal to
+                  confirm what they were given. */}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button type="submit" className="btn" disabled={isSaving || !form.patient || !form.complaint}>
@@ -547,7 +767,7 @@ const Encounter = () => {
                     inputMode="decimal"
                   />
                 </div>
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ marginTop: 8, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                   Record the most recent / measured vitals. Use numbers only. BP must use a single slash (/) as shown: <strong>SYS/DIA</strong>.
                 </div>
               </div>
@@ -571,7 +791,7 @@ const Encounter = () => {
               </div>
 
               {/* Removed attachments per request */}
-              <div className="card" style={{ padding: 12, fontSize: 13, color: 'var(--muted)' }}>
+              <div className="card" style={{ padding: 12, fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
                 <strong>Notes on documentation</strong>
                 <ul style={{ margin: '8px 0 0 18px' }}>
                   <li>Keep entries clear and objective.</li>
@@ -583,6 +803,16 @@ const Encounter = () => {
           </form>
         </div>
       </section>
+
+      <ResultDialog
+        open={Boolean(result)}
+        tone={result?.tone}
+        title={result?.title}
+        message={result?.message}
+        details={result?.details}
+        actions={result?.actions}
+        onClose={() => setResult(null)}
+      />
     </main>
   );
 };

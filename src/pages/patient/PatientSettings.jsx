@@ -70,8 +70,15 @@ const ToggleSwitch = ({ checked, onChange, disabled = false, ariaLabel }) => {
 
 export const DENSITY_STORAGE_KEY = 'tup-clinic-density';
 
+// Only the patient surface carries a density control, but this refuses to touch
+// the document anywhere else — defence in depth alongside the surface gate in
+// App.jsx, so a stray import can never restyle the staff portal.
+const DENSITY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
+const IS_DENSITY_SURFACE = DENSITY_SURFACE === 'user';
+
 export const applyDensityToDOM = (density) => {
   if (typeof document === 'undefined') return;
+  if (!IS_DENSITY_SURFACE) return;
   const normalized = density === 'compact' || density === 'comfortable' ? density : 'normal';
   document.documentElement.setAttribute('data-density', normalized);
   try {
@@ -317,10 +324,10 @@ const PatientSettings = () => {
         <div className="page-header" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h2 className="patient-page-title" style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
+              <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
                 Settings
               </h2>
-              <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>
+              <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
                 Manage your portal preferences, notifications, and display options.
               </div>
             </div>
@@ -334,8 +341,8 @@ const PatientSettings = () => {
                   gap: 6,
                   padding: '5px 12px',
                   borderRadius: 9999,
-                  fontSize: 12,
-                  fontWeight: 600,
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 'var(--font-weight-semibold)',
                   transition: 'all 180ms ease',
                   background:
                     saveStatus === 'saved'
@@ -381,10 +388,10 @@ const PatientSettings = () => {
           {/* SECTION 1: Appearance & Display */}
           <div className="card patient-settings-card" style={{ padding: 22, border: '1px solid var(--border)', borderRadius: 12 }}>
             <div className="card-header-block" style={{ marginBottom: 18, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 Appearance & Display
               </h3>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
                 Customize how the patient portal looks and feels on your devices
               </div>
             </div>
@@ -393,8 +400,8 @@ const PatientSettings = () => {
               {/* Theme Mode Segmented Pill */}
               <div className="patient-setting-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Color Theme</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>Color Theme</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2 }}>
                     Switch between light, dark, or system-matching contrast
                   </div>
                 </div>
@@ -433,8 +440,8 @@ const PatientSettings = () => {
                           padding: '6px 14px',
                           borderRadius: 8,
                           border: 'none',
-                          fontSize: 13,
-                          fontWeight: isSelected ? 700 : 500,
+                          fontSize: 'var(--font-size-sm)',
+                          fontWeight: isSelected ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
                           cursor: 'pointer',
                           transition: 'all 180ms ease',
                           background: isSelected ? 'var(--panel, #ffffff)' : 'transparent',
@@ -453,8 +460,8 @@ const PatientSettings = () => {
               {/* Font Scale Selection */}
               <div className="patient-setting-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, borderTop: '1px solid var(--border-subtle, var(--border))', paddingTop: 16 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Text Density</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>Text Density</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2 }}>
                     Adjust UI sizing and spacing for comfortable reading
                   </div>
                 </div>
@@ -489,8 +496,8 @@ const PatientSettings = () => {
                           padding: '6px 12px',
                           borderRadius: 8,
                           border: 'none',
-                          fontSize: 13,
-                          fontWeight: isSelected ? 700 : 500,
+                          fontSize: 'var(--font-size-sm)',
+                          fontWeight: isSelected ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
                           cursor: 'pointer',
                           transition: 'all 180ms ease',
                           background: isSelected ? 'var(--panel, #ffffff)' : 'transparent',
@@ -510,10 +517,10 @@ const PatientSettings = () => {
           {/* SECTION 2: Notifications & Alerts */}
           <div className="card patient-settings-card" style={{ padding: 22, border: '1px solid var(--border)', borderRadius: 12 }}>
             <div className="card-header-block" style={{ marginBottom: 18, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+              <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 Notifications & Communication
               </h3>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
                 Control how and when university clinic personnel contact you
               </div>
             </div>
@@ -522,10 +529,10 @@ const PatientSettings = () => {
               {/* Appointment Reminders */}
               <div className="patient-setting-toggle-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
                     Appointment Reminders
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
                     Receive schedule confirmation and 24-hour reminders prior to your clinical consultations.
                   </div>
                 </div>
@@ -539,10 +546,10 @@ const PatientSettings = () => {
               {/* Direct Inquiry Alerts */}
               <div className="patient-setting-toggle-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, borderTop: '1px solid var(--border-subtle, var(--border))', paddingTop: 16 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
                     Direct Inquiry & Message Alerts
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
                     Alert me immediately when clinic physicians or triage nurses reply to an ongoing inquiry.
                   </div>
                 </div>
@@ -556,10 +563,10 @@ const PatientSettings = () => {
               {/* University Health Announcements */}
               <div className="patient-setting-toggle-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, borderTop: '1px solid var(--border-subtle, var(--border))', paddingTop: 16 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
                     Clinic Announcements & Health Drives
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
                     Stay informed regarding annual physical examinations, vaccine missions, and university health advisories.
                   </div>
                 </div>
@@ -573,10 +580,10 @@ const PatientSettings = () => {
               {/* Email Notifications Digest */}
               <div className="patient-setting-toggle-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, borderTop: '1px solid var(--border-subtle, var(--border))', paddingTop: 16 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)' }}>
                     Email Notifications
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
                     Deliver summaries and updates directly to your registered institutional student email.
                   </div>
                 </div>
@@ -593,10 +600,10 @@ const PatientSettings = () => {
           <div className="card patient-settings-card" style={{ padding: 22, border: '1px solid var(--border)', borderRadius: 12 }}>
             <div className="card-header-block patient-account-header" style={{ marginBottom: 18, borderBottom: '1px solid var(--border)', paddingBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                   Account & Security
                 </h3>
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
                   Institutional student credentials and Supabase authentication status
                 </div>
               </div>
@@ -604,7 +611,7 @@ const PatientSettings = () => {
                 type="button"
                 className="btn secondary patient-change-password-btn patient-change-password-desktop"
                 onClick={() => setShowPasswordModal(true)}
-                style={{ fontSize: 13, padding: '7px 14px' }}
+                style={{ fontSize: 'var(--font-size-sm)', padding: '7px 14px' }}
               >
                 Change Password
               </button>
@@ -612,40 +619,40 @@ const PatientSettings = () => {
 
             <div className="patient-account-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
               <div className="patient-account-id-item">
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                   Student ID Number
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 4 }}>
                   {user?.patient_id || 'TUPM-XX-XXXX'}
                 </div>
               </div>
 
               <div className="patient-account-email-item">
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                   Registered Email
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginTop: 4 }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginTop: 4 }}>
                   {user?.email || 'student@tup.edu.ph'}
                 </div>
               </div>
 
               <div className="patient-account-role-item">
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                   Portal Role
                 </div>
                 <div style={{ marginTop: 4 }}>
-                  <span className="badge badge-primary" style={{ fontWeight: 600 }}>
+                  <span className="badge badge-primary" style={{ fontWeight: 'var(--font-weight-semibold)' }}>
                     Student / Patient
                   </span>
                 </div>
               </div>
 
               <div className="patient-account-security-item">
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                   Security Protection
                 </div>
                 <div style={{ marginTop: 4 }}>
-                  <span className="badge badge-success" style={{ fontWeight: 600 }}>
+                  <span className="badge badge-success" style={{ fontWeight: 'var(--font-weight-semibold)' }}>
                     Active & Encrypted
                   </span>
                 </div>
@@ -656,7 +663,7 @@ const PatientSettings = () => {
               type="button"
               className="btn secondary patient-change-password-btn patient-change-password-mobile"
               onClick={() => setShowPasswordModal(true)}
-              style={{ fontSize: 13, padding: '7px 14px' }}
+              style={{ fontSize: 'var(--font-size-sm)', padding: '7px 14px' }}
             >
               Change Password
             </button>
@@ -694,7 +701,7 @@ const PatientSettings = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                   Change Account Password
                 </h3>
                 <button
@@ -713,7 +720,7 @@ const PatientSettings = () => {
                     padding: '8px 12px',
                     borderRadius: 8,
                     marginBottom: 14,
-                    fontSize: 13,
+                    fontSize: 'var(--font-size-sm)',
                     background: passwordMsg.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                     color: passwordMsg.type === 'success' ? '#10b981' : '#ef4444',
                     border: passwordMsg.type === 'success' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
@@ -726,7 +733,7 @@ const PatientSettings = () => {
               <form onSubmit={handlePasswordSubmit}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                       New Password (Minimum 6 characters) *
                     </label>
                     <div style={{ position: 'relative' }}>
@@ -762,7 +769,7 @@ const PatientSettings = () => {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--text)' }}>
+                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
                       Confirm New Password *
                     </label>
                     <input

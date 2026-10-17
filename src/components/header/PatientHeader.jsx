@@ -64,7 +64,7 @@ const PatientHeader = ({ onToggleNav }) => {
             onClick={onToggleNav}
             aria-label="Toggle navigation menu"
           >
-            <span style={{ fontSize: 20, lineHeight: 1 }}>☰</span>
+            <span style={{ fontSize: 'var(--font-size-xl)', lineHeight: 1 }}>☰</span>
           </button>
 
           <div
@@ -78,10 +78,10 @@ const PatientHeader = ({ onToggleNav }) => {
               style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }}
             />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', lineHeight: 1.1, letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1.1, letterSpacing: '-0.01em' }}>
                 TUP CLINIC
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+              <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>
                 Patient Portal
               </div>
             </div>
@@ -172,13 +172,13 @@ const PatientHeader = ({ onToggleNav }) => {
               >
                 {/* User Identity Preview */}
                 <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {displayName}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2 }}>
                     {displayRole}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                  <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {studentId}
                   </div>
                 </div>
@@ -196,8 +196,8 @@ const PatientHeader = ({ onToggleNav }) => {
                       padding: '10px 16px',
                       background: 'transparent',
                       border: 'none',
-                      fontSize: 14,
-                      fontWeight: 600,
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
                       color: 'var(--text)',
                       textAlign: 'left',
                       cursor: 'pointer',
@@ -220,8 +220,8 @@ const PatientHeader = ({ onToggleNav }) => {
                       padding: '10px 16px',
                       background: 'transparent',
                       border: 'none',
-                      fontSize: 14,
-                      fontWeight: 600,
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
                       color: 'var(--text)',
                       textAlign: 'left',
                       cursor: 'pointer',
@@ -244,8 +244,8 @@ const PatientHeader = ({ onToggleNav }) => {
                       padding: '10px 16px',
                       background: 'transparent',
                       border: 'none',
-                      fontSize: 14,
-                      fontWeight: 600,
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
                       color: 'var(--danger, #f87171)',
                       textAlign: 'left',
                       cursor: 'pointer',
@@ -289,10 +289,10 @@ const PatientHeader = ({ onToggleNav }) => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
               Sign Out?
             </h3>
-            <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 14, lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
               Are you sure you want to log out of the Patient Portal?
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>

@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import autoTable from 'jspdf-autotable';
 import jsPDF from 'jspdf';
+import TablePagination from '../components/table/TablePagination.jsx';
+import { useTablePagination } from '../hooks/useTablePagination.js';
 import Chart from 'chart.js/auto';
 import {
   Chart as ChartJS,
@@ -43,18 +45,13 @@ const Reports = () => {
   const [reportData, setReportData] = useState([]);
   const [chartData, setChartData] = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showExportPasswordModal, setShowExportPasswordModal] = useState(false);
-  const [exportPasswordInput, setExportPasswordInput] = useState('');
-  const [exportPasswordError, setExportPasswordError] = useState('');
-  const [pendingExportAction, setPendingExportAction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [dateError, setDateError] = useState('');
   const mountedRef = useRef(false);
-  const REPORT_EXPORT_PASSWORD =
-    import.meta.env.VITE_REPORT_EXPORT_PASSWORD ||
-    import.meta.env.VITE_EXPORT_CENSUS_PASSWORD ||
-    'TUPCensus@2026';
+  const reportPagination = useTablePagination(reportData, {
+    resetKey: `${from}|${to}|${type}`,
+  });
 
   useEffect(() => {
     const today = new Date();
@@ -120,7 +117,7 @@ const Reports = () => {
             datasets: [{
               label: 'Cases',
               data: labels.map(l => monthCounts[l]),
-              backgroundColor: 'rgba(54,162,235,0.85)',
+              backgroundColor: isDark ? 'rgba(96, 165, 250, 0.75)' : 'rgba(54,162,235,0.85)',
             }]
           },
           options: {
@@ -151,7 +148,9 @@ const Reports = () => {
               backgroundColor: [
                 '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
                 '#FF9F40', '#8BC34A', '#607D8B', '#9E9E9E', '#FFC107',
-              ]
+              ],
+              borderColor: isDark ? '#1e293b' : '#ffffff',
+              borderWidth: 2
             }]
           },
           options: {
@@ -176,7 +175,7 @@ const Reports = () => {
             datasets: [{
               label: 'Visits',
               data: dates.map(d => visitCounts[d]),
-              backgroundColor: 'rgba(255,99,132,0.85)',
+              backgroundColor: isDark ? 'rgba(248, 113, 113, 0.75)' : 'rgba(255,99,132,0.85)',
             }]
           },
           options: {
@@ -368,7 +367,7 @@ const Reports = () => {
         body: smallTableRows.slice(1),
         startY: tableStart,
         margin: { left: margin, right: margin, top: margin, bottom: 60 },
-        styles: { fontSize: 10, overflow: 'linebreak', cellPadding: 6 },
+        styles: { fontSize: 11, overflow: 'linebreak', cellPadding: 6 },
         headStyles: { fillColor: [245,245,245] },
         showHead: 'everyPage',
         didDrawPage: function (data) {
@@ -526,31 +525,20 @@ const Reports = () => {
     }
   };
 
-  const requestReportExport = (action) => {
+  // Exports are no longer password-gated. The portal is only reachable by
+  // signed-in staff, and every export is recorded in the audit trail.
+  const requestReportExport = async (action) => {
     if (!reportData || reportData.length === 0 || exporting) return;
-    setPendingExportAction(action);
-    setExportPasswordInput('');
-    setExportPasswordError('');
     setShowExportMenu(false);
-    setShowExportPasswordModal(true);
-  };
 
-  const confirmReportExport = async () => {
-    const trimmed = (exportPasswordInput || '').trim();
-    if (!trimmed) {
-      setExportPasswordError('Please enter the export password.');
-      return;
-    }
-    if (trimmed !== REPORT_EXPORT_PASSWORD) {
-      setExportPasswordError('Incorrect export password.');
-      return;
-    }
-
-    const action = pendingExportAction;
-    setShowExportPasswordModal(false);
-    setExportPasswordInput('');
-    setExportPasswordError('');
-    setPendingExportAction(null);
+    try {
+      await logAudit(
+        'EXPORT',
+        `Exported ${type} report (${useFrom} → ${useTo}) as ${action === 'csv-full' ? 'CSV' : 'PDF'} — ${reportData.length} records`,
+        undefined,
+        { type: 'export', meta: { entity: 'reports', format: action === 'csv-full' ? 'csv' : 'pdf', rowCount: reportData.length, from: useFrom, to: useTo, reportType: type } }
+      );
+    } catch (e) { /* audit failure must not block the export */ }
 
     if (action === 'csv-full') exportCsv('full');
     if (action === 'pdf-selected') await exportPdf('selected');
@@ -574,15 +562,15 @@ const Reports = () => {
         <div className="card" style={{ padding: '20px 22px', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Report Overview
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
                 Configure date range, analytical view, and generate official clinical records
               </div>
             </div>
 
-            <span className="badge badge-purple" style={{ fontSize: 12, padding: '4px 10px' }}>
+            <span className="badge badge-purple" style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}>
               <strong>{reportData.length}</strong> records analyzed
             </span>
           </div>
@@ -602,7 +590,7 @@ const Reports = () => {
                   aria-label="From date"
                 />
               </div>
-              <span style={{ color: 'var(--border)', fontWeight: 600 }}>|</span>
+              <span style={{ color: 'var(--border)', fontWeight: 'var(--font-weight-semibold)' }}>|</span>
               <div className="reports-date-field">
                 <label htmlFor="r-to" className="reports-date-label">To</label>
                 <input
@@ -661,7 +649,7 @@ const Reports = () => {
           </div>
 
           {dateError && (
-            <div style={{ padding: '10px 14px', background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border, var(--border))', borderRadius: 8, color: 'var(--danger)', fontSize: 13, marginTop: 12 }}>
+            <div style={{ padding: '10px 14px', background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border, var(--border))', borderRadius: 8, color: 'var(--danger)', fontSize: 'var(--font-size-sm)', marginTop: 12 }}>
               {dateError}
             </div>
           )}
@@ -675,7 +663,7 @@ const Reports = () => {
             <div className="card" style={{ padding: '20px 22px' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: 16 }}>Analytics Visualization</h3>
+                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Analytics Visualization</h3>
                   <span className="card-subtitle">
                     Showing {type === 'census' ? 'case counts' : (type === 'diagnoses' ? 'diagnostic breakdown' : 'daily trends')} for selected range
                   </span>
@@ -683,7 +671,7 @@ const Reports = () => {
               </div>
 
               {loading ? (
-                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
                   Generating visualization…
                 </div>
               ) : (!reportData || reportData.length === 0) ? (
@@ -696,10 +684,10 @@ const Reports = () => {
                   padding: '36px 20px',
                   textAlign: 'center'
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+                  <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginBottom: 6 }}>
                     No report data available
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.5 }}>
                     There are no encounter records within the selected date range. Try selecting a different date range.
                   </div>
                 </div>
@@ -709,7 +697,7 @@ const Reports = () => {
                    chartData.type === 'pie' ? <Pie data={chartData.data} options={chartData.options} /> : null}
                 </div>
               ) : (
-                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
                   No chart available for the specified range.
                 </div>
               )}
@@ -719,20 +707,17 @@ const Reports = () => {
             <div className="card" style={{ padding: '20px 22px' }}>
               <div className="card-header" style={{ marginBottom: 12 }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: 16 }}>Raw Encounters Data</h3>
+                  <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Raw Encounters Data</h3>
                   <span className="card-subtitle">Granular clinical records within active date filter</span>
                 </div>
-                <span className="badge badge-neutral">
-                  Rows: <strong>{reportData.length}</strong>
-                </span>
               </div>
 
               {(!reportData || reportData.length === 0) ? (
-                <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
                   No data records found for the selected date range.
                 </div>
               ) : (
-                <div className="table-responsive" style={{ maxHeight: 360 }}>
+                <div className="table-responsive">
                   <table className="table" aria-label="Report data table">
                     <thead>
                       <tr>
@@ -743,11 +728,11 @@ const Reports = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.map(enc => (
+                      {reportPagination.pageRows.map(enc => (
                         <tr key={enc.id || Math.random()}>
                           <td style={{ color: 'var(--text-muted)' }}>{new Date(enc.encounter_date).toLocaleString()}</td>
                           <td>
-                            <span style={{ fontWeight: 700 }}>{enc.patient_name || enc.patient_id}</span>
+                            <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{enc.patient_name || enc.patient_id}</span>
                           </td>
                           <td>{enc.clinician_name || 'Staff'}</td>
                           <td style={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -759,16 +744,26 @@ const Reports = () => {
                   </table>
                 </div>
               )}
+
+              <TablePagination
+                page={reportPagination.page}
+                totalPages={reportPagination.totalPages}
+                startIndex={reportPagination.startIndex}
+                endIndex={reportPagination.endIndex}
+                total={reportPagination.total}
+                onPageChange={reportPagination.goToPage}
+                itemLabel="records"
+              />
             </div>
           </div>
 
           {/* Side Guide Card */}
           <div className="card" style={{ padding: '18px 20px' }}>
-            <h3 className="card-title" style={{ fontSize: 16, marginBottom: 12 }}>
+            <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)', marginBottom: 12 }}>
               Clinical Intelligence Guide
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 'var(--font-size-xs)', lineHeight: 1.5, color: 'var(--text-muted)' }}>
               <div>
                 <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 2 }}>Auto 30-Day Lookback</strong>
                 By default, queries the last {DEFAULT_LOOKBACK_DAYS} days of clinic operations to ensure responsive analysis.
@@ -792,41 +787,6 @@ const Reports = () => {
         </div>
       </div>
 
-      {showExportPasswordModal && (
-        <div style={{ position:'fixed', inset:0, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2100 }}>
-          <div style={{ background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', padding:24, borderRadius:16, maxWidth:420, width:'92%', boxShadow: 'var(--shadow-lg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Reports Export Authorization</h3>
-              <button type="button" className="modal-close-btn" onClick={() => setShowExportPasswordModal(false)} aria-label="Close modal">
-                <CloseIcon size={18} />
-              </button>
-            </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
-              Enter staff export security password to download the protected clinic census.
-            </p>
-            <input
-              type="password"
-              className="input"
-              value={exportPasswordInput}
-              onChange={(e) => {
-                setExportPasswordInput(e.target.value);
-                if (exportPasswordError) setExportPasswordError('');
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter') confirmReportExport(); }}
-              placeholder="Enter export password..."
-              style={{ width: '100%', marginTop: 8 }}
-              autoFocus
-            />
-            {exportPasswordError && (
-              <div style={{ color: 'var(--danger)', marginTop: 8, fontSize: 13, fontWeight: 600 }}>{exportPasswordError}</div>
-            )}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop: 20 }}>
-              <button className="btn secondary" onClick={() => setShowExportPasswordModal(false)}>Cancel</button>
-              <button className="btn" onClick={confirmReportExport}>Confirm & Export</button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 };
@@ -840,7 +800,7 @@ const menuBtnStyle = {
   background: 'transparent',
   color: 'var(--text)',
   cursor: 'pointer',
-  fontSize: 13
+  fontSize: 'var(--font-size-sm)'
 };
 
 export default Reports;

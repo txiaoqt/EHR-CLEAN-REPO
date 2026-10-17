@@ -355,15 +355,14 @@ const MyProfile = () => {
           zIndex: 2000,
           padding: '12px 20px',
           borderRadius: 12,
-          color: 'white',
-          fontWeight: 700,
-          backgroundColor: messageType === 'error' ? '#dc2626' : '#059669',
+          color: 'var(--text-on-primary)',
+          fontWeight: 'var(--font-weight-bold)',
+          backgroundColor: messageType === 'error' ? 'var(--danger)' : 'var(--color-emerald)',
           boxShadow: 'var(--shadow-lg)',
           display: 'flex',
           alignItems: 'center',
           gap: 8
         }}>
-          <span>{messageType === 'error' ? '⚠️' : '✓'}</span>
           <span>{message}</span>
         </div>
       )}
@@ -398,7 +397,7 @@ const MyProfile = () => {
           <div className="card" style={{ padding: '22px 20px', textAlign: 'center' }}>
             <div className="card-header" style={{ marginBottom: 16, textAlign: 'left' }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Profile Overview</h3>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Profile Overview</h3>
                 <span className="card-subtitle">Verified staff credentials</span>
               </div>
             </div>
@@ -439,7 +438,7 @@ const MyProfile = () => {
                   onChange={handleImageUpload}
                   style={{ display: 'none' }}
                 />
-                <div style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, marginBottom: 14, cursor: 'pointer' }} onClick={openFileInput}>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary-text, #fda4af)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 14, cursor: 'pointer' }} onClick={openFileInput}>
                   Click to change photo
                 </div>
               </>
@@ -447,27 +446,27 @@ const MyProfile = () => {
 
             {!isEditing ? (
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{user.name}</h3>
-                <div style={{ marginTop: 2, fontSize: 14, fontWeight: 600, color: 'var(--color-primary)' }}>{user.role}</div>
-                <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-muted)' }}>{user.email}</div>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>{user.name}</h3>
+                <div style={{ marginTop: 2, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-primary-text, #fda4af)' }}>{user.role}</div>
+                <div style={{ marginTop: 4, fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>{user.email}</div>
 
                 {/* Structured Metadata Panel */}
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Account Status</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)' }}>Account Status</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-emerald-text)', fontWeight: 'var(--font-weight-bold)' }}>
                       <span className="status-dot" style={{ width: 7, height: 7 }}></span> Active
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Access Level</span>
-                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>{user.role || 'Staff'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--font-weight-semibold)' }}>Access Level</span>
+                    <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{user.role || 'Staff'}</span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 600 }}>Clinical Engagement</span>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>Clinical Engagement</span>
+                    <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)' }}>
                       {stats.encountersCreated} Encounters · {stats.appointmentsScheduled} Appointments
                     </span>
                   </div>
@@ -475,7 +474,7 @@ const MyProfile = () => {
               </div>
             ) : (
               <div style={{ textAlign: 'left', marginTop: 10 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Display Name</label>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Display Name</label>
                 <input
                   type="text"
                   name="name"
@@ -485,7 +484,7 @@ const MyProfile = () => {
                   placeholder="Enter full name"
                   style={{ width: '100%' }}
                 />
-                <div style={{ color: 'var(--text-light)', fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+                <div style={{ color: 'var(--text-light)', fontSize: 'var(--font-size-2xs)', marginTop: 6, lineHeight: 1.4 }}>
                   Note: Official email and role changes must be requested through clinic administration.
                 </div>
               </div>
@@ -496,7 +495,7 @@ const MyProfile = () => {
           <div className="card" style={{ padding: '20px 22px' }}>
             <div className="card-header" style={{ marginBottom: 14 }}>
               <div>
-                <h3 className="card-title" style={{ fontSize: 16 }}>Recent Operational Activity</h3>
+                <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Recent Operational Activity</h3>
                 <span className="card-subtitle">Your latest logged actions and consultations</span>
               </div>
               <button type="button" className="btn secondary small" onClick={openActivityModal}>
@@ -531,12 +530,12 @@ const MyProfile = () => {
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       {/* Primary readable action description */}
-                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {act.detail || act.action || 'Activity'}
                       </div>
                     </div>
                     {/* Timestamp */}
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {act.created_at ? new Date(act.created_at).toLocaleString() : ''}
                     </div>
                   </button>
@@ -551,8 +550,8 @@ const MyProfile = () => {
                 border: '1px solid var(--border-subtle)',
                 color: 'var(--text-muted)'
               }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>No recent activity</div>
-                <div style={{ fontSize: 12 }}>Recent staff actions and consultations will appear here.</div>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginBottom: 4 }}>No recent activity</div>
+                <div style={{ fontSize: 'var(--font-size-xs)' }}>Recent staff actions and consultations will appear here.</div>
               </div>
             )}
           </div>
@@ -575,8 +574,8 @@ const MyProfile = () => {
           <div style={{ width: '96%', maxWidth: 960, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxHeight: '88vh', overflow: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Activity History Log</h3>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Historical audit and clinical records for your staff account</div>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Activity History Log</h3>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Historical audit and clinical records for your staff account</div>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <button className={`btn small ${modalTab === 'audit' ? '' : 'secondary'}`} onClick={() => setModalTab('audit')}>Audit Logs</button>
@@ -611,7 +610,7 @@ const MyProfile = () => {
                           }
                         }}>
                           <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : ''}</td>
-                          <td style={{ fontWeight: 600 }}>{row.action || row.type}</td>
+                          <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{row.action || row.type}</td>
                           <td>{row.performed_by}</td>
                           <td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.detail || row.message || JSON.stringify(row.meta || {})}</td>
                         </tr>
@@ -629,7 +628,7 @@ const MyProfile = () => {
                       {(modalData.encounters || []).map(row => (
                         <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => { navigate(`/encounter?id=${row.id}`); closeActivityModal(); }}>
                           <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : (row.encounter_date ? new Date(row.encounter_date).toLocaleString() : '')}</td>
-                          <td style={{ fontWeight: 700 }}>{row.patient_name || row.patient_id}</td>
+                          <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{row.patient_name || row.patient_id}</td>
                           <td>{row.clinician_name || row.clinician}</td>
                           <td style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.chief_complaint || (row.assessment_plan ? row.assessment_plan.split(',')[0] : '')}</td>
                         </tr>
@@ -647,7 +646,7 @@ const MyProfile = () => {
                       {(modalData.appointments || []).map(row => (
                         <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => { navigate(`/appointments?id=${row.id}`); closeActivityModal(); }}>
                           <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : (row.appointment_date ? `${row.appointment_date} ${row.appointment_time || ''}` : '')}</td>
-                          <td style={{ fontWeight: 700 }}>{row.patient_name || row.patient_id}</td>
+                          <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{row.patient_name || row.patient_id}</td>
                           <td>{row.clinician_name || row.clinician}</td>
                           <td>
                             <span className="badge badge-info">{row.status || 'Scheduled'}</span>
