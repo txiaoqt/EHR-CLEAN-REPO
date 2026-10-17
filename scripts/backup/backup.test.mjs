@@ -9,9 +9,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSecrets, redact, REQUIRED_SECRETS } from './common.mjs';
+import { validateSecrets, redact, REQUIRED_SECRETS, inspectDatabaseUrl } from './common.mjs';
 import { backupIdentity } from './run-backup.mjs';
-import { inspectEndpoint } from './check-r2.mjs';
+import { inspectEndpoint, inspectBucketName } from './check-r2.mjs';
 
 const completeEnv = () => ({
   SUPABASE_DB_URL: 'postgresql://user:pw@db.example.com:5432/postgres',
@@ -123,23 +123,29 @@ test('a missing or malformed run identity is refused', () => {
 const GOOD = 'https://a1b2c3d4e5f60718293a4b5c6d7e8f90.r2.cloudflarestorage.com';
 
 test('a well-formed endpoint passes', () => {
-  assert.deepEqual(inspectEndpoint(GOOD), { ok: true, problems: [] });
+  const { ok, problems, normalized } = inspectEndpoint(GOOD);
+  assert.equal(ok, true);
+  assert.deepEqual(problems, []);
+  assert.equal(normalized, GOOD);
 });
 
 test('a jurisdiction endpoint passes', () => {
   assert.equal(inspectEndpoint('https://a1b2c3d4e5f60718293a4b5c6d7e8f90.eu.r2.cloudflarestorage.com').ok, true);
 });
 
-test('a trailing slash is reported', () => {
-  const { ok, problems } = inspectEndpoint(`${GOOD}/`);
-  assert.equal(ok, false);
-  assert.match(problems.join(' '), /trailing slash/);
+// A trailing slash and a pasted newline are NORMALISED, not rejected: the
+// reference implementation accepts both, and the aws CLI does not, so refusing
+// them here would reject a value that works everywhere else.
+test('a trailing slash is accepted and normalised away', () => {
+  const result = inspectEndpoint(`${GOOD}/`);
+  assert.equal(result.ok, true);
+  assert.equal(result.normalized, GOOD, 'the CLI must receive the origin without the slash');
 });
 
-test('a pasted newline is reported', () => {
-  const { ok, problems } = inspectEndpoint(`${GOOD}\n`);
-  assert.equal(ok, false);
-  assert.match(problems.join(' '), /whitespace/);
+test('a pasted newline is accepted and trimmed', () => {
+  const result = inspectEndpoint(`${GOOD}\n`);
+  assert.equal(result.ok, true);
+  assert.equal(result.normalized, GOOD);
 });
 
 test('the r2.dev public URL is named for what it is', () => {
@@ -148,10 +154,12 @@ test('the r2.dev public URL is named for what it is', () => {
   assert.match(problems.join(' '), /public bucket URL/);
 });
 
-test('doubled scheme, quotes and a dashboard URL are all caught', () => {
+test('doubled scheme, quotes, credentials, query and path are all caught', () => {
   assert.match(inspectEndpoint(`https://${GOOD}`).problems.join(' '), /twice/);
   assert.match(inspectEndpoint(`"${GOOD}"`).problems.join(' '), /quote/);
-  assert.match(inspectEndpoint('https://dash.cloudflare.com/').problems.join(' '), /dashboard URL/);
+  assert.match(inspectEndpoint('https://user:pw@acct.r2.cloudflarestorage.com').problems.join(' '), /credentials/);
+  assert.match(inspectEndpoint(`${GOOD}?x=1`).problems.join(' '), /query/);
+  assert.match(inspectEndpoint(`${GOOD}/some/path`).problems.join(' '), /path/);
 });
 
 test('a wrong host is reported', () => {
@@ -161,4 +169,53 @@ test('a wrong host is reported', () => {
 test('an empty endpoint reports a problem rather than passing', () => {
   assert.equal(inspectEndpoint('').ok, false);
   assert.equal(inspectEndpoint(undefined).ok, false);
+});
+
+// --- database connection string ---------------------------------------------
+// The transaction pooler cannot serve a dump: it does not hold a session, so the
+// failure lands partway through rather than at the start, and nothing about it
+// points back to the port.
+
+test('a direct connection passes', () => {
+  assert.doesNotThrow(() => inspectDatabaseUrl('postgresql://postgres:pw@db.abcdefgh.supabase.co:5432/postgres'));
+  assert.doesNotThrow(() => inspectDatabaseUrl('postgresql://postgres.abcdefgh:pw@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres'));
+});
+
+test('the transaction pooler on 6543 is refused, and named', () => {
+  assert.throws(
+    () => inspectDatabaseUrl('postgresql://postgres.abcdefgh:pw@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres'),
+    /transaction pooler/
+  );
+});
+
+test('a connection string without a password is refused', () => {
+  assert.throws(() => inspectDatabaseUrl('postgresql://postgres@db.abcdefgh.supabase.co:5432/postgres'), /password/);
+  assert.throws(() => inspectDatabaseUrl('not-a-url'), /valid connection string/);
+  assert.throws(() => inspectDatabaseUrl('mysql://u:p@h/db'), /PostgreSQL/);
+});
+
+test('validateSecrets applies the database check too', () => {
+  const env = { ...completeEnv(), SUPABASE_DB_URL: 'postgresql://postgres.abcdefgh:pw@aws-0-ap.pooler.supabase.com:6543/postgres' };
+  assert.throws(() => validateSecrets(env), /transaction pooler/);
+});
+
+// --- bucket name -------------------------------------------------------------
+// Cloudflare follows S3 naming. An underscore is the usual mistake and the error
+// it produces is far from obvious.
+
+test('a valid bucket name passes', () => {
+  assert.equal(inspectBucketName('ehr-backups').ok, true);
+  assert.equal(inspectBucketName('ehr.backups.2026').ok, true);
+});
+
+test('an underscore or capital is reported', () => {
+  assert.match(inspectBucketName('ehr_backups').problems.join(' '), /S3 does not allow/);
+  assert.match(inspectBucketName('EHR-Backups').problems.join(' '), /S3 does not allow/);
+});
+
+test('a bad length or bad ends are reported', () => {
+  assert.match(inspectBucketName('ab').problems.join(' '), /3 to 63/);
+  assert.match(inspectBucketName('-backups').problems.join(' '), /start and end/);
+  assert.match(inspectBucketName('backups-').problems.join(' '), /start and end/);
+  assert.equal(inspectBucketName('').ok, false);
 });

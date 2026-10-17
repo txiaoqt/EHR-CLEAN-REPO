@@ -26,42 +26,70 @@ const PROBE_PREFIX = '_checks';
 /**
  * Checks the endpoint's SHAPE before handing it to the aws CLI.
  *
- * The CLI answers a malformed endpoint with `Invalid endpoint: <value>`, and
- * GitHub then redacts the value, so the log says nothing useful. Worse, a
- * trailing slash or a stray newline is invisible in a secret field. This says
- * what is actually wrong without ever printing the value.
+ * Modelled on the reference implementation's validateR2Config, which parses the
+ * endpoint with `new URL()` and requires an https origin with no credentials,
+ * path, query or fragment — `pathname === '/'`, so a trailing slash is fine.
+ *
+ * A trailing slash is NORMALISED rather than rejected. The reference tolerates
+ * it, and the aws CLI does not, so rejecting it here would refuse a value that
+ * actually works everywhere else. A pasted newline is trimmed for the same
+ * reason. Only genuinely wrong shapes are refused.
+ *
+ * The value is never printed: GitHub redacts it anyway, and a diagnostic that
+ * cannot say what is wrong is worse than one that says nothing.
  */
 export function inspectEndpoint(raw) {
   const value = String(raw ?? '');
+  if (!value.trim()) return { ok: false, problems: ['it is empty'], normalized: null };
+
+  // Trim first: a newline pasted with the value is invisible in a secret field
+  // and is not a reason to fail.
+  const trimmed = value.trim();
   const problems = [];
 
-  if (value !== value.trim()) {
-    problems.push('it has leading or trailing whitespace (a newline pasted with it is the usual cause)');
-  }
-  const trimmed = value.trim();
-
-  if (!/^https:\/\//.test(trimmed)) {
-    problems.push('it does not start with https://');
-  }
-  if (trimmed.endsWith('/')) {
-    problems.push('it ends with a trailing slash — the endpoint should be the host only');
-  }
-  if (/^https:\/\/https:\/\//.test(trimmed)) {
-    problems.push('it has https:// twice');
-  }
-  if (/["']/.test(trimmed)) {
-    problems.push('it contains quote characters — paste the value without them');
-  }
+  if (/^https:\/\/https:\/\//.test(trimmed)) problems.push('it has https:// twice');
+  if (/["']/.test(trimmed)) problems.push('it contains quote characters — paste the value without them');
   if (/\.r2\.dev/.test(trimmed)) {
     problems.push('it is an r2.dev public bucket URL, not the S3 API endpoint — the S3 endpoint is https://<ACCOUNT_ID>.r2.cloudflarestorage.com');
   }
-  if (/cloudflare\.com\/?$/.test(trimmed) && !/r2\.cloudflarestorage\.com/.test(trimmed)) {
-    problems.push('it looks like a dashboard URL rather than the S3 API endpoint');
-  }
-  if (!/\.r2\.cloudflarestorage\.com$/.test(trimmed) && !/\.r2\.cloudflarestorage\.com/.test(trimmed)) {
-    problems.push('it does not end with .r2.cloudflarestorage.com');
+
+  let url = null;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    problems.push('it is not a valid URL');
   }
 
+  if (url) {
+    if (url.protocol !== 'https:') problems.push('it is not https');
+    if (url.username || url.password) problems.push('it contains credentials');
+    if (url.search) problems.push('it has a query string — the endpoint is the origin only');
+    if (url.hash) problems.push('it has a fragment');
+    // pathname is '/' for both "host" and "host/", so a trailing slash passes.
+    if (url.pathname !== '/') problems.push('it has a path — the endpoint is the origin only');
+    if (!/\.r2\.cloudflarestorage\.com$/.test(url.hostname)) {
+      problems.push('its host does not end with .r2.cloudflarestorage.com');
+    }
+  }
+
+  if (problems.length > 0) return { ok: false, problems, normalized: null };
+
+  // Normalised for the CLI: origin only, no trailing slash.
+  return { ok: true, problems: [], normalized: url.origin };
+}
+
+/**
+ * Cloudflare follows S3 bucket naming: 3–63 characters, lowercase letters,
+ * digits, dots and hyphens. An underscore is the usual mistake, and the failure
+ * it produces is far from obvious.
+ */
+export function inspectBucketName(raw) {
+  const name = String(raw ?? '').trim();
+  if (!name) return { ok: false, problems: ['it is empty'] };
+  const problems = [];
+  if (!/^[a-z0-9.-]+$/.test(name)) problems.push('it contains characters S3 does not allow (underscores and capitals are the usual ones)');
+  if (name.length < 3 || name.length > 63) problems.push('it must be 3 to 63 characters');
+  if (!/^[a-z0-9]/.test(name) || !/[a-z0-9]$/.test(name)) problems.push('it must start and end with a letter or digit');
   return { ok: problems.length === 0, problems };
 }
 
@@ -69,17 +97,21 @@ export async function checkR2(env = process.env) {
   validateSecrets(env);
 
   const { R2_BUCKET_NAME } = env;
-  // Trimmed, so a pasted newline cannot reach the CLI. aws rejects a value with
-  // one and the error is unreadable.
-  const R2_ENDPOINT = String(env.R2_ENDPOINT).trim();
 
   const shape = inspectEndpoint(env.R2_ENDPOINT);
   if (!shape.ok) {
-    // Report every problem at once, so this does not take one run each.
     throw new Error(
       `R2_ENDPOINT looks wrong:\n  - ${shape.problems.join('\n  - ')}\n` +
       `It should be exactly: https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
     );
+  }
+  // Use the normalised form, so a trailing slash or a pasted newline reaches the
+  // CLI in the one shape it accepts.
+  const R2_ENDPOINT = shape.normalized;
+
+  const bucket = inspectBucketName(R2_BUCKET_NAME);
+  if (!bucket.ok) {
+    throw new Error(`R2_BUCKET_NAME looks wrong:\n  - ${bucket.problems.join('\n  - ')}`);
   }
   const r2Env = {
     ...process.env,

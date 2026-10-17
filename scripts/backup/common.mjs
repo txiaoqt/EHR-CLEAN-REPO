@@ -30,6 +30,37 @@ export function validateSecrets(env = process.env) {
   if (!/^https:\/\//.test(env.R2_ENDPOINT)) {
     throw new Error('R2_ENDPOINT must be an https URL');
   }
+  inspectDatabaseUrl(env.SUPABASE_DB_URL);
+}
+
+/**
+ * Checks the database connection string can actually serve a dump.
+ *
+ * The transaction pooler listens on 6543 and cannot run pg_dump — it does not
+ * hold a session, so the dump fails partway through rather than at the start.
+ * The port is easy to copy from the wrong line of the Supabase dashboard, and
+ * nothing about the failure points back to it.
+ */
+export function inspectDatabaseUrl(raw) {
+  let url;
+  try {
+    url = new URL(String(raw));
+  } catch {
+    throw new Error('SUPABASE_DB_URL is not a valid connection string');
+  }
+  if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+    throw new Error('SUPABASE_DB_URL must be a PostgreSQL connection string');
+  }
+  if (!url.hostname || !url.username || !url.password) {
+    throw new Error('SUPABASE_DB_URL must include the host, user and password');
+  }
+  if (url.port === '6543') {
+    throw new Error(
+      'SUPABASE_DB_URL uses port 6543, the transaction pooler, which cannot run pg_dump. ' +
+      'Use the direct connection (port 5432) or the session pooler.'
+    );
+  }
+  return url;
 }
 
 /**
