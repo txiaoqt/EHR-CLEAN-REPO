@@ -196,6 +196,44 @@ async function uploadR2({ archive, backupId, env }) {
   return { key, size: head.ContentLength, sha256: localHash };
 }
 
+/**
+ * Records the successful backup so the staff portal can show it.
+ *
+ * Called only AFTER the upload has been verified. A timestamp written earlier
+ * would claim a backup that may not exist — the sidebar would say "backed up"
+ * on the strength of a run that failed at the upload.
+ *
+ * Failure here does not fail the run. The backup is already in R2 and verified;
+ * a portal that did not hear about it is a smaller problem than a workflow that
+ * reports failure on a backup that worked. It is logged, not swallowed.
+ */
+async function recordLastBackup({ env, backupId }) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) return;
+  const stamp = new Date().toISOString();
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/settings?on_conflict=key`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SECRET_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify([
+        { key: 'last_backup', value: stamp },
+        { key: 'last_backup_id', value: backupId },
+      ]),
+    });
+    if (!res.ok) {
+      log(`WARNING: the backup succeeded but the portal could not be updated (HTTP ${res.status}).`);
+      return;
+    }
+    log(`Portal updated: last backup recorded as ${stamp}`);
+  } catch (error) {
+    log(`WARNING: the backup succeeded but the portal could not be updated (${redact(error.message)}).`);
+  }
+}
+
 export async function runBackup(env = process.env) {
   validateSecrets(env);
   const identity = backupIdentity(env);
@@ -231,6 +269,10 @@ export async function runBackup(env = process.env) {
     await run('tar', ['-tzf', archive]);
 
     await uploadR2({ archive, ...identity, env });
+
+    // Only now, with the archive uploaded and verified, is it true to say the
+    // clinic has a backup.
+    await recordLastBackup({ env, backupId: identity.backupId });
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

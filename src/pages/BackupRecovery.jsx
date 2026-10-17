@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { supabase } from '../supabaseClient.js';
 import {
   fetchBackupRuns,
   requestBackup,
@@ -23,10 +24,32 @@ import ResultDialog from '../components/ResultDialog.jsx';
  */
 const BackupRecovery = () => {
   const [state, setState] = useState({ loading: true, error: null, runs: [], activeBackup: false, dispatchEnabled: false });
+  // Read from the settings table, which the workflow writes to only after an
+  // upload has been verified. Shown even when the run history is unavailable, so
+  // the page is never blank about whether a backup has happened.
+  const [recorded, setRecorded] = useState(null);
   const [requesting, setRequesting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState(null);
   const busyRef = useRef(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('settings')
+          .select('key,value')
+          .in('key', ['last_backup', 'last_backup_id']);
+        if (!mounted || !data) return;
+        const map = Object.fromEntries(data.map((row) => [row.key, row.value]));
+        if (map.last_backup) setRecorded({ at: map.last_backup, id: map.last_backup_id || null });
+      } catch (_) {
+        // The run history is the better source; this is a fallback.
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -135,16 +158,33 @@ const BackupRecovery = () => {
             <header className="settings-card-head" style={{ marginBottom: 10 }}>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertIcon size={18} />
-                {state.error.code === 'not_configured' ? 'Backup is not configured yet' : 'Backup information unavailable'}
+                {state.error.code === 'not_configured' ? 'Live run history is not available yet' : 'Backup information unavailable'}
               </h2>
               <p>{state.error.message}</p>
             </header>
+
+            {recorded && (
+              <div className="settings-identity" style={{ marginBottom: 14 }}>
+                <div className="settings-identity-label">Last verified backup</div>
+                <div className="settings-identity-body">
+                  <div>
+                    <div className="settings-identity-name" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {new Date(recorded.at).toLocaleString()}
+                    </div>
+                    {recorded.id && <div className="settings-identity-meta">Run {recorded.id}</div>}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="settings-callout" style={{ marginTop: 0 }}>
               {state.error.code === 'not_configured' ? (
                 <>
                   Set <code>GITHUB_BACKUP_TOKEN</code>, <code>GITHUB_BACKUP_REPOSITORY</code>,{' '}
                   <code>GITHUB_BACKUP_WORKFLOW</code> and <code>GITHUB_BACKUP_REF</code> as secrets on the{' '}
-                  <code>backup-control</code> function. <code>docs/BACKUP_RECOVERY.md</code> lists them.
+                  <code>backup-control</code> function, then deploy it:{' '}
+                  <code>supabase functions deploy backup-control</code>.{' '}
+                  <code>docs/BACKUP_RECOVERY.md</code> lists them.
                 </>
               ) : (
                 <>Try refreshing. If it keeps failing, the GitHub token may have expired.</>
