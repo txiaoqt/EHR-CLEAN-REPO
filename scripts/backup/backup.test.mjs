@@ -71,6 +71,19 @@ test('redact removes a postgres URL with its password', () => {
   assert.match(out, /\[redacted\]/);
 });
 
+// The runner attaches tool stderr to its errors, and an endpoint or a signed
+// link can appear there without looking like a credential.
+test('redact removes any URL, not only credential-bearing ones', () => {
+  const out = redact('aws: [ERROR]: Invalid endpoint: https://acct.r2.cloudflarestorage.com');
+  assert.doesNotMatch(out, /cloudflarestorage/);
+  assert.match(out, /\[URL redacted\]/);
+});
+
+test('redact removes a signed URL with its signature', () => {
+  const out = redact('GET https://project.supabase.co/storage/v1/object/sign/a/b?token=eyJhbGciOi.abc.def failed');
+  assert.doesNotMatch(out, /supabase\.co/);
+});
+
 test('redact removes key/value pairs and JWTs', () => {
   assert.doesNotMatch(redact('SUPABASE_SECRET_KEY=sb_secret_abc123'), /sb_secret_abc123/);
   const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.signaturepart';

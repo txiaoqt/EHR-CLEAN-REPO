@@ -71,6 +71,10 @@ export function inspectDatabaseUrl(raw) {
 export function redact(text = '') {
   return String(text)
     .replace(/postgres(ql)?:\/\/[^\s"']+/gi, 'postgres://[redacted]')
+    // Any URL, not just a credential-bearing one. Taken from the reference
+    // implementation: this runner attaches tool stderr to its errors, and an
+    // endpoint or a signed link can appear there without looking like a secret.
+    .replace(/(?:https?):\/\/[^\s"',)]+/gi, '[URL redacted]')
     // Any NAME=value where the name looks like a credential. The first version
     // of this listed specific names and missed SUPABASE_SECRET_KEY — the very
     // secret this runner uses — so it matches on the shape instead.
