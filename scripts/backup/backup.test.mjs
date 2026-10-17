@@ -9,9 +9,16 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSecrets, redact, REQUIRED_SECRETS, inspectDatabaseUrl } from './common.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  validateSecrets, redact, REQUIRED_SECRETS, inspectDatabaseUrl,
+  inspectEndpoint, inspectBucketName,
+} from './common.mjs';
 import { backupIdentity } from './run-backup.mjs';
-import { inspectEndpoint, inspectBucketName } from './check-r2.mjs';
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const completeEnv = () => ({
   SUPABASE_DB_URL: 'postgresql://user:pw@db.example.com:5432/postgres',
@@ -210,6 +217,30 @@ test('a connection string without a password is refused', () => {
 test('validateSecrets applies the database check too', () => {
   const env = { ...completeEnv(), SUPABASE_DB_URL: 'postgresql://postgres.abcdefgh:pw@aws-0-ap.pooler.supabase.com:6543/postgres' };
   assert.throws(() => validateSecrets(env), /transaction pooler/);
+});
+
+// --- the runner must normalise, not just the check ---------------------------
+// The storage check passed on an endpoint the backup then failed on, because the
+// normalisation lived in the check only: it stripped the trailing slash and the
+// runner handed the CLI the raw value. These read the runner's source, since the
+// failure is in which value it passes rather than in any function's result.
+
+test('the runner normalises the endpoint rather than passing the raw secret', () => {
+  const runner = fs.readFileSync(path.join(projectRoot, 'scripts/backup/run-backup.mjs'), 'utf8');
+  assert.match(runner, /import \{[^}]*r2Endpoint[^}]*\} from '\.\/common\.mjs'/s, 'the runner imports the shared helper');
+  assert.match(runner, /--endpoint-url', r2Endpoint\(env\)/, 'the preflight uses the normalised value');
+  assert.doesNotMatch(
+    runner,
+    /--endpoint-url', env\.R2_ENDPOINT/,
+    'the raw secret is never handed to the CLI'
+  );
+});
+
+test('validateSecrets validates the endpoint and bucket up front', () => {
+  // So a typo fails before the database dump rather than after it.
+  assert.throws(() => validateSecrets({ ...completeEnv(), R2_ENDPOINT: 'https://example.com' }), /R2_ENDPOINT looks wrong/);
+  assert.throws(() => validateSecrets({ ...completeEnv(), R2_BUCKET_NAME: 'ehr_backups' }), /R2_BUCKET_NAME looks wrong/);
+  assert.doesNotThrow(() => validateSecrets({ ...completeEnv(), R2_ENDPOINT: `${completeEnv().R2_ENDPOINT}/` }));
 });
 
 // --- bucket name -------------------------------------------------------------

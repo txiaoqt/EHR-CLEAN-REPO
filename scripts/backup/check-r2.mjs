@@ -19,79 +19,17 @@
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { validateSecrets, redact, run, log } from './common.mjs';
+import {
+  validateSecrets, redact, run, log,
+  inspectEndpoint, inspectBucketName, r2Endpoint,
+} from './common.mjs';
 
 const PROBE_PREFIX = '_checks';
 
-/**
- * Checks the endpoint's SHAPE before handing it to the aws CLI.
- *
- * Modelled on the reference implementation's validateR2Config, which parses the
- * endpoint with `new URL()` and requires an https origin with no credentials,
- * path, query or fragment — `pathname === '/'`, so a trailing slash is fine.
- *
- * A trailing slash is NORMALISED rather than rejected. The reference tolerates
- * it, and the aws CLI does not, so rejecting it here would refuse a value that
- * actually works everywhere else. A pasted newline is trimmed for the same
- * reason. Only genuinely wrong shapes are refused.
- *
- * The value is never printed: GitHub redacts it anyway, and a diagnostic that
- * cannot say what is wrong is worse than one that says nothing.
- */
-export function inspectEndpoint(raw) {
-  const value = String(raw ?? '');
-  if (!value.trim()) return { ok: false, problems: ['it is empty'], normalized: null };
-
-  // Trim first: a newline pasted with the value is invisible in a secret field
-  // and is not a reason to fail.
-  const trimmed = value.trim();
-  const problems = [];
-
-  if (/^https:\/\/https:\/\//.test(trimmed)) problems.push('it has https:// twice');
-  if (/["']/.test(trimmed)) problems.push('it contains quote characters — paste the value without them');
-  if (/\.r2\.dev/.test(trimmed)) {
-    problems.push('it is an r2.dev public bucket URL, not the S3 API endpoint — the S3 endpoint is https://<ACCOUNT_ID>.r2.cloudflarestorage.com');
-  }
-
-  let url = null;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    problems.push('it is not a valid URL');
-  }
-
-  if (url) {
-    if (url.protocol !== 'https:') problems.push('it is not https');
-    if (url.username || url.password) problems.push('it contains credentials');
-    if (url.search) problems.push('it has a query string — the endpoint is the origin only');
-    if (url.hash) problems.push('it has a fragment');
-    // pathname is '/' for both "host" and "host/", so a trailing slash passes.
-    if (url.pathname !== '/') problems.push('it has a path — the endpoint is the origin only');
-    if (!/\.r2\.cloudflarestorage\.com$/.test(url.hostname)) {
-      problems.push('its host does not end with .r2.cloudflarestorage.com');
-    }
-  }
-
-  if (problems.length > 0) return { ok: false, problems, normalized: null };
-
-  // Normalised for the CLI: origin only, no trailing slash.
-  return { ok: true, problems: [], normalized: url.origin };
-}
-
-/**
- * Cloudflare follows S3 bucket naming: 3–63 characters, lowercase letters,
- * digits, dots and hyphens. An underscore is the usual mistake, and the failure
- * it produces is far from obvious.
- */
-export function inspectBucketName(raw) {
-  const name = String(raw ?? '').trim();
-  if (!name) return { ok: false, problems: ['it is empty'] };
-  const problems = [];
-  if (!/^[a-z0-9.-]+$/.test(name)) problems.push('it contains characters S3 does not allow (underscores and capitals are the usual ones)');
-  if (name.length < 3 || name.length > 63) problems.push('it must be 3 to 63 characters');
-  if (!/^[a-z0-9]/.test(name) || !/[a-z0-9]$/.test(name)) problems.push('it must start and end with a letter or digit');
-  return { ok: problems.length === 0, problems };
-}
+// inspectEndpoint and inspectBucketName live in common.mjs so the check and the
+// runner share one implementation. Re-exported here so the tests keep reading
+// them from the module they belong to.
+export { inspectEndpoint, inspectBucketName };
 
 export async function checkR2(env = process.env) {
   validateSecrets(env);
@@ -105,14 +43,13 @@ export async function checkR2(env = process.env) {
       `It should be exactly: https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
     );
   }
-  // Use the normalised form, so a trailing slash or a pasted newline reaches the
-  // CLI in the one shape it accepts.
-  const R2_ENDPOINT = shape.normalized;
-
   const bucket = inspectBucketName(R2_BUCKET_NAME);
   if (!bucket.ok) {
     throw new Error(`R2_BUCKET_NAME looks wrong:\n  - ${bucket.problems.join('\n  - ')}`);
   }
+
+  // The same call the runner makes, so passing here means the runner passes.
+  const R2_ENDPOINT = r2Endpoint(env);
   const r2Env = {
     ...process.env,
     AWS_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID,
@@ -130,7 +67,9 @@ export async function checkR2(env = process.env) {
   try {
     // 1. Endpoint and bucket. A 403 here means credentials or bucket scope;
     //    404 usually means the bucket name or account id.
-    log(`Checking ${R2_ENDPOINT} …`);
+    // The endpoint itself is not printed: it is a secret, and the redaction
+    // would replace it with "[URL redacted]", which tells the reader nothing.
+    log('Checking the configured R2 endpoint …');
     await run('aws', [
       's3api', 'head-bucket', '--bucket', R2_BUCKET_NAME, '--endpoint-url', R2_ENDPOINT,
     ], { env: r2Env });

@@ -18,6 +18,87 @@ export const REQUIRED_SECRETS = [
   'R2_BUCKET_NAME',
 ];
 
+/**
+ * Checks the endpoint's SHAPE and returns the form the aws CLI accepts.
+ *
+ * Modelled on the reference implementation's validateR2Config, which parses the
+ * endpoint with `new URL()` and requires an https origin with no credentials,
+ * path, query or fragment — `pathname === '/'`, so a trailing slash is fine.
+ *
+ * A trailing slash is NORMALISED rather than rejected. The reference tolerates
+ * it (its uploader uses the AWS SDK), and the aws CLI does not, so rejecting it
+ * would refuse a value that works everywhere else.
+ *
+ * This lives here rather than in the check because BOTH the check and the runner
+ * need it. It was first written into check-r2.mjs only, which meant the check
+ * passed on an endpoint the runner then failed on — the check normalised the
+ * slash away and the runner handed the CLI the raw value.
+ */
+export function inspectEndpoint(raw) {
+  const value = String(raw ?? '');
+  if (!value.trim()) return { ok: false, problems: ['it is empty'], normalized: null };
+
+  // Trim first: a newline pasted with the value is invisible in a secret field
+  // and is not a reason to fail.
+  const trimmed = value.trim();
+  const problems = [];
+
+  if (/^https:\/\/https:\/\//.test(trimmed)) problems.push('it has https:// twice');
+  if (/["']/.test(trimmed)) problems.push('it contains quote characters — paste the value without them');
+  if (/\.r2\.dev/.test(trimmed)) {
+    problems.push('it is an r2.dev public bucket URL, not the S3 API endpoint — the S3 endpoint is https://<ACCOUNT_ID>.r2.cloudflarestorage.com');
+  }
+
+  let url = null;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    problems.push('it is not a valid URL');
+  }
+
+  if (url) {
+    if (url.protocol !== 'https:') problems.push('it is not https');
+    if (url.username || url.password) problems.push('it contains credentials');
+    if (url.search) problems.push('it has a query string — the endpoint is the origin only');
+    if (url.hash) problems.push('it has a fragment');
+    // pathname is '/' for both "host" and "host/", so a trailing slash passes.
+    if (url.pathname !== '/') problems.push('it has a path — the endpoint is the origin only');
+    if (!/\.r2\.cloudflarestorage\.com$/.test(url.hostname)) {
+      problems.push('its host does not end with .r2.cloudflarestorage.com');
+    }
+  }
+
+  if (problems.length > 0) return { ok: false, problems, normalized: null };
+  return { ok: true, problems: [], normalized: url.origin };
+}
+
+/** The endpoint in the one shape the aws CLI accepts, or a clear refusal. */
+export function r2Endpoint(env = process.env) {
+  const shape = inspectEndpoint(env.R2_ENDPOINT);
+  if (!shape.ok) {
+    throw new Error(
+      `R2_ENDPOINT looks wrong:\n  - ${shape.problems.join('\n  - ')}\n` +
+      'It should be exactly: https://<ACCOUNT_ID>.r2.cloudflarestorage.com'
+    );
+  }
+  return shape.normalized;
+}
+
+/**
+ * Cloudflare follows S3 bucket naming: 3–63 characters, lowercase letters,
+ * digits, dots and hyphens. An underscore is the usual mistake, and the failure
+ * it produces is far from obvious.
+ */
+export function inspectBucketName(raw) {
+  const name = String(raw ?? '').trim();
+  if (!name) return { ok: false, problems: ['it is empty'] };
+  const problems = [];
+  if (!/^[a-z0-9.-]+$/.test(name)) problems.push('it contains characters S3 does not allow (underscores and capitals are the usual ones)');
+  if (name.length < 3 || name.length > 63) problems.push('it must be 3 to 63 characters');
+  if (!/^[a-z0-9]/.test(name) || !/[a-z0-9]$/.test(name)) problems.push('it must start and end with a letter or digit');
+  return { ok: problems.length === 0, problems };
+}
+
 export function validateSecrets(env = process.env) {
   const missing = REQUIRED_SECRETS.filter((key) => !env[key] || !String(env[key]).trim());
   if (missing.length > 0) {
@@ -27,8 +108,12 @@ export function validateSecrets(env = process.env) {
   if (!/^https:\/\//.test(env.SUPABASE_URL)) {
     throw new Error('SUPABASE_URL must be an https URL');
   }
-  if (!/^https:\/\//.test(env.R2_ENDPOINT)) {
-    throw new Error('R2_ENDPOINT must be an https URL');
+  // Validates the endpoint and the bucket up front, so a typo fails before the
+  // database dump rather than after it.
+  r2Endpoint(env);
+  const bucket = inspectBucketName(env.R2_BUCKET_NAME);
+  if (!bucket.ok) {
+    throw new Error(`R2_BUCKET_NAME looks wrong:\n  - ${bucket.problems.join('\n  - ')}`);
   }
   inspectDatabaseUrl(env.SUPABASE_DB_URL);
 }

@@ -25,7 +25,7 @@ import { mkdir, mkdtemp, rm, writeFile, readdir, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateSecrets, redact, run, log } from './common.mjs';
+import { validateSecrets, redact, run, log, r2Endpoint } from './common.mjs';
 
 const PG_MAJOR = '17';
 
@@ -145,7 +145,14 @@ async function generateManifest({ root, backupId, createdAtUtc, gitCommitSha, da
 
 /** Proves the endpoint and bucket are reachable before a long upload begins. */
 async function preflightR2({ env }) {
-  await run('aws', ['s3api', 'head-bucket', '--bucket', env.R2_BUCKET_NAME, '--endpoint-url', env.R2_ENDPOINT], {
+  await run('aws', [
+    's3api', 'head-bucket',
+    '--bucket', env.R2_BUCKET_NAME,
+    // Normalised: the aws CLI rejects a trailing slash, and a trailing slash is
+    // a perfectly valid endpoint. Passing the raw value here is what made the
+    // storage check pass and the backup fail on the same secret.
+    '--endpoint-url', r2Endpoint(env),
+  ], {
     env: r2Env(env),
   });
 }
@@ -158,16 +165,17 @@ const r2Env = (env) => ({
 });
 
 async function uploadR2({ archive, backupId, env }) {
+  const endpoint = r2Endpoint(env);
   const key = `backups/${backupId}/${path.basename(archive)}`;
   await run('aws', [
     's3', 'cp', archive, `s3://${env.R2_BUCKET_NAME}/${key}`,
-    '--endpoint-url', env.R2_ENDPOINT,
+    '--endpoint-url', endpoint,
     '--only-show-errors',
   ], { env: r2Env(env) });
 
   const { stdout } = await run('aws', [
     's3api', 'head-object', '--bucket', env.R2_BUCKET_NAME, '--key', key,
-    '--endpoint-url', env.R2_ENDPOINT, '--output', 'json',
+    '--endpoint-url', endpoint, '--output', 'json',
   ], { env: r2Env(env) });
   const head = JSON.parse(stdout);
 
@@ -175,7 +183,7 @@ async function uploadR2({ archive, backupId, env }) {
   // survived.
   const downloaded = await run('aws', [
     's3', 'cp', `s3://${env.R2_BUCKET_NAME}/${key}`, '-',
-    '--endpoint-url', env.R2_ENDPOINT,
+    '--endpoint-url', endpoint,
   ], { env: r2Env(env), encoding: 'buffer', maxBuffer: 1024 * 1024 * 512 });
   const remoteHash = sha256(Buffer.from(downloaded.stdout));
 
