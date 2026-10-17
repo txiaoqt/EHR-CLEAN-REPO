@@ -180,12 +180,13 @@ async function uploadR2({ archive, backupId, env }) {
   const head = JSON.parse(stdout);
 
   // Re-download and compare, because a successful PUT does not prove the bytes
-  // survived.
+  // survived. `binary: true` is essential: a tar.gz read as UTF-8 is mangled,
+  // and the comparison would fail on a backup that is actually intact.
   const downloaded = await run('aws', [
     's3', 'cp', `s3://${env.R2_BUCKET_NAME}/${key}`, '-',
     '--endpoint-url', endpoint,
-  ], { env: r2Env(env), encoding: 'buffer', maxBuffer: 1024 * 1024 * 512 });
-  const remoteHash = sha256(Buffer.from(downloaded.stdout));
+  ], { env: r2Env(env), binary: true });
+  const remoteHash = sha256(downloaded.stdout);
 
   const { readFile } = await import('node:fs/promises');
   const localHash = sha256(await readFile(archive));

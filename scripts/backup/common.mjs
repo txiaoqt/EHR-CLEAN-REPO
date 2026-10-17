@@ -170,18 +170,34 @@ export function redact(text = '') {
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]');
 }
 
-/** Runs a command with output captured, throwing a redacted error on failure. */
+/**
+ * Runs a command with output captured, throwing a redacted error on failure.
+ *
+ * Pass `binary: true` when the output is not text. Chunks arrive as Buffers, and
+ * `chunk.toString()` mangles anything that is not valid UTF-8 — a gzip stream
+ * becomes a string full of replacement characters, so a re-downloaded archive
+ * hashes differently from the file that was uploaded and the verification fails
+ * on a backup that is actually intact.
+ *
+ * `encoding` and `maxBuffer` are NOT spawn options (they belong to execFile), so
+ * passing them here would be silently ignored. Use `binary`.
+ */
 export function run(command, args, options = {}) {
+  const { binary = false, ...spawnOptions } = options;
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options });
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], ...spawnOptions });
+    const chunks = [];
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stdout.on('data', (d) => {
+      if (binary) chunks.push(d);
+      else stdout += d.toString();
+    });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (err) => reject(new Error(redact(`${command} failed to start: ${err.message}`))));
     child.on('close', (code) => {
-      if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(redact(`${command} exited ${code}: ${stderr || stdout}`)));
+      if (code === 0) resolve({ stdout: binary ? Buffer.concat(chunks) : stdout, stderr });
+      else reject(new Error(redact(`${command} exited ${code}: ${stderr || (binary ? '' : stdout)}`)));
     });
   });
 }

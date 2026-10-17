@@ -10,11 +10,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import {
   validateSecrets, redact, REQUIRED_SECRETS, inspectDatabaseUrl,
-  inspectEndpoint, inspectBucketName,
+  inspectEndpoint, inspectBucketName, run,
 } from './common.mjs';
 import { backupIdentity } from './run-backup.mjs';
 
@@ -241,6 +244,55 @@ test('validateSecrets validates the endpoint and bucket up front', () => {
   assert.throws(() => validateSecrets({ ...completeEnv(), R2_ENDPOINT: 'https://example.com' }), /R2_ENDPOINT looks wrong/);
   assert.throws(() => validateSecrets({ ...completeEnv(), R2_BUCKET_NAME: 'ehr_backups' }), /R2_BUCKET_NAME looks wrong/);
   assert.doesNotThrow(() => validateSecrets({ ...completeEnv(), R2_ENDPOINT: `${completeEnv().R2_ENDPOINT}/` }));
+});
+
+// --- binary output -----------------------------------------------------------
+// The upload verification re-downloads the archive and compares its SHA-256.
+// Chunks arrive as Buffers and `chunk.toString()` mangles anything that is not
+// valid UTF-8, so a tar.gz hashed differently from the file that was uploaded —
+// and the check failed on a backup that was actually intact.
+
+test('run() returns exact bytes with binary: true', async () => {
+  // Deliberately invalid UTF-8: 0x80, 0xC0, 0xFF have no valid single-byte
+  // encoding, so any toString() round trip corrupts them.
+  const payload = Buffer.from([0x1f, 0x8b, 0x80, 0xc0, 0xff, 0x00, 0xfe, 0x41, 0x42]);
+  const script = `process.stdout.write(Buffer.from([${[...payload].join(',')}]))`;
+
+  const binary = await run('node', ['-e', script], { binary: true });
+  assert.ok(Buffer.isBuffer(binary.stdout), 'binary: true returns a Buffer');
+  assert.deepEqual(binary.stdout, payload, 'the bytes are identical');
+
+  const text = await run('node', ['-e', script]);
+  assert.notEqual(Buffer.from(text.stdout, 'utf8').length, payload.length,
+    'without binary the same output is corrupted — which is why the option exists');
+});
+
+test('a gzip archive survives the round trip and hashes the same', async () => {
+  // The exact case: hash the file, stream it back through run(), hash that.
+  // gzip is produced in-process rather than with `tar`, which on Windows reads
+  // an absolute path as a remote host ("Cannot connect to C:"). The test is
+  // about the bytes, not about tar.
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ehr-binary-test-'));
+  try {
+    const gz = path.join(work, 'payload.tar.gz');
+    // Random bytes rather than repeated text: repeated text compresses to almost
+    // nothing, so the size assertion below would have been measuring nothing.
+    // Random data is also closer to what a real dump looks like.
+    fs.writeFileSync(gz, zlib.gzipSync(randomBytes(40_000)));
+
+    const localHash = createHash('sha256').update(fs.readFileSync(gz)).digest('hex');
+    // A node one-liner rather than `cat`, so the test does not depend on a
+    // shell utility being on PATH.
+    const streamed = await run('node', [
+      '-e', 'process.stdout.write(require("node:fs").readFileSync(process.argv[1]))', gz,
+    ], { binary: true });
+    const remoteHash = createHash('sha256').update(streamed.stdout).digest('hex');
+
+    assert.equal(remoteHash, localHash, 'a streamed archive hashes identically');
+    assert.ok(streamed.stdout.length > 1000, 'the whole archive came through, not a truncated part');
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
 });
 
 // --- bucket name -------------------------------------------------------------
