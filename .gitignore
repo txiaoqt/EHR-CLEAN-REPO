@@ -38,6 +38,17 @@ supabase/.temp/
 scratch/
 
 # ============================================================================
+# Nested repositories
+# ============================================================================
+# `reviewer/` is a separate git repository that was once recorded in this one as
+# a gitlink (mode 160000) with no .gitmodules to resolve it. That makes
+# `actions/checkout` fail with "No url found for submodule path 'reviewer'", so
+# every workflow dies before it starts. A gitlink stores only a commit hash —
+# none of its files were ever in this repository — so ignoring it loses nothing.
+# The work itself lives in that repository's own history.
+reviewer/
+
+# ============================================================================
 # Logs
 # ============================================================================
 logs/
