@@ -1,0 +1,58 @@
+name: EHR backup storage check
+
+# A backup takes minutes; a misconfigured bucket fails at the end of them. This
+# answers the same question in under a minute — is R2 reachable, and can we
+# actually write to it — so a bad endpoint or a read-only token is found before
+# a real run rather than after.
+#
+# Run this after changing any R2_* secret.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ehr-backup-storage-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate backup code
+        run: node --test scripts/backup/backup.test.mjs
+
+      - name: Check the aws CLI is present
+        run: |
+          set -euo pipefail
+          command -v aws >/dev/null
+          aws --version
+
+      - name: Probe R2 — reachable, writable, and the bytes survive
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node scripts/backup/check-r2.mjs
