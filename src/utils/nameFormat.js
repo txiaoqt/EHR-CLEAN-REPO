@@ -56,9 +56,13 @@ export const toProperName = (value) => {
  * "First Middle Last" — or "First Last" when no middle name is given.
  * An initial-style middle name is kept as typed ("G." -> "G.").
  */
-export const composeFullName = ({ firstName = '', middleName = '', lastName = '' }) => {
+export const composeFullName = ({ firstName = '', middleName = '', lastName = '', suffix = '' }) => {
   const parts = [toProperName(firstName), toProperName(middleName), toProperName(lastName)]
     .map((p) => p.trim())
     .filter(Boolean);
+  // The suffix follows the surname — "Juan Santos Dela Cruz Jr." — and is left
+  // as typed, since "Jr." and "III" are not names to be title-cased.
+  const tail = String(suffix || '').trim();
+  if (tail) parts.push(tail);
   return parts.join(' ');
 };

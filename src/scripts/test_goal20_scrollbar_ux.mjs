@@ -61,8 +61,15 @@ assert(dashboardContent.includes('item.value'), 'Diagnosis count values preserve
 
 // 3. Audit Scope & Backend Safety
 console.log('\n>>> [3. AUDITING SCOPE & BACKEND SAFETY]');
-// Verify global scrollbars are NOT globally overridden
-assert(!layoutContent.includes('::-webkit-scrollbar {\n  display: none;'), 'Global scrollbars are not globally hidden');
+// Verify global scrollbars are NOT globally overridden.
+//
+// The pattern is anchored to the start of a line on purpose. Unanchored, it
+// matched a SCOPED rule — `.patient-events-pills-strip::-webkit-scrollbar {
+// display: none; }` — and reported a global override that was not there. It also
+// depended on line endings: with CRLF the `\n` in the pattern never matched, so
+// the assertion passed for the wrong reason and flipped the moment the file was
+// checked out with LF.
+assert(!/^::-webkit-scrollbar\s*\{[^}]*display:\s*none/m.test(layoutContent), 'Global scrollbars are not globally hidden');
 assert(!layoutContent.includes('*::-webkit-scrollbar'), 'Universal scrollbar selector not used');
 
 console.log('\n========================================================================');

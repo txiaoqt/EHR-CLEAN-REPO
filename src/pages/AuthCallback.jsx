@@ -3,10 +3,9 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
+import { surfaceHomeForRole } from '../deploySurface.js';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
-const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
-const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -111,11 +110,9 @@ const AuthCallback = () => {
 
       // 6. If normal authenticated user, route to surface home
       if (isAuthenticated) {
-        const role = (user?.role || '').toLowerCase();
-        const surfaceHome = IS_USER_SURFACE
-          ? '/patient/dashboard'
-          : (role === 'patient' ? '/patient/dashboard' : '/dashboard');
-        navigate(surfaceHome, { replace: true });
+        // Previously this sent every user-surface account to /patient/dashboard,
+        // so an enrollee landed on the student portal instead of their own.
+        navigate(surfaceHomeForRole(user?.role), { replace: true });
         return;
       }
 

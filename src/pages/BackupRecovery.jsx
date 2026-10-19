@@ -10,6 +10,7 @@ import {
 } from '../utils/backupControl.js';
 import { AlertIcon, ClockIcon } from '../components/icons/Icons.jsx';
 import ResultDialog from '../components/ResultDialog.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
 
 /**
  * Backup & Recovery.
@@ -150,7 +151,30 @@ const BackupRecovery = () => {
         </div>
 
         {state.loading && (
-          <div className="card settings-card" role="status">Loading backup history…</div>
+          <div className="card settings-card" role="status">
+            <div style={{ marginBottom: recorded ? 16 : 0 }}>
+              {recorded ? (
+                <>
+                  <div className="settings-identity" style={{ marginBottom: 14 }}>
+                    <div className="settings-identity-label">Last verified backup</div>
+                    <div className="settings-identity-body">
+                      <div>
+                        <div className="settings-identity-name" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {new Date(recorded.at).toLocaleString()}
+                        </div>
+                        {recorded.id && <div className="settings-identity-meta">Run {recorded.id}</div>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="settings-row-note" style={{ margin: 0 }}>
+                    Loading run history from GitHub…
+                  </div>
+                </>
+              ) : (
+                'Loading backup history…'
+              )}
+            </div>
+          </div>
         )}
 
         {!state.loading && state.error && (
@@ -268,48 +292,59 @@ const BackupRecovery = () => {
               </div>
             </div>
 
-            <div className="card settings-card">
-              <header className="settings-card-head">
+            <div className="card table-section-card backup-history-table-card">
+              <header className="settings-card-head table-section-header">
                 <h2>Backup history</h2>
                 <p>Recent 25 manual runs from GitHub Actions, in your local timezone.</p>
               </header>
 
-              {runs.length === 0 ? (
-                <p className="settings-row-note" style={{ margin: 0 }}>
-                  Backup history will appear here after the first run.
-                </p>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table" aria-label="Backup history">
-                    <thead>
-                      <tr>
-                        <th style={{ whiteSpace: 'nowrap' }}>Date and time</th>
-                        <th style={{ whiteSpace: 'nowrap' }}>Status</th>
-                        <th style={{ whiteSpace: 'nowrap' }}>Duration</th>
-                        <th style={{ whiteSpace: 'nowrap' }}>Revision</th>
-                        <th style={{ whiteSpace: 'nowrap' }}>Run</th>
+              <div className="table-responsive">
+                <table className="table" aria-label="Backup history">
+                  <thead>
+                    <tr>
+                      <th style={{ whiteSpace: 'nowrap' }}>Date and time</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Status</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Duration</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Revision</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Run</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.loading ? (
+                      <tr className="table-empty-row"><td colSpan={5}>Loading backup history…</td></tr>
+                    ) : state.error ? (
+                      <tr className="table-empty-row"><td colSpan={5}>Backup history unavailable</td></tr>
+                    ) : runs.length === 0 ? (
+                      <tr className="table-empty-row"><td colSpan={5}>No backup runs yet</td></tr>
+                    ) : runs.map((run) => (
+                      <tr key={run.id}>
+                        <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                          {new Date(run.createdAt).toLocaleString()}
+                        </td>
+                        <td><StatusPill run={run} /></td>
+                        <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatDuration(run)}</td>
+                        <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{run.headSha.slice(0, 7)}</td>
+                        <td>
+                          <a href={run.htmlUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                            #{run.runNumber}
+                          </a>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {runs.map((run) => (
-                        <tr key={run.id}>
-                          <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                            {new Date(run.createdAt).toLocaleString()}
-                          </td>
-                          <td><StatusPill run={run} /></td>
-                          <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatDuration(run)}</td>
-                          <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{run.headSha.slice(0, 7)}</td>
-                          <td>
-                            <a href={run.htmlUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                              #{run.runNumber}
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <TablePagination
+                page={0}
+                totalPages={1}
+                startIndex={runs.length ? 1 : 0}
+                endIndex={runs.length}
+                total={runs.length}
+                onPageChange={() => {}}
+                itemLabel="backup runs"
+                showWhenEmpty={!state.loading}
+              />
             </div>
           </>
         )}

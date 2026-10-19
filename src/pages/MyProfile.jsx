@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
-import { CloseIcon } from '../components/icons/Icons.jsx';
+import { CloseIcon, EncountersIcon, CalendarIcon } from '../components/icons/Icons.jsx';
+import KpiCard from '../components/KpiCard.jsx';
+import TablePagination from '../components/table/TablePagination.jsx';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 
 const MyProfile = () => {
@@ -369,6 +371,13 @@ const MyProfile = () => {
     if (el) el.click();
   };
 
+  const modalRows = modalData[modalTab] || [];
+  const modalItemLabel = modalTab === 'audit'
+    ? 'audit entries'
+    : modalTab === 'encounters'
+      ? 'encounters'
+      : 'appointments';
+
   if (loading) return <main className="main"><div className="card">Loading staff profile...</div></main>;
 
   return (
@@ -422,18 +431,16 @@ const MyProfile = () => {
             labels, when it is the most concrete thing on the page. */}
         <div className="profile-kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
           {[
-            { label: 'Encounters recorded', value: stats.encountersCreated, note: 'Clinical notes you have written' },
-            { label: 'Appointments booked', value: stats.appointmentsScheduled, note: 'Consultations you have scheduled' },
-          ].map(({ label, value, note }) => (
-            <div key={label} className="card" style={{ padding: '16px 18px' }}>
-              <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                {label}
-              </div>
-              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1.1, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
-                {value}
-              </div>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>{note}</div>
-            </div>
+            { label: 'Encounters recorded', value: stats.encountersCreated, note: 'Clinical notes you have written', Icon: EncountersIcon },
+            { label: 'Appointments booked', value: stats.appointmentsScheduled, note: 'Consultations you have scheduled', Icon: CalendarIcon },
+          ].map(({ label, value, note, Icon }) => (
+            <KpiCard
+              key={label}
+              title={label}
+              value={value}
+              description={note}
+              Icon={Icon}
+            />
           ))}
         </div>
 
@@ -643,14 +650,17 @@ const MyProfile = () => {
             {modalLoading ? (
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading activity records…</div>
             ) : (
-              <div className="table-responsive">
+              <>
+              <div className="table-responsive table-edge-bleed table-edge-bleed--fixed-24">
                 {modalTab === 'audit' && (
                   <table className="table">
                     <thead>
                       <tr><th>Time</th><th>Action</th><th>Performed By</th><th>Details</th></tr>
                     </thead>
                     <tbody>
-                      {(modalData.audit || []).map(row => (
+                      {(modalData.audit || []).length === 0 ? (
+                        <tr className="table-empty-row"><td colSpan={4}>No activity yet</td></tr>
+                      ) : (modalData.audit || []).map(row => (
                         <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => {
                           const possibleId = row.reference_id || row.item_id || row.encounter_id || row.appointment_id;
                           if (possibleId) {
@@ -678,7 +688,9 @@ const MyProfile = () => {
                       <tr><th>Time</th><th>Patient</th><th>Clinician</th><th>Complaint</th></tr>
                     </thead>
                     <tbody>
-                      {(modalData.encounters || []).map(row => (
+                      {(modalData.encounters || []).length === 0 ? (
+                        <tr className="table-empty-row"><td colSpan={4}>No encounter records yet</td></tr>
+                      ) : (modalData.encounters || []).map(row => (
                         <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => { navigate(`/encounter?id=${row.id}`); closeActivityModal(); }}>
                           <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : (row.encounter_date ? new Date(row.encounter_date).toLocaleString() : '')}</td>
                           <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{row.patient_name || row.patient_id}</td>
@@ -696,7 +708,9 @@ const MyProfile = () => {
                       <tr><th>Time</th><th>Patient</th><th>Clinician</th><th>Status</th></tr>
                     </thead>
                     <tbody>
-                      {(modalData.appointments || []).map(row => (
+                      {(modalData.appointments || []).length === 0 ? (
+                        <tr className="table-empty-row"><td colSpan={4}>No appointments yet</td></tr>
+                      ) : (modalData.appointments || []).map(row => (
                         <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => { navigate(`/appointments?id=${row.id}`); closeActivityModal(); }}>
                           <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : (row.appointment_date ? `${row.appointment_date} ${row.appointment_time || ''}` : '')}</td>
                           <td style={{ fontWeight: 'var(--font-weight-bold)' }}>{row.patient_name || row.patient_id}</td>
@@ -710,6 +724,17 @@ const MyProfile = () => {
                   </table>
                 )}
               </div>
+              <TablePagination
+                page={0}
+                totalPages={1}
+                startIndex={modalRows.length ? 1 : 0}
+                endIndex={modalRows.length}
+                total={modalRows.length}
+                onPageChange={() => {}}
+                itemLabel={modalItemLabel}
+                showWhenEmpty
+              />
+              </>
             )}
           </div>
         </div>

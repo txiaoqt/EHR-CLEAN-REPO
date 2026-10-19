@@ -1,0 +1,15 @@
+.staff-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+.staff-availability[data-status="online"] { color: var(--text); }
+.staff-availability-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--muted); }
+.staff-availability[data-status="online"] .staff-availability-dot { background: var(--success, #059669); }
+.staff-presence-note { color: var(--muted); font-size: var(--font-size-xs); line-height: 1.5; margin: 6px 0 0; }
+.staff-presence-note[data-error="true"] { color: var(--danger); }
+.staff-presence-note:empty { display: none; }

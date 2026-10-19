@@ -189,11 +189,14 @@ export const auditLogsExportConfig = {
 // the medicine columns to a few points each.
 // ---------------------------------------------------------------------------
 export const buildMedicalLogExportConfig = (medicines = []) => ({
-  title: 'Medical Log',
-  filenamePrefix: 'medical-log',
+  title: 'Medicine Log',
+  filenamePrefix: 'Medicine_Log',
+  paperSize: 'a4',
   orientation: 'landscape',
   lockOrientation: true,
-  footerText: footer('Medical Log'),
+  pdfTemplate: 'medicine-log',
+  pdfReadOnly: true,
+  footerText: footer('Medicine Log'),
   pdfFontSize: 6.5,
   pdfCellPadding: 2.5,
   // Only the medicine headers are rotated. The visit block is wide enough to
@@ -207,17 +210,29 @@ export const buildMedicalLogExportConfig = (medicines = []) => ({
     // and content and given exactly that, so none holds dead space. What is
     // left over goes to the medicine columns, which is where the width is
     // actually needed.
-    { label: 'Date', value: (r) => manilaDate(r.visit_date) },
-    { label: 'Student ID', value: (r) => r.patient_id },
-    { label: 'Name', value: (r) => r.patient_name || r.profile?.full_name, pdfMaxWidth: 130 },
-    { label: 'Sex', value: (r) => sexAbbrev(r.profile?.sex), pdfAlign: 'center' },
-    { label: 'Dept./Course', value: (r) => courseAcronym(r.profile?.course) },
-    { label: 'Complaint', value: (r) => r.chief_complaint, pdfMaxWidth: 90 },
+    {
+      label: 'Date',
+      pdfLabel: 'DATE',
+      value: (r) => manilaDate(r.visit_date),
+      pdfValue: (r) => {
+        if (!r.visit_date) return '';
+        const date = new Date(r.visit_date);
+        return Number.isNaN(date.getTime()) ? String(r.visit_date) : new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Manila', month: 'numeric', day: 'numeric', year: '2-digit',
+        }).format(date);
+      },
+    },
+    { label: 'Student ID', value: (r) => r.patient_id, excludeFromPdf: true },
+    { label: 'Name', pdfLabel: 'NAME', value: (r) => r.patient_name || r.profile?.full_name, pdfMaxWidth: 130 },
+    { label: 'Sex', pdfLabel: 'SEX', value: (r) => sexAbbrev(r.profile?.sex), pdfAlign: 'center' },
+    { label: 'Dept./Course', pdfLabel: 'COURSE/\nDEPT.', value: (r) => courseAcronym(r.profile?.course) },
+    { label: 'Complaint', pdfLabel: 'COMPLAINT', value: (r) => r.chief_complaint, pdfMaxWidth: 90 },
     // The signature's "content" is an image, so it is given a fixed width
     // rather than measured from its caption.
     {
       label: 'Patient Signature',
       value: () => '',
+      pdfLabel: 'SIGNATURE',
       csvValue: (r) => (r.patient_signature_path ? `Signed ${manilaDate(r.patient_signed_at)}` : ''),
       pdfImage: (r) => r.signatureImage || null,
       pdfImageHeight: 16,
@@ -228,6 +243,7 @@ export const buildMedicalLogExportConfig = (medicines = []) => ({
     },
     ...medicines.map((m) => ({
       label: m.item_name,
+      medicineName: m.item_name,
       value: (r) => {
         const qty = r.dispensed?.[m.item_name];
         return qty ? qty : '';

@@ -1,0 +1,122 @@
+{
+  "version": "1.0",
+  "effective_date": "2026-10-19",
+  "title": "TUP Clinic Portal policies",
+  "terms": [
+    {
+      "heading": "About the portal",
+      "paragraphs": [
+        "These Terms of Service govern your use of the TUP Manila Clinic portal for student and enrollee accounts. The portal supports account registration, appointment booking, clinic inquiries, health records, visit acknowledgements, and enrollee medical certificate submission and review.",
+        "By agreeing, you accept these rules for using the portal. The Privacy Policy explains how information is handled. Acknowledging that notice is separate from consent to a medical procedure or any optional use of your information."
+      ]
+    },
+    {
+      "heading": "Your account and information",
+      "paragraphs": [
+        "Use your own identity and an email address you control. Provide accurate student or applicant details and report errors to the clinic. Keep passwords and verification codes private, and sign out when using a shared device.",
+        "Submit information about another person, including an emergency contact, only when you are authorized to provide it and have informed them where appropriate. If you are a minor and need help understanding these terms or providing health information, ask a parent or guardian and the clinic for assistance."
+      ]
+    },
+    {
+      "heading": "Appointments, inquiries, and clinical decisions",
+      "paragraphs": [
+        "An appointment request is subject to the clinic's availability and recorded booking status. Booking, uploading a document, or sending an inquiry does not guarantee a consultation, medical clearance, prescription, certificate approval, or account elevation.",
+        "The portal is not monitored as an emergency service. For urgent care, go directly to the clinic or the nearest emergency department. Online descriptions, photos, status labels, and record summaries do not replace a clinician's examination, advice, or official decision."
+      ]
+    },
+    {
+      "heading": "Health details, documents, and visit acknowledgements",
+      "paragraphs": [
+        "Share only relevant, accurate information and readable files that you are entitled to submit. Optional appointment photos and optional health disclosures may be left blank. The clinic record form is optional for enrolled students and remains part of the enrollee requirements shown in the portal.",
+        "A recorded visit acknowledgement confirms that you reviewed that visit record, including any medicines listed. It can be requested even when no medicine was given. Read the record before signing and contact the clinic if it is incorrect. This acknowledgement is not consent to unrelated treatment and does not waive your rights."
+      ]
+    },
+    {
+      "heading": "Acceptable use",
+      "items": [
+        "Do not impersonate another person or submit forged, misleading, or unauthorized records.",
+        "Do not share another person's health information without authority.",
+        "Do not attempt to bypass access controls, change another person's records, introduce harmful files, or disrupt the service.",
+        "Do not use clinic messaging to harass others or send unlawful or unrelated material."
+      ],
+      "paragraphs": [
+        "The clinic may restrict an account to investigate misuse, protect information, or meet an official requirement. Contact the clinic to ask about a restriction or correct information."
+      ]
+    },
+    {
+      "heading": "Availability and electronic records",
+      "paragraphs": [
+        "Access may be limited by clinic hours, account eligibility, maintenance, network availability, or your assigned role. Keep copies of documents you need. If an online action cannot be completed, contact the clinic through its official channels.",
+        "The system records the policy version and the time of your agreement. Account actions, appointment updates, submitted files, messages, and visit acknowledgements may also form part of clinic records. Portal records remain subject to clinical review, applicable law, and institutional records procedures."
+      ]
+    },
+    {
+      "heading": "Declining, changes, and questions",
+      "paragraphs": [
+        "You may decline before creating an account. If you decline the required agreement after signing in, you will be signed out and cannot continue to the portal. Contact the clinic about access to services through another channel; declining these portal terms is not a waiver of your rights or an instruction to destroy clinical records.",
+        "Material policy changes will be identified by a new version. Accounts subject to this agreement will be asked to review and accept the current version before continuing. For questions about these terms, contact the TUP Manila University Medical and Dental Clinic using the University's official contact directory."
+      ]
+    }
+  ],
+  "privacy": [
+    {
+      "heading": "Who handles your information",
+      "paragraphs": [
+        "This notice describes information handled through the TUP Manila Clinic portal for clinic services and enrollee medical requirements. TUP Manila, through its University Medical and Dental Clinic and authorized university personnel, is responsible for the institutional records processed through this service.",
+        "For privacy questions, requests to exercise your rights, or the University's designated data protection contact, approach the clinic or use TUP Manila's official contact directory: https://www.tup.edu.ph/page/contact-us. The clinic is listed under Medical/Dental, local 607."
+      ]
+    },
+    {
+      "heading": "Information processed through the portal",
+      "items": [
+        "Account and identity details: name, email address, student or applicant identifier, birthday, degree or course, year level, and other registration information you provide.",
+        "Contact details: phone numbers, addresses, and emergency contacts you submit.",
+        "Health and visit details: relevant health history, allergies, medications, conditions or disability information you choose to share, complaints, appointment descriptions and photos, clinician notes, vital signs, medicines recorded for a visit, and visit acknowledgement signatures.",
+        "Enrollee requirements: clinic record forms, medical certificate files, review status and remarks, and account elevation records.",
+        "Service and security records: inquiries and attachments, appointment activity, authentication and verification events, audit records, and the policy version and server-recorded time of agreement."
+      ]
+    },
+    {
+      "heading": "Purposes and basis for processing",
+      "paragraphs": [
+        "Information is used to identify the correct patient or applicant, verify accounts and enrollee requirements, arrange visits, prepare for consultations, provide and document care, communicate with you, manage medicine dispensing, and maintain authorized clinic reports and records. It is also used to protect accounts and investigate errors or misuse.",
+        "Health information is sensitive personal information. The clinic must process personal information on a lawful basis under the Data Privacy Act of 2012 and applicable rules. Depending on the activity, this may involve providing medical care under appropriate safeguards, fulfilling a legal or official duty, protecting life and health, or obtaining specific consent where required. This portal acknowledgement does not authorize every possible use of your information."
+      ]
+    },
+    {
+      "heading": "Required and optional information",
+      "paragraphs": [
+        "Required fields are identified in the relevant process. If required information is missing, the related online request may not be completed. Appointment photos, optional health disclosures, and the clinic record form for enrolled students may be left blank. Enrollee requirements are identified separately.",
+        "Choosing not to provide an optional photo or optional health disclosure does not by itself prevent portal access. Do not upload information about someone else or unrelated documents unless the clinic has requested them and you have authority to provide them."
+      ]
+    },
+    {
+      "heading": "Access, sharing, and service providers",
+      "paragraphs": [
+        "Authorized clinic physicians, nurses, administrators, and university personnel may access information needed for their assigned duties. Clinic reporting and authorized exports may contain visit information. Information may be disclosed when required or permitted by law or when necessary to protect life and health.",
+        "Supabase provides the application's account authentication, database, and file storage services. Email delivery and hosting providers may process the information needed to operate those services. Their access must remain limited to authorized service purposes and applicable safeguards. The portal does not offer your health information as a public directory or for advertising."
+      ]
+    },
+    {
+      "heading": "Storage, devices, and retention",
+      "paragraphs": [
+        "The application uses authenticated sessions, role-based access controls, database access rules, and audit records. Your browser stores session information and limited application settings to keep the service working. Protect downloaded records and sign out on shared devices. No system can guarantee absolute security.",
+        "Clinic information is retained for the period required for the relevant clinical, enrolment, legal, and institutional records purposes, including required archives and backups. Retention periods depend on the record type; request the applicable schedule from the clinic or University's data protection contact. Account sign-out, withdrawal of consent, or account closure does not automatically erase records that must lawfully be retained."
+      ]
+    },
+    {
+      "heading": "Your choices and rights",
+      "paragraphs": [
+        "Subject to applicable law and justified limitations, you may ask to be informed about processing, access your personal information, correct inaccuracies, object to certain processing, request blocking or erasure, and exercise other rights under the Data Privacy Act. Where processing relies on consent, you may withdraw that consent; the clinic must explain the consequences for the particular optional activity.",
+        "Send requests or report suspected misuse to the clinic or University's designated data protection contact. Identity verification may be needed before records are released or changed. You may also seek guidance or raise a privacy complaint with the National Privacy Commission at https://privacy.gov.ph."
+      ]
+    },
+    {
+      "heading": "Automated functions and policy updates",
+      "paragraphs": [
+        "The portal uses recorded information to display queue availability, appointment and visit statuses, reminders, counts, and eligibility steps. Clinicians and authorized staff make clinical and certificate-review decisions; a status or automated count is not a medical diagnosis.",
+        "The agreement record identifies the policy version you reviewed. When an updated agreement is required, the current notice will be available for review before you continue. Ask the clinic if a proposed use of your information is not explained here."
+      ]
+    }
+  ]
+}

@@ -2,10 +2,31 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import PatientRecordForm from '../../components/PatientRecordForm.jsx';
+import { CheckIcon } from '../../components/icons/Icons.jsx';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
+import { isValidPhMobile, limitPhone, normalizePhMobile } from '../../utils/courses.js';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const HEALTH_DISCLOSURE_OPTIONS = [
+  { id: 'physical', label: 'Physical health condition' },
+  { id: 'mental', label: 'Mental or psychological health condition' },
+  { id: 'pwd', label: 'Person with disability (PWD)' },
+  { id: 'none', label: 'No conditions to report' },
+  { id: 'prefer_not_to_disclose', label: 'Prefer not to disclose' },
+];
+const HEALTH_DISCLOSURE_LABELS = Object.fromEntries(
+  HEALTH_DISCLOSURE_OPTIONS.filter(({ id }) => !['none', 'prefer_not_to_disclose'].includes(id)).map(({ id, label }) => [id, label])
+);
+
+const formatProfileDate = (value) => {
+  if (!value) return 'Not on file';
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
 
 const PatientProfilePortal = () => {
   const { user, updateUser } = useAuth();
@@ -16,6 +37,10 @@ const PatientProfilePortal = () => {
     id: '',
     name: '',
     year: '',
+    course: '',
+    sex: '',
+    date_of_birth: '',
+    last_visit_date: '',
     contact_number: '',
     address: '',
     emergency_contact: '',
@@ -25,9 +50,45 @@ const PatientProfilePortal = () => {
     allergies: '',
     notes: '',
     avatar_url: '',
+    profile_data: {},
+    health_condition_categories: [],
+    health_condition_notes: '',
   });
 
   const [editing, setEditing] = useState(false);
+  const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // The clinic record form is a separate row from the patient profile, so it is
+  // loaded separately rather than folded into `profile`.
+  const [record, setRecord] = useState(null);
+  const [recordLoading, setRecordLoading] = useState(true);
+  const [recordEditing, setRecordEditing] = useState(false);
+
+  const loadRecord = React.useCallback(async () => {
+    try {
+      const patientId = user?.patient_id;
+      if (!patientId) {
+        setRecordLoading(false);
+        return;
+      }
+      const { data } = await supabase
+        .from('patient_record_forms')
+        .select('*')
+        .eq('subject_type', 'patient')
+        .eq('subject_id', String(patientId))
+        .maybeSingle();
+      setRecord(data || null);
+    } catch (err) {
+      console.warn('Could not load the clinic record form:', err);
+    } finally {
+      setRecordLoading(false);
+    }
+  }, [user?.patient_id]);
+
+  useEffect(() => {
+    loadRecord();
+  }, [loadRecord]);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [msg, setMsg] = useState('');
@@ -77,15 +138,26 @@ const PatientProfilePortal = () => {
         id: user.patient_id,
         name: extData?.full_name || pData?.name || uName || '',
         year: extData?.year || pData?.year || '',
-        contact_number: extData?.contact_number || '',
+        course: extData?.course || '',
+        sex: extData?.sex || '',
+        date_of_birth: pData?.date_of_birth || '',
+        last_visit_date: pData?.last_visit_date || '',
+        contact_number: normalizePhMobile(extData?.contact_number),
         address: extData?.address || '',
         emergency_contact: extData?.emergency_contact || '',
-        emergency_contact_number: extData?.emergency_contact_number || '',
+        emergency_contact_number: normalizePhMobile(extData?.emergency_contact_number),
         blood_type: extData?.blood_type || '',
         medications: extData?.medications || pData?.medications || '',
         allergies: extData?.allergies || pData?.allergies || '',
         notes: extData?.notes || extData?.medical_history || pData?.notes || '',
         avatar_url: resolvedAvatar,
+        profile_data: extData?.profile_data && typeof extData.profile_data === 'object' && !Array.isArray(extData.profile_data)
+          ? extData.profile_data
+          : {},
+        health_condition_categories: Array.isArray(extData?.profile_data?.health_disclosure?.categories)
+          ? extData.profile_data.health_disclosure.categories
+          : [],
+        health_condition_notes: extData?.profile_data?.health_disclosure?.notes || '',
       };
 
       setProfile(loadedProfile);
@@ -96,7 +168,11 @@ const PatientProfilePortal = () => {
       }
     };
 
-    loadProfile();
+    loadProfile()
+      .catch((err) => console.warn('Could not load the patient profile:', err))
+      .finally(() => {
+        if (mounted) setProfileLoading(false);
+      });
     return () => { mounted = false; };
   }, [user?.patient_id, user?.name]);
 
@@ -277,25 +353,67 @@ const PatientProfilePortal = () => {
       setProfile({ ...originalProfileRef.current });
     }
     setEditing(false);
+    setProfileDetailsOpen(false);
     setMsg('');
+  };
+
+  const startEditing = () => {
+    setProfileDetailsOpen(true);
+    setEditing(true);
+  };
+
+  const toggleHealthDisclosure = (category, checked) => {
+    const exclusiveCategories = ['none', 'prefer_not_to_disclose'];
+    setProfile((previous) => {
+      const next = new Set(previous.health_condition_categories || []);
+      if (exclusiveCategories.includes(category)) {
+        next.clear();
+        if (checked) next.add(category);
+      } else {
+        exclusiveCategories.forEach((exclusive) => next.delete(exclusive));
+        if (checked) next.add(category);
+        else next.delete(category);
+      }
+      return { ...previous, health_condition_categories: [...next] };
+    });
   };
 
   // Save profile fields
   const save = async () => {
     if (!user?.patient_id) return;
-    setSaving(true);
     setMsg('');
 
     const authoritativeName = originalProfileRef.current?.name || user?.name || profile.name;
     const parsedYear = Number(profile.year) || 1;
-    const trimmedContact = profile.contact_number?.trim() || null;
+    const trimmedContact = normalizePhMobile(profile.contact_number) || null;
     const trimmedAddress = profile.address?.trim() || null;
     const trimmedEmergencyContact = profile.emergency_contact?.trim() || null;
-    const trimmedEmergencyPhone = profile.emergency_contact_number?.trim() || null;
+    const trimmedEmergencyPhone = normalizePhMobile(profile.emergency_contact_number) || null;
+
+    if (
+      (trimmedContact && !isValidPhMobile(trimmedContact)) ||
+      (trimmedEmergencyPhone && !isValidPhMobile(trimmedEmergencyPhone))
+    ) {
+      setMsg('Phone numbers must contain 11 digits and start with 09.');
+      return;
+    }
+
+    setSaving(true);
     const trimmedBloodType = profile.blood_type?.trim() || null;
     const trimmedAllergies = profile.allergies?.trim() || null;
     const trimmedMedications = profile.medications?.trim() || null;
     const trimmedNotes = profile.notes?.trim() || null;
+    const trimmedHealthConditionNotes = profile.health_condition_notes?.trim() || '';
+    const existingProfileData = profile.profile_data && typeof profile.profile_data === 'object' && !Array.isArray(profile.profile_data)
+      ? profile.profile_data
+      : {};
+    const nextProfileData = {
+      ...existingProfileData,
+      health_disclosure: {
+        categories: [...new Set(profile.health_condition_categories || [])],
+        notes: trimmedHealthConditionNotes,
+      },
+    };
 
     try {
       const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id || null;
@@ -339,6 +457,7 @@ const PatientProfilePortal = () => {
             medical_history: trimmedNotes,
             notes: trimmedNotes,
             avatar_url: profile.avatar_url || null,
+            profile_data: nextProfileData,
             updated_at: new Date().toISOString(),
           },
         ], { onConflict: 'patient_id' });
@@ -363,6 +482,9 @@ const PatientProfilePortal = () => {
         allergies: trimmedAllergies || '',
         medications: trimmedMedications || '',
         notes: trimmedNotes || '',
+        profile_data: nextProfileData,
+        health_condition_categories: [...new Set(profile.health_condition_categories || [])],
+        health_condition_notes: trimmedHealthConditionNotes,
       };
 
       setProfile(updatedProfile);
@@ -370,6 +492,7 @@ const PatientProfilePortal = () => {
 
       setMsg('Profile details saved successfully.');
       setEditing(false);
+      setProfileDetailsOpen(false);
     } catch (err) {
       console.error('Save profile exception:', err.message || err);
       setMsg('Unable to save your profile changes. Please try again.');
@@ -378,333 +501,280 @@ const PatientProfilePortal = () => {
     }
   };
 
-  const renderField = (label, value, placeholder = 'None provided') => (
-    <div>
-      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginTop: 4, minHeight: 20 }}>
-        {value || <span style={{ color: 'var(--muted)', fontWeight: 'var(--font-weight-normal)' }}>{placeholder}</span>}
-      </div>
-    </div>
-  );
+  const renderProfileField = ({ key, label, placeholder = 'Not provided', type = 'text' }) => {
+    const value = profile[key] || '';
+    const isPhoneField = type === 'tel';
+    if (!editing) {
+      return (
+        <div className="patient-profile-detail-field" key={key}>
+          <span className="patient-profile-detail-label">{label}</span>
+          <strong className={value ? '' : 'is-empty'}>{value || placeholder}</strong>
+        </div>
+      );
+    }
+
+    const handleChange = (event) => {
+      const nextValue = isPhoneField ? limitPhone(event.target.value) : event.target.value;
+      setProfile((previous) => ({ ...previous, [key]: nextValue }));
+    };
+    return (
+      <label className="patient-profile-edit-field" key={key}>
+        <span className="patient-profile-detail-label">{label}</span>
+        {type === 'textarea' ? (
+          <textarea className="input" rows={4} value={value} onChange={handleChange} placeholder={placeholder} />
+        ) : (
+          <input
+            className="input"
+            type={type}
+            inputMode={isPhoneField ? 'numeric' : undefined}
+            autoComplete={isPhoneField ? 'tel-national' : undefined}
+            maxLength={isPhoneField ? 11 : undefined}
+            pattern={isPhoneField ? '09[0-9]{9}' : undefined}
+            title={isPhoneField ? 'Enter 11 digits beginning with 09.' : undefined}
+            value={value}
+            onChange={handleChange}
+            placeholder={isPhoneField ? '09XXXXXXXXX' : placeholder}
+          />
+        )}
+        {isPhoneField && <span className="patient-profile-phone-hint">Enter 11 digits, starting with 09.</span>}
+      </label>
+    );
+  };
+
+  const healthCategories = (profile.health_condition_categories || []).filter((category) => HEALTH_DISCLOSURE_LABELS[category]);
+  const healthDisclosureSummary = profile.health_condition_categories?.includes('none')
+    ? 'No conditions to report'
+    : profile.health_condition_categories?.includes('prefer_not_to_disclose')
+      ? 'Not disclosed'
+      : healthCategories.length
+        ? healthCategories.map((category) => HEALTH_DISCLOSURE_LABELS[category]).join(', ')
+        : 'Not provided';
 
   return (
     <main className="main">
-      <section className="page patient-profile-page" style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', boxSizing: 'border-box' }}>
-        {/* Page Header */}
-        <div className="page-header patient-profile-header" style={{ marginBottom: 16 }}>
-          <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>Profile</h2>
-          <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
-            Manage your student details, emergency contacts, and personal health information.
+      <section className="page patient-profile-page patient-profile-shell" aria-busy={profileLoading}>
+        <header className="patient-profile-page-header">
+          <div>
+            <h1>Profile</h1>
+            <p>Manage your contact details and the health information you choose to share with the clinic.</p>
           </div>
-        </div>
+        </header>
 
-        {/* Profile Identity Card (Cohesive, left-aligned identity block with integrated Edit Action) */}
-        <div className="card patient-identity-card" style={{ padding: 20, marginBottom: 20, border: '1px solid var(--border)', borderRadius: 12, width: '100%', boxSizing: 'border-box' }}>
-          <div className="patient-identity-card-inner" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            
-            {/* Identity & Avatar Section */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flex: '1 1 280px', minWidth: 0 }}>
-              {/* Avatar */}
-              <div className="patient-identity-avatar-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <section className="card patient-profile-hero" aria-label="Student profile summary">
+          <div className="patient-profile-hero-top">
+            <div className="patient-profile-identity">
+              <div className="patient-profile-avatar-column">
                 <img
                   src={profile.avatar_url || user?.avatar || avatarPlaceholder}
-                  alt={profile.name || 'Patient Avatar'}
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '2px solid #ffffff',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                    background: 'var(--bg, #f1f5f9)',
-                  }}
+                  alt={profile.name || 'Patient profile photo'}
+                  className="patient-profile-avatar"
                 />
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
+                  className="patient-profile-file-input"
                   onChange={handlePhotoSelect}
                 />
-                {/* Photo Controls (Visible ONLY in Edit Mode) */}
                 {editing && (
-                  <div className="patient-photo-controls" style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      className="btn secondary small"
-                      style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', width: '100%', whiteSpace: 'nowrap' }}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingPhoto}
-                    >
-                      {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
+                  <div className="patient-profile-photo-actions">
+                    <button type="button" className="btn secondary small" onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto}>
+                      {uploadingPhoto ? 'Uploading…' : 'Change photo'}
                     </button>
-                    {profile.avatar_url ? (
-                      <button
-                        type="button"
-                        className="btn secondary small"
-                        style={{ fontSize: 'var(--font-size-2xs)', padding: '2px 8px', width: '100%', color: 'var(--danger)', whiteSpace: 'nowrap' }}
-                        onClick={handleRemovePhoto}
-                        disabled={uploadingPhoto}
-                      >
+                    {profile.avatar_url && (
+                      <button type="button" className="btn secondary small" onClick={handleRemovePhoto} disabled={uploadingPhoto}>
                         Remove
                       </button>
-                    ) : null}
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Identity Info (Left-aligned, scannable, compact) */}
-              <div className="patient-identity-info-section" style={{ flex: 1, minWidth: 0 }}>
-                {!editing ? (
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word' }}>
-                      {profile.name || user?.name || 'Student Patient'}
-                    </h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                      <span className="badge badge-primary" style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}>
-                        Student / Patient
-                      </span>
-                      <span className="badge badge-success" style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-2xs)', padding: '2px 8px' }}>
-                        Active
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 6, fontWeight: 'var(--font-weight-medium)' }}>
-                      <strong style={{ color: 'var(--text)' }}>{profile.id || user?.patient_id || 'TUPM-XX-XXXX'}</strong>
-                      <span style={{ margin: '0 6px' }}>·</span>
-                      <span>{profile.year ? `Year ${profile.year}` : 'Year not specified'}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                    {/* Read-Only Full Name in Edit Mode */}
-                    <div>
-                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
-                        Full Name
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', lineHeight: 1.3, wordBreak: 'break-word', paddingTop: 2 }}>
-                        {profile.name || user?.name || 'Student Patient'}
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 3, color: 'var(--text)' }}>
-                        Academic Year Level
-                      </label>
-                      <input
-                        className="input"
-                        type="number"
-                        min="1"
-                        max="6"
-                        style={{ width: '100%', height: 36, fontSize: 'var(--font-size-sm)' }}
-                        value={profile.year}
-                        onChange={(e) => setProfile((p) => ({ ...p, year: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                )}
+              <div className="patient-profile-identity-copy">
+                <div className="patient-profile-name-row">
+                  <h2>{profile.name || user?.name || 'Student Patient'}</h2>
+                  <span className="badge badge-neutral">Student / Patient</span>
+                  <span className="badge badge-success">Active</span>
+                </div>
+                <p className="patient-profile-student-id">{profile.id || user?.patient_id || 'TUPM ID not on file'}</p>
+                <div className="patient-profile-health-summary">
+                  {healthCategories.length ? healthCategories.map((category) => (
+                    <span className="patient-health-tag" key={category}>{HEALTH_DISCLOSURE_LABELS[category]}</span>
+                  )) : (
+                    <span className="patient-health-summary-empty">
+                      {healthDisclosureSummary === 'Not provided' ? 'Health information not provided' : healthDisclosureSummary}
+                    </span>
+                  )}
+                  {healthDisclosureSummary === 'Not provided'
+                    ? <span className="patient-health-source">Not yet shared</span>
+                    : <span className="patient-health-source">Patient reported</span>}
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons Integrated into Identity Card */}
-            <div className="patient-identity-actions" style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+            <div className="patient-profile-actions">
               {!editing ? (
-                <button
-                  type="button"
-                  className="btn primary"
-                  style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: 'var(--font-size-sm)' }}
-                  onClick={() => setEditing(true)}
-                >
-                  Edit Profile
-                </button>
+                <button type="button" className="btn primary" onClick={startEditing}>Edit profile</button>
               ) : (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    style={{ padding: '8px 14px', fontSize: 'var(--font-size-sm)' }}
-                    onClick={handleCancel}
-                    disabled={saving}
-                  >
-                    Cancel
+                <>
+                  <button type="button" className="btn secondary" onClick={handleCancel} disabled={saving}>Cancel</button>
+                  <button type="button" className="btn primary" onClick={save} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save changes'}
                   </button>
-                  <button
-                    type="button"
-                    className="btn primary"
-                    style={{ padding: '8px 16px', fontSize: 'var(--font-size-sm)' }}
-                    onClick={save}
-                    disabled={saving}
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
+                </>
               )}
             </div>
-
-          </div>
-        </div>
-
-        {/* Structured Profile Sections */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {/* Section 1: Contact Information */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-              Contact Information
-            </h3>
-            {!editing ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-                {renderField('Contact Phone Number', profile.contact_number, 'None provided')}
-                {renderField('Current Address', profile.address, 'None provided')}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Contact Phone Number
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. 0917-123-4567"
-                    value={profile.contact_number}
-                    onChange={(e) => setProfile((p) => ({ ...p, contact_number: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Current Address
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. Ayala Blvd, Ermita, Manila"
-                    value={profile.address}
-                    onChange={(e) => setProfile((p) => ({ ...p, address: e.target.value }))}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Section 2: Emergency Contact */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-              Emergency Contact
-            </h3>
-            {!editing ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-                {renderField('Emergency Contact Person', profile.emergency_contact, 'None specified')}
-                {renderField('Emergency Phone Number', profile.emergency_contact_number, 'None specified')}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Emergency Contact Person
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. Maria Carbon (Parent/Guardian)"
-                    value={profile.emergency_contact}
-                    onChange={(e) => setProfile((p) => ({ ...p, emergency_contact: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Emergency Phone Number
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. 0918-987-6543"
-                    value={profile.emergency_contact_number}
-                    onChange={(e) => setProfile((p) => ({ ...p, emergency_contact_number: e.target.value }))}
-                  />
-                </div>
-              </div>
-            )}
+          <div className="patient-profile-facts">
+            <div><span>Birthday</span><strong>{formatProfileDate(profile.date_of_birth)}</strong></div>
+            <div><span>Degree / Course</span><strong>{profile.course || 'Not on file'}</strong></div>
+            <div><span>Last visit</span><strong>{formatProfileDate(profile.last_visit_date)}</strong></div>
+          </div>
+        </section>
+
+        <section className="card patient-profile-details" aria-label="Profile details">
+          <div className="patient-profile-details-heading">
+            <div>
+              <h2>Profile details</h2>
+              <p>Contact info, emergency contact, health information, and medical history.</p>
+            </div>
+            <button
+              type="button"
+              className="btn secondary patient-profile-details-toggle"
+              aria-expanded={profileDetailsOpen}
+              onClick={() => setProfileDetailsOpen((open) => !open)}
+            >
+              {profileDetailsOpen ? 'Hide details' : 'Show details'}
+              <span className={`patient-profile-chevron${profileDetailsOpen ? ' is-open' : ''}`} aria-hidden="true" />
+            </button>
           </div>
 
-          {/* Section 3: Health Information */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-              Health Information
-            </h3>
-            {!editing ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                {renderField('Blood Type', profile.blood_type, 'Not specified')}
-                {renderField('Known Allergies', profile.allergies, 'None reported')}
-                {renderField('Current Active Medications', profile.medications, 'None reported')}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Blood Type
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. O+, A+, B+"
-                    value={profile.blood_type}
-                    onChange={(e) => setProfile((p) => ({ ...p, blood_type: e.target.value }))}
-                  />
+          {profileDetailsOpen && (
+            <div className="patient-profile-detail-groups">
+              <section className="patient-profile-detail-group">
+                <h3>Contact info</h3>
+                <div className="patient-profile-detail-grid">
+                  {renderProfileField({ key: 'contact_number', label: 'Contact phone number', placeholder: 'Not provided', type: 'tel' })}
+                  {renderProfileField({ key: 'address', label: 'Current address', placeholder: 'Not provided' })}
                 </div>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Known Allergies
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. Penicillin, Pollen, Peanuts"
-                    value={profile.allergies}
-                    onChange={(e) => setProfile((p) => ({ ...p, allergies: e.target.value }))}
-                  />
+              </section>
+
+              <section className="patient-profile-detail-group">
+                <h3>Emergency contact</h3>
+                <div className="patient-profile-detail-grid">
+                  {renderProfileField({ key: 'emergency_contact', label: 'Emergency contact person', placeholder: 'Not specified' })}
+                  {renderProfileField({ key: 'emergency_contact_number', label: 'Emergency phone number', placeholder: 'Not specified', type: 'tel' })}
                 </div>
-                <div>
-                  <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                    Current Active Medications
-                  </label>
-                  <input
-                    className="input"
-                    style={{ width: '100%' }}
-                    placeholder="e.g. Salbutamol inhaler as needed"
-                    value={profile.medications}
-                    onChange={(e) => setProfile((p) => ({ ...p, medications: e.target.value }))}
-                  />
+              </section>
+
+              <section className="patient-profile-detail-group">
+                <h3>Health information</h3>
+                <div className="patient-profile-detail-grid">
+                  {renderProfileField({ key: 'blood_type', label: 'Blood type', placeholder: 'Not specified' })}
+                  {renderProfileField({ key: 'allergies', label: 'Known allergies', placeholder: 'None reported' })}
+                  {renderProfileField({ key: 'medications', label: 'Current medications', placeholder: 'None reported' })}
                 </div>
-              </div>
-            )}
+                <div className="patient-profile-health-disclosure">
+                  <div>
+                    <span className="patient-profile-detail-label">Health conditions or disability</span>
+                    <p className="patient-profile-health-help">Optional and self-reported. This information helps clinic staff prepare; it is not a clinical diagnosis.</p>
+                  </div>
+                  {editing ? (
+                    <>
+                      <div className="patient-profile-health-options" role="group" aria-label="Health information to share with the clinic">
+                        {HEALTH_DISCLOSURE_OPTIONS.map(({ id: category, label }) => (
+                          <label className="patient-profile-health-option" key={category}>
+                            <input
+                              type="checkbox"
+                              checked={(profile.health_condition_categories || []).includes(category)}
+                              onChange={(event) => toggleHealthDisclosure(category, event.target.checked)}
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {healthCategories.length > 0 && (
+                        <label className="patient-profile-edit-field patient-profile-health-notes">
+                          <span className="patient-profile-detail-label">Optional details for clinic staff</span>
+                          <textarea
+                            className="input"
+                            rows={3}
+                            maxLength={1000}
+                            value={profile.health_condition_notes || ''}
+                            onChange={(event) => setProfile((previous) => ({ ...previous, health_condition_notes: event.target.value }))}
+                            placeholder="Share a diagnosis, accommodation, or care consideration if you choose."
+                          />
+                        </label>
+                      )}
+                    </>
+                  ) : (
+                    <div className="patient-profile-health-view">
+                      <strong>{healthDisclosureSummary}</strong>
+                      {profile.health_condition_notes && <p>{profile.health_condition_notes}</p>}
+                      <span>Shared by the student; not verified as a diagnosis.</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="patient-profile-detail-group">
+                <h3>Medical history</h3>
+                <div className="patient-profile-detail-grid">
+                  {renderProfileField({ key: 'notes', label: 'Medical history and special conditions', placeholder: 'No medical history provided', type: 'textarea' })}
+                </div>
+              </section>
+            </div>
+          )}
+        </section>
+
+        <section className="card clinic-record-card" aria-label="Clinic record form">
+          <div className="clinic-record-heading">
+            <div>
+              <h2>Clinic record form</h2>
+              <p>Optional for enrolled students. Your student details are already on file; add or update your health details whenever you choose.</p>
+            </div>
           </div>
 
-          {/* Section 4: Medical History & Clinical Notes */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)', borderRadius: 12 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-              Medical History & Clinical Notes
-            </h3>
-            {!editing ? (
+          {recordLoading || profileLoading ? (
+            <div className="clinic-record-loading" role="status">Loading your record…</div>
+          ) : recordEditing ? (
+            <PatientRecordForm
+              key={`${record?.id || 'new'}-${profile.course}-${profile.date_of_birth}-${profile.sex}`}
+              initial={{
+                ...(record || {}),
+                college_course: profile.course || '',
+                date_of_birth: profile.date_of_birth || '',
+                sex: profile.sex || '',
+              }}
+              identity={{
+                college_course: profile.course,
+                date_of_birth: profile.date_of_birth,
+                sex: profile.sex,
+              }}
+              lockIdentity
+              onCancel={() => setRecordEditing(false)}
+              onSaved={() => {
+                setRecordEditing(false);
+                loadRecord();
+              }}
+            />
+          ) : (
+            <div className="clinic-record-summary">
               <div>
-                {renderField('Patient Medical Notes & Special Conditions', profile.notes, 'No special conditions noted')}
+                {record?.submitted_at ? (
+                  <span className="clinic-record-submitted"><CheckIcon size={15} /> Submitted {formatProfileDate(record.submitted_at)}</span>
+                ) : (
+                  <strong className="clinic-record-not-submitted">No record form submitted yet</strong>
+                )}
+                <p>{record?.submitted_at ? 'Your answers are on file and visible to the clinic. You can update them if anything changes.' : 'You can add your health details here if you would like. The form will not limit portal access.'}</p>
               </div>
-            ) : (
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                  Patient Medical Notes & Special Conditions
-                </label>
-                <textarea
-                  className="input"
-                  rows={3}
-                  style={{ width: '100%', resize: 'vertical' }}
-                  placeholder="Enter any medical history, chronic conditions, or clinic notes..."
-                  value={profile.notes}
-                  onChange={(e) => setProfile((p) => ({ ...p, notes: e.target.value }))}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+              <button type="button" className="btn secondary" onClick={() => setRecordEditing(true)}>
+                Update Record Form
+              </button>
+            </div>
+          )}
+        </section>
 
         {/* Status Message Notification Toast */}
         {msgOpen && msg && (

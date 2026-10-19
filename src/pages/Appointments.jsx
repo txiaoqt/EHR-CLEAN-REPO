@@ -1,19 +1,21 @@
 // src/pages/Appointments.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, isOwnerOrPrivileged } from '../accessControl.js';
-import { SearchIcon, CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
+import { SearchIcon, CloseIcon, ChevronDownIcon, CalendarIcon, ClockIcon, ReportsIcon } from '../components/icons/Icons.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { appointmentsExportConfig } from '../utils/export/configs.js';
+import KpiCard from '../components/KpiCard.jsx';
 
 const Appointments = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -26,18 +28,16 @@ const Appointments = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef(null);
 
-  // modal/new appointment state
+  // Modal state for starting an unscheduled walk-in encounter.
   const [showModal, setShowModal] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [selectedName, setSelectedName] = useState('');
-  const [newAppt, setNewAppt] = useState({
+  const [walkInVisit, setWalkInVisit] = useState({
     patient_id: '',
     appointment_date: '',
     appointment_time: '',
-    type: 'Consult',
     clinician_name: user ? user.name : '',
-    status: 'Scheduled'
   });
   const [loading, setLoading] = useState(true);
 
@@ -239,80 +239,85 @@ const Appointments = () => {
   const kpi_future = (appointments || []).filter(a => a.appointment_date > todayKey).length;
 
   // modal handlers
-  const openNewModal = () => setShowModal(true);
+  const openNewModal = () => {
+    const now = new Date();
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now).map(({ type, value }) => [type, value]));
+
+    setPatientSearch('');
+    setPatientSuggestions([]);
+    setSelectedName('');
+    setWalkInVisit({
+      patient_id: '',
+      appointment_date: `${parts.year}-${parts.month}-${parts.day}`,
+      appointment_time: `${parts.hour}:${parts.minute}`,
+      clinician_name: user ? user.name : '',
+    });
+    setShowModal(true);
+  };
+
+  // Dashboard walk-in entry routes here with a one-time navigation flag so it
+  // can reuse this flow instead of creating a scheduled appointment.
+  useEffect(() => {
+    if (location.state?.openWalkInModal !== true) return;
+
+    openNewModal();
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
+    });
+  }, [location.key]);
+
   const closeNewModal = () => {
     setShowModal(false);
     setPatientSearch('');
     setPatientSuggestions([]);
     setSelectedName('');
-    setNewAppt({
+    setWalkInVisit({
       patient_id: '',
       appointment_date: '',
       appointment_time: '',
-      type: 'Consult',
       clinician_name: user ? user.name : '',
-      status: 'Scheduled'
     });
   };
-  const handleNewApptChange = (e) => {
+  const handleWalkInChange = (e) => {
     const { id, value } = e.target;
-    setNewAppt(prev => ({ ...prev, [id]: value }));
+    setWalkInVisit(prev => ({ ...prev, [id]: value }));
   };
   const pickPatientSuggestion = (s) => {
-    setNewAppt(prev => ({ ...prev, patient_id: s.id }));
+    setWalkInVisit(prev => ({ ...prev, patient_id: s.id }));
     setSelectedName(s.name);
     setPatientSearch(`${s.name} (${s.id})`);
     setPatientSuggestions([]);
   };
-  const submitNewAppointment = async () => {
-    try {
-      if (!newAppt.patient_id || !newAppt.appointment_date || !newAppt.appointment_time) {
-        alert('Please fill required fields.');
-        return;
-      }
+  const openWalkInEncounter = () => {
+    if (!walkInVisit.patient_id || !walkInVisit.appointment_date || !walkInVisit.appointment_time) return;
 
-      const todayManila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
-      if (newAppt.appointment_date < todayManila) {
-        alert('Cannot schedule an appointment for a past date.');
-        return;
-      }
-      const apptType = newAppt.appointment_type || (newAppt.appointment_date === todayManila ? 'Same-day Appointment' : 'Future Appointment');
-      const payload = {
-        ...newAppt,
-        appointment_type: apptType,
-      };
+    const walkInAt = `${walkInVisit.appointment_date}T${walkInVisit.appointment_time}`;
+    const params = new URLSearchParams({
+      walkIn: '1',
+      patientId: walkInVisit.patient_id,
+      walkInAt,
+    });
+    const patientId = walkInVisit.patient_id;
+    const patientName = selectedName || patientId;
 
-      const { data, error } = await supabase.from('appointments').insert([payload]).select();
-      if (error) {
-        const errMsg = String(error.message || '').toLowerCase();
-        if (errMsg.includes('this time slot has already ended') || errMsg.includes('slot has already ended')) {
-          alert('Failed to save appointment: This time slot has already ended. Please select an upcoming or future time slot.');
-          return;
-        }
-        if (errMsg.includes('same-day appointments are only available') || errMsg.includes('future appointments must be scheduled')) {
-          alert(errMsg.includes('future')
-            ? 'Future appointments must be scheduled for tomorrow or a later date.'
-            : 'Same-day appointments are only available for today.');
-          return;
-        }
-        if (error.code === '23505' && (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))) {
-          alert('Failed to save appointment: This time slot is no longer available. Please select another available slot.');
-          return;
-        }
-        if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
-          alert('Failed to save appointment: This student already has an active appointment.');
-          return;
-        }
-        throw error;
-      }
-      const newRecord = { ...data[0], students: { name: selectedName } };
-      setAppointments(prev => [...prev, newRecord]);
-      await logAudit('Appointment Creation', `Added appointment ${newAppt.patient_id} on ${newAppt.appointment_date} ${newAppt.appointment_time}`);
-      closeNewModal();
-    } catch (err) {
-      console.error('Save error:', err);
-      alert('Error saving appointment: ' + (err.message || err));
-    }
+    closeNewModal();
+    navigate(`/encounter?${params.toString()}`, {
+      state: {
+        patientId,
+        patientName,
+        walkInFromStaffModal: true,
+        walkInAt,
+      },
+    });
   };
 
   // update status: debug-friendly, ONLY update DB + local state (no redirect)
@@ -462,112 +467,52 @@ const Appointments = () => {
     }
   };
 
-  // Open action: Resolve patient by canonical patient_id (student ID) and route to Profile or Registration
+  // Open the scheduled visit in the encounter form with its patient and booking preselected.
   const handleAction = async (appt) => {
     if (!appt || appt.status === 'Cancelled' || openingApptId) return;
 
     const patientId = (appt.patient_id || '').trim();
     if (!patientId) {
-      showToast('Unable to open patient profile. The appointment has no patient ID.', 'error');
+      showToast('This appointment has no patient ID, so an encounter cannot be started.', 'error');
       return;
     }
 
     setOpeningApptId(appt.id);
     try {
-      // 1. Check if patient clinical profile exists in patients table
-      const { data: existingPatient, error: patientErr } = await supabase
-        .from('patients')
-        .select('id, name, year')
-        .eq('id', patientId)
+      const { data: linkedEncounter, error: encounterError } = await supabase
+        .from('encounters')
+        .select('id')
+        .eq('appointment_id', appt.id)
         .maybeSingle();
+      if (encounterError) throw encounterError;
 
-      if (patientErr) {
-        console.warn('Error querying patients table for ID:', patientId, patientErr);
-      }
-
-      if (existingPatient && existingPatient.id) {
-        // Clinical profile exists -> navigate to existing Patient Profile page
-        navigate(`/patient-profile?id=${encodeURIComponent(existingPatient.id)}`);
+      if (linkedEncounter?.id) {
+        showToast('An encounter is already recorded for this appointment. Opening the Medical Log.', 'info');
+        navigate('/medical-log');
         return;
       }
 
-      // 2. Student exists in student directory but does not yet have a clinical patient profile
-      const { data: studentRecord, error: studentErr } = await supabase
+      let patientName = appt.patient_name || appt.students?.name || '';
+      if (!patientName) {
+        const { data: studentRecord, error: studentErr } = await supabase
         .from('students')
-        .select('id, name, year')
+        .select('id, name')
         .eq('id', patientId)
         .maybeSingle();
-
-      if (studentErr) {
-        console.warn('Error querying students table for ID:', patientId, studentErr);
+        if (studentErr) console.warn('Could not resolve the patient name from the student directory:', studentErr);
+        patientName = studentRecord?.name || '';
       }
 
-      // Auxiliary query for email / profile details from patient_profiles or users
-      let auxEmail = '';
-      let auxYear = studentRecord?.year || 1;
-
-      try {
-        const { data: ppData } = await supabase
-          .from('patient_profiles')
-          .select('email, year_level')
-          .eq('patient_id', patientId)
-          .maybeSingle();
-        if (ppData?.email) auxEmail = ppData.email;
-        if (ppData?.year_level) auxYear = ppData.year_level;
-      } catch (e) {
-        console.warn('Auxiliary patient_profiles query failed:', e);
-      }
-
-      if (!auxEmail) {
-        try {
-          const { data: uData } = await supabase
-            .from('users')
-            .select('email')
-            .eq('patient_id', patientId)
-            .maybeSingle();
-          if (uData?.email) auxEmail = uData.email;
-        } catch (e) {
-          console.warn('Auxiliary users query failed:', e);
-        }
-      }
-
-      if (studentRecord && studentRecord.id) {
-        // Route to Register Patient flow with pre-filled verified info
-        navigate('/patients', {
-          state: {
-            autoOpenRegister: true,
-            registerStudent: {
-              id: studentRecord.id,
-              name: studentRecord.name || appt.patient_name || '',
-              year: studentRecord.year || auxYear || 1,
-              email: auxEmail || ''
-            }
-          }
-        });
-        return;
-      }
-
-      // 3. Fallback check: Check users or patient_profiles in case student is registered there
-      if (auxEmail) {
-        navigate('/patients', {
-          state: {
-            autoOpenRegister: true,
-            registerStudent: {
-              id: patientId,
-              name: appt.patient_name || '',
-              year: auxYear || 1,
-              email: auxEmail || ''
-            }
-          }
-        });
-        return;
-      }
-
-      // 4. Student record cannot be found anywhere
-      showToast('Unable to open patient profile. The associated student record could not be found.', 'error');
+      navigate(`/encounter?appointmentId=${encodeURIComponent(appt.id)}`, {
+        state: {
+          patientId,
+          patientName: patientName || patientId,
+          appointmentId: appt.id,
+        },
+      });
     } catch (err) {
-      console.error('Error resolving patient for appointment:', err);
-      showToast('Unable to open patient profile. An unexpected error occurred.', 'error');
+      console.error('Error opening the appointment encounter:', err);
+      showToast('Unable to open this appointment. Please try again.', 'error');
     } finally {
       setOpeningApptId(null);
     }
@@ -799,29 +744,27 @@ const Appointments = () => {
               Export
             </button>
             <button type="button" className="btn" onClick={openNewModal}>
-              New Appointment
+              New Walk-in
             </button>
           </div>
         </div>
 
         {/* 2. SUMMARY METRICS: 4 High-level status cards */}
         <div className="appointments-kpi-grid">
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Scheduled Today</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-blue-text)' }}>{kpi_today_scheduled}</div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Cancelled Today</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--danger)' }}>{kpi_today_canceled}</div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>This Week</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-amber-text)' }}>{kpi_week_total}</div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 16px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Future Schedules</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-emerald-text)' }}>{kpi_future}</div>
-          </div>
+          {[
+            { title: 'Scheduled Today', value: kpi_today_scheduled, description: 'Appointments scheduled for today', Icon: CalendarIcon },
+            { title: 'Cancelled Today', value: kpi_today_canceled, description: 'Appointments cancelled today', Icon: CloseIcon },
+            { title: 'This Week', value: kpi_week_total, description: 'Appointments dated this week', Icon: ReportsIcon },
+            { title: 'Future Schedules', value: kpi_future, description: 'Appointments dated after today', Icon: ClockIcon },
+          ].map((kpi) => (
+            <KpiCard
+              key={kpi.title}
+              title={kpi.title}
+              value={kpi.value}
+              description={kpi.description}
+              Icon={kpi.Icon}
+            />
+          ))}
         </div>
 
         {/* 3. WEEKLY SCHEDULE CONTEXT (Horizontal Overview) */}
@@ -851,9 +794,9 @@ const Appointments = () => {
         </div>
 
         {/* 4. PRIMARY APPOINTMENT WORKSPACE: Table with unified toolbar */}
-        <div className="card" style={{ padding: '20px 22px' }}>
+        <div className="card appointments-schedule-card">
           {/* Card Header & Dynamic Count */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+          <div className="appointments-schedule-header">
             <div>
               <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Appointments Schedule
@@ -951,7 +894,7 @@ const Appointments = () => {
 
           {/* Active Date Filter Chip (if selected) */}
           {selectedDate && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-xs)', background: 'var(--panel)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 14 }}>
+            <div className="appointments-schedule-date-filter">
               <span style={{ color: 'var(--text-muted)' }}>Filtered date:</span>
               <strong style={{ color: 'var(--color-primary-text, #fda4af)' }}>{formatSelectedDateLabel(selectedDate)}</strong>
               <button
@@ -966,8 +909,8 @@ const Appointments = () => {
             </div>
           )}
 
-          <div className="table-responsive">
-            <table className="table" aria-label="Appointments table">
+          <div className="table-responsive appointments-schedule-table-wrap">
+            <table className="table appointments-schedule-table" aria-label="Appointments table">
               <thead>
                 <tr>
                   <th>Queue #</th>
@@ -985,8 +928,8 @@ const Appointments = () => {
                 {loading ? (
                   <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading appointments…</td></tr>
                 ) : filteredAppointments.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No appointments found.</td>
+                  <tr className="table-empty-row">
+                    <td colSpan={9}>{appointments.length === 0 ? 'No appointments yet' : 'No matching appointments'}</td>
                   </tr>
                 ) : (
                   pagination.pageRows.map((appt) => (
@@ -1046,7 +989,7 @@ const Appointments = () => {
                               className="btn secondary small"
                               disabled
                               style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                              title="Cannot open cancelled appointment profile"
+                              title="Cancelled appointments cannot be opened"
                             >
                               Open
                             </button>
@@ -1088,40 +1031,46 @@ const Appointments = () => {
             total={pagination.total}
             onPageChange={pagination.goToPage}
             itemLabel="appointments"
+            showWhenEmpty={!loading}
           />
         </div>
 
-        {/* New Appointment modal */}
+        {/* Start a walk-in encounter */}
         {showModal && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 1200, background: 'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <div style={{ width: 640, maxWidth: '95%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
+            <div className="appointment-create-dialog" style={{ width: 640, maxWidth: '95%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>New Appointment</h3>
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>New Walk-in Visit</h3>
                 <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
                   <CloseIcon size={18} />
                 </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Patient</label>
+                <div className="appointment-patient-search" style={{ gridColumn: '1 / -1' }}>
+                  <label htmlFor="appointment_patient_search" style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Patient</label>
                   <input
+                    id="appointment_patient_search"
                     type="text"
                     placeholder="Search patient name or student ID..."
                     className="input"
                     value={patientSearch}
-                    onChange={(e) => setPatientSearch(e.target.value)}
+                    onChange={(e) => {
+                      setPatientSearch(e.target.value);
+                      setWalkInVisit(prev => ({ ...prev, patient_id: '' }));
+                      setSelectedName('');
+                    }}
                     style={{ width: '100%' }}
                   />
                   {patientSuggestions.length > 0 && (
-                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, marginTop: 6, maxHeight: 160, overflowY: 'auto', background: 'var(--panel)', boxShadow: 'var(--shadow-md)' }}>
+                    <div className="appointment-patient-results" role="group" aria-label="Matching patients">
                       {patientSuggestions.map(s => (
-                        <div key={s.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-sm)', color: 'var(--text)' }} onClick={() => pickPatientSuggestion(s)}>
+                        <button key={s.id} type="button" className="appointment-patient-result" onClick={() => pickPatientSuggestion(s)}>
                           <strong>{s.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({s.id})</span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -1129,34 +1078,33 @@ const Appointments = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Date</label>
-                  <input id="appointment_date" type="date" className="input" value={newAppt.appointment_date} onChange={handleNewApptChange} style={{ width: '100%' }} />
+                  <input id="appointment_date" type="date" className="input" value={walkInVisit.appointment_date} onChange={handleWalkInChange} style={{ width: '100%' }} />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Time</label>
-                  <input id="appointment_time" type="time" className="input" value={newAppt.appointment_time} onChange={handleNewApptChange} style={{ width: '100%' }} />
+                  <input id="appointment_time" type="time" className="input" value={walkInVisit.appointment_time} onChange={handleWalkInChange} style={{ width: '100%' }} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Type</label>
-                  <select id="type" className="input" value={newAppt.type} onChange={handleNewApptChange} style={{ width: '100%' }}>
-                    <option>Consult</option>
-                    <option>Follow-up</option>
-                  </select>
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Visit type</label>
+                  <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                    Walk-in
+                  </div>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Clinician</label>
                   <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', minHeight: 40, display: 'flex', alignItems: 'center' }}>
-                    <strong>{newAppt.clinician_name || 'Staff Clinician'}</strong>
+                    <strong>{walkInVisit.clinician_name || 'Staff Clinician'}</strong>
                   </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button className="btn secondary" onClick={closeNewModal}>Cancel</button>
-                <button className="btn" onClick={submitNewAppointment} disabled={!newAppt.patient_id || !newAppt.appointment_date || !newAppt.appointment_time}>
-                  Save Appointment
+                <button className="btn" onClick={openWalkInEncounter} disabled={!walkInVisit.patient_id || !walkInVisit.appointment_date || !walkInVisit.appointment_time}>
+                  Open Encounter
                 </button>
               </div>
             </div>

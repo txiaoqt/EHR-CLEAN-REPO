@@ -2,7 +2,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
-import { ChevronDownIcon } from '../components/icons/Icons.jsx';
+import { ChevronDownIcon, CalendarIcon, CheckIcon, ClockIcon, HistoryIcon, SearchIcon } from '../components/icons/Icons.jsx';
+import KpiCard from '../components/KpiCard.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
 import { emailEnabled } from '../utils.js';
@@ -425,35 +426,43 @@ const Events = () => {
         </div>
 
         {/* KPI Cards */}
-        <div className="events-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
-          <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Total Events</div>
-            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 4 }}>{stats.total}</div>
-          </div>
-          <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Published Events</div>
-            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--success, #16a34a)', marginTop: 4 }}>{stats.published}</div>
-          </div>
-          <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Upcoming Events</div>
-            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--primary, #8b0000)', marginTop: 4 }}>{stats.upcoming}</div>
-          </div>
-          <div className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Drafts & Inactive</div>
-            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--muted)', marginTop: 4 }}>{stats.drafts}</div>
-          </div>
+        <div className="events-kpi-grid">
+          {[
+            { title: 'Total Events', value: stats.total, description: 'Events in the clinic calendar', Icon: CalendarIcon },
+            { title: 'Published Events', value: stats.published, description: 'Visible to registered students', Icon: CheckIcon },
+            { title: 'Upcoming Events', value: stats.upcoming, description: 'Scheduled and not cancelled', Icon: ClockIcon },
+            { title: 'Drafts & Inactive', value: stats.drafts, description: 'Draft or unpublished events', Icon: HistoryIcon },
+          ].map((kpi) => (
+            <KpiCard
+              key={kpi.title}
+              title={kpi.title}
+              value={kpi.value}
+              description={kpi.description}
+              Icon={kpi.Icon}
+            />
+          ))}
         </div>
 
-        {/* Filters & Search Toolbar */}
-        <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              className="input"
-              style={{ flex: '1 1 240px', minWidth: 200 }}
-              placeholder="Search by title, location, description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Events table and its controls share one continuous workspace. */}
+        <div className="card table-section-card events-table-card">
+          <div className="table-section-header">
+            <div>
+              <h2 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Clinic events</h2>
+              <span className="card-subtitle">Schedule, publish, and manage university health activities.</span>
+            </div>
+          </div>
+
+          <div className="table-section-toolbar events-table-toolbar">
+            <label className="events-search-wrapper">
+              <SearchIcon size={16} aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Search by title, location, or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search events"
+              />
+            </label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)' }}>Category:</span>
               <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -487,20 +496,17 @@ const Events = () => {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Events Table */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="table-responsive" style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-responsive">
+            <table className="table">
               <thead>
-                <tr style={{ background: 'var(--table-header-bg, rgba(0,0,0,0.03))', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ textAlign: 'left', padding: '12px 16px' }}>Event Title & Details</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px' }}>Category</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px' }}>Date & Schedule</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px' }}>Location</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px' }}>Status</th>
-                  <th style={{ textAlign: 'right', padding: '12px 16px' }}>Actions</th>
+                <tr>
+                  <th>Event Title & Details</th>
+                  <th>Category</th>
+                  <th>Date & Schedule</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -511,16 +517,13 @@ const Events = () => {
                     </td>
                   </tr>
                 ) : filteredEvents.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-                      <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-md)' }}>No events found</div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 4 }}>Create a new clinic event or adjust your filters.</div>
-                    </td>
+                  <tr className="table-empty-row">
+                    <td colSpan={6}>{events.length === 0 ? 'No events yet' : 'No matching events'}</td>
                   </tr>
                 ) : (
                   eventPagination.pageRows.map((ev) => (
-                    <tr key={ev.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '14px 16px' }}>
+                    <tr key={ev.id}>
+                      <td>
                         <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', fontSize: 'var(--font-size-base)' }}>{ev.title}</div>
                         {ev.description && (
                           <div style={{ color: 'var(--muted)', fontSize: 'var(--font-size-sm)', marginTop: 4, maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -528,12 +531,12 @@ const Events = () => {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
+                      <td>
                         <span className={`badge ${getCategoryBadgeClass(ev.category)}`} style={{ fontWeight: 'var(--font-weight-semibold)' }}>
                           {ev.category || 'General'}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-base)' }}>
+                      <td style={{ fontSize: 'var(--font-size-base)' }}>
                         <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{ev.event_date}</div>
                         {(ev.start_time || ev.end_time) && (
                           <div style={{ color: 'var(--muted)', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
@@ -541,15 +544,15 @@ const Events = () => {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-base)', color: 'var(--muted)' }}>
+                      <td style={{ fontSize: 'var(--font-size-base)', color: 'var(--muted)' }}>
                         {ev.location || '—'}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
+                      <td>
                         <span className={`badge ${getStatusBadgeClass(ev.status)}`} style={{ fontWeight: 'var(--font-weight-semibold)', textTransform: 'capitalize' }}>
                           {ev.status}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                           {ev.status === 'published' && (
                             <button
@@ -592,6 +595,7 @@ const Events = () => {
             total={eventPagination.total}
             onPageChange={eventPagination.goToPage}
             itemLabel="events"
+            showWhenEmpty={!loading}
           />
         </div>
 

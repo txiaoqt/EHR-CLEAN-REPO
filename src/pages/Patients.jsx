@@ -525,9 +525,9 @@ const Patients = () => {
         )}
 
         {/* Patients Table Card */}
-        <div className="card" style={{ padding: '20px 22px' }}>
+        <div className="card table-section-card patients-table-card">
           {/* Card Header & Dynamic Count */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+          <div className="table-section-header">
             <div>
               <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Registered Patients
@@ -539,7 +539,7 @@ const Patients = () => {
           </div>
 
           {/* Table Toolbar: Fluid Search + Sort Field + Sort Direction */}
-          <div className="patients-toolbar">
+          <div className="patients-toolbar table-section-toolbar">
             {/* 1. Full-Width Search Input (Single visible input shell) */}
             <div className="patients-search-wrapper">
               <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
@@ -613,7 +613,7 @@ const Patients = () => {
                 {loading ? (
                   <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patient records…</td></tr>
                 ) : sortedPatients.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No patients found.</td></tr>
+                  <tr className="table-empty-row"><td colSpan={5}>{patients.length === 0 ? 'No patients yet' : 'No matching patients'}</td></tr>
                 ) : (
                   pagination.pageRows.map(pat => (
                     <tr key={pat.id}>
@@ -659,6 +659,7 @@ const Patients = () => {
             total={pagination.total}
             onPageChange={pagination.goToPage}
             itemLabel="patients"
+            showWhenEmpty={!loading}
           />
         </div>
 

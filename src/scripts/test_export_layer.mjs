@@ -714,8 +714,8 @@ const medLogPageSrc = read('src/pages/MedicalLog.jsx');
 assert(/loadSignatureDataUrls/.test(medLogPageSrc), 'the page preloads the signature images');
 assert(/readAsDataURL/.test(medLogPageSrc), 'the images are converted for jsPDF');
 assert(
-  /SIGNATURE_IMAGE_LIMIT/.test(medLogPageSrc),
-  'the number of images fetched is capped, so a large export cannot stall'
+  /SIGNATURE_FETCH_CONCURRENCY/.test(medLogPageSrc),
+  'signature requests use bounded concurrency without omitting later visits'
 );
 assert(
   /signatureImage: e\.patient_signature_path/.test(medLogPageSrc),
@@ -901,7 +901,7 @@ assert(
   'the profile shows the full note, expandable'
 );
 assert(
-  /Medical Log/.test(read('src/components/sidebar/Sidebar.jsx')),
+  /Medicine Log/.test(read('src/components/sidebar/Sidebar.jsx')),
   'the clinic-wide record is reachable from the sidebar'
 );
 console.log('  ✓ PASS: note readable in both places, queue named for its job');

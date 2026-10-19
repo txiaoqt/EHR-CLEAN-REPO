@@ -1,16 +1,18 @@
 // filename: src/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseClient.js';
+import { stopStaffPresence } from './utils/staffPresenceLifecycle.js';
+import {
+  DEPLOY_SURFACE,
+  IS_ADMIN_SURFACE,
+  IS_USER_SURFACE,
+  isRoleCompatibleWithSurface,
+} from './deploySurface.js';
 
-const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
-const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
-const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
-
-export const isRoleCompatibleWithSurface = (role) => {
-  const normalized = (role || '').toLowerCase();
-  if (!normalized) return false;
-  return IS_ADMIN_SURFACE ? normalized !== 'patient' : normalized === 'patient';
-};
+// Re-exported so existing importers keep working; the rule itself now lives in
+// one place, because writing it out per call site is what let four of them drift
+// out of step with each other.
+export { isRoleCompatibleWithSurface };
 
 const AuthContext = createContext();
 
@@ -22,6 +24,10 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
+  const sessionUserId = useRef(null);
+  // OTP verification creates a session before registration finishes. Keep that
+  // temporary session on the signup form until registration has completed.
+  const [registrationInProgress, setRegistrationInProgress] = useState(false);
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem('ehr_user');
@@ -229,7 +235,57 @@ export const AuthProvider = ({ children }) => {
         console.warn('Error querying users table:', userErr);
       }
 
-      // 3. Fallback: Check metadata if explicitly a patient (NEVER default to nurse!)
+      // 3. Check public.enrollees — an applicant who has no TUP account yet.
+      //
+      // Checked after users and before the metadata fallback, because an
+      // enrollee is deliberately not in either of the other tables:
+      // sync_public_user_from_auth skips an unrecognised role, so signing up
+      // with role 'enrollee' creates no patient row. This is what makes that
+      // account usable without making it look like a patient.
+      try {
+        const { data: enrolleeData } = await supabase
+          .from('enrollees')
+          .select('id, auth_user_id, first_name, middle_name, surname, suffix, personal_email, applicant_id, status, tup_email, elevated_student_id')
+          .eq('auth_user_id', authUser.id)
+          .maybeSingle();
+
+        if (enrolleeData) {
+          const fullName = [
+            enrolleeData.first_name,
+            enrolleeData.middle_name,
+            enrolleeData.surname,
+            enrolleeData.suffix,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const isElevated = enrolleeData.status === 'elevated';
+
+          return {
+            id: enrolleeData.id,
+            auth_user_id: enrolleeData.auth_user_id || authUser.id,
+            name: fullName || authUser.email,
+            email: enrolleeData.personal_email || authUser.email,
+            avatar: null,
+            role: 'enrollee',
+            enrollee_status: enrolleeData.status || 'enrollee',
+            elevated: isElevated,
+            tup_email: enrolleeData.tup_email || null,
+            elevated_student_id: enrolleeData.elevated_student_id || null,
+            applicant_id: enrolleeData.applicant_id || null,
+            patient_id: null,
+            // An elevated enrollee account is retired; they sign in with their
+            // official @tup.edu.ph student account from then on.
+            active: !isElevated,
+            locked_until: null,
+          };
+        }
+      } catch (enrolleeErr) {
+        // A failure here must not block sign-in: the enrollee may simply not
+        // have completed registration yet, and the next step tells them so.
+        console.warn('Error querying enrollees table:', enrolleeErr);
+      }
+
+      // 4. Fallback: Check metadata if explicitly a patient (NEVER default to nurse!)
       const metaRole = (authUser.user_metadata?.role || '').toLowerCase();
       if (metaRole === 'patient') {
         return {
@@ -240,6 +296,31 @@ export const AuthProvider = ({ children }) => {
           avatar: null,
           role: 'patient',
           patient_id: authUser.user_metadata?.patient_id || null,
+          active: true,
+          locked_until: null,
+        };
+      }
+
+      // Signed up as an enrollee but no record yet: the OTP was confirmed and
+      // the registration RPC has not completed. Recognising this is better than
+      // returning null, which would sign them out with no explanation — instead
+      // the portal can tell them their registration is unfinished.
+      if (metaRole === 'enrollee') {
+        return {
+          id: authUser.id,
+          auth_user_id: authUser.id,
+          name: authUser.user_metadata?.name || authUser.email,
+          email: authUser.email,
+          avatar: null,
+          role: 'enrollee',
+          enrollee_status: 'incomplete',
+          first_name: authUser.user_metadata?.first_name || null,
+          middle_name: authUser.user_metadata?.middle_name || null,
+          surname: authUser.user_metadata?.surname || null,
+          suffix: authUser.user_metadata?.suffix || null,
+          date_of_birth: authUser.user_metadata?.date_of_birth || null,
+          applicant_id: authUser.user_metadata?.applicant_id || null,
+          patient_id: null,
           active: true,
           locked_until: null,
         };
@@ -272,10 +353,11 @@ export const AuthProvider = ({ children }) => {
         if (!mounted) return;
         if (error) console.warn('[AUTH] Error retrieving session:', error);
         setSession(initSession);
+        sessionUserId.current = initSession?.user?.id || null;
 
         if (initSession?.user) {
           const profile = await fetchUserProfile(initSession.user);
-          if (mounted && profile) {
+          if (mounted && profile && sessionUserId.current === initSession.user.id) {
             if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
               setUser(profile);
               try {
@@ -320,8 +402,9 @@ export const AuthProvider = ({ children }) => {
     // 2. Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!mounted) return;
+      sessionUserId.current = currentSession?.user?.id || null;
       setSession(currentSession);
 
       if (event === 'PASSWORD_RECOVERY') {
@@ -351,7 +434,7 @@ export const AuthProvider = ({ children }) => {
             return prevUser;
           }
           fetchUserProfile(currentSession.user).then((profile) => {
-            if (mounted && profile) {
+            if (mounted && profile && sessionUserId.current === currentSession.user.id) {
               if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
                 setUser(profile);
                 try {
@@ -390,6 +473,9 @@ export const AuthProvider = ({ children }) => {
       console.warn('[Auth] Rejected login: profile role incompatible with surface', { role: profile?.role, DEPLOY_SURFACE });
       return;
     }
+    // A delayed sign-in handler must not restore a profile after the user has
+    // declined the policy gate and signed out, or signed in as someone else.
+    if (profile.auth_user_id && profile.auth_user_id !== sessionUserId.current) return;
     setUser(profile);
     try {
       localStorage.setItem('ehr_user', JSON.stringify(profile));
@@ -397,10 +483,12 @@ export const AuthProvider = ({ children }) => {
     } catch (_) {}
   };
 
-  const logout = async () => {
+  const logout = useCallback(async (options) => {
     console.log('[Auth] Sign out started');
+    sessionUserId.current = null;
     try {
-      const { error } = await supabase.auth.signOut();
+      await stopStaffPresence();
+      const { error } = await supabase.auth.signOut({ scope: options?.scope === 'local' ? 'local' : 'global' });
       if (error) {
         console.warn('[Auth] Sign out error:', error);
       } else {
@@ -421,7 +509,7 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.clear();
       } catch (_) {}
     }
-  };
+  }, [setIsPasswordRecoverySession]);
 
   const updateUser = (partial) => {
     setUser((prev) => {
@@ -442,6 +530,8 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         initializing,
+        registrationInProgress,
+        setRegistrationInProgress,
         isPasswordRecoverySession,
         setIsPasswordRecoverySession,
         clearPasswordRecoveryState,

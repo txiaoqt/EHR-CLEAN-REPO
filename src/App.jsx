@@ -18,6 +18,12 @@ import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
 import BackupRecovery from './pages/BackupRecovery.jsx';
+import EnrolleeHome from './pages/enrollee/EnrolleeHome.jsx';
+import EnrolleeMessages from './pages/enrollee/EnrolleeMessages.jsx';
+import EnrolleeProfile from './pages/enrollee/EnrolleeProfile.jsx';
+import Enrollees from './pages/Enrollees.jsx';
+import ArchiveFiles from './pages/ArchiveFiles.jsx';
+import EnrolleeReview from './pages/EnrolleeReview.jsx';
 import AuditTrail from './pages/AuditTrail.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import PatientDashboard from './pages/patient/PatientDashboard.jsx';
@@ -32,6 +38,10 @@ import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
+import PolicyAgreement from './components/PolicyAgreement.jsx';
+import LegalPolicy from './pages/LegalPolicy.jsx';
+import useAppPolicy from './hooks/useAppPolicy.js';
+import { StaffPresenceProvider } from './StaffPresenceContext.jsx';
 import { useStaffDeviceCheck } from './hooks/useStaffDeviceCheck.js';
 import { useSidebar } from './useSidebar.js';
 import './styles/main.css';
@@ -39,10 +49,14 @@ import { exportCsv } from './utils.js';
 import { useAuth } from './AuthContext.jsx';
 import { useTheme, normalizeTheme } from './ThemeContext.jsx';
 import { getClinicHoursMessage, hasRequiredRole, isWithinClinicHours } from './accessControl.js';
-
-const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
-const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
-const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
+import {
+  DEPLOY_SURFACE,
+  IS_ADMIN_SURFACE,
+  IS_USER_SURFACE,
+  isRoleCompatibleWithSurface,
+  isUserSurfaceRole as isUserSurfaceRoleOf,
+  surfaceHomeForRole,
+} from './deploySurface.js';
 
 const getRoleHome = (role) => ((role || '').toLowerCase() === 'patient' ? '/patient/dashboard' : '/dashboard');
 const isPatientRole = (role) => (role || '').toLowerCase() === 'patient';
@@ -79,16 +93,20 @@ const ProtectedRoute = ({
   if (!isWithinClinicHours()) return <Navigate to="/login" replace state={{ sessionMessage: getClinicHoursMessage() }} />;
 
   const userRole = (user?.role || '').toLowerCase();
-  const isRoleAllowedOnSurface = IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient';
+  // An enrollee belongs on the user surface: they are an applicant, not staff,
+  // and they sign in with a personal address on the same portal patients use.
+  // The rule comes from deploySurface.js rather than being restated here.
+  const userSurfaceRole = isUserSurfaceRoleOf(userRole);
+  const isRoleAllowedOnSurface = IS_ADMIN_SURFACE ? !userSurfaceRole : userSurfaceRole;
   if (!isRoleAllowedOnSurface) {
-    const errorMessage = IS_ADMIN_SURFACE && userRole === 'patient'
-      ? 'Patient accounts are not allowed on this portal.'
-      : 'Only patient accounts can log in on this portal.';
+    const errorMessage = IS_ADMIN_SURFACE
+      ? 'Student accounts are not allowed on this portal.'
+      : 'Only student accounts can log in on this portal.';
     return <Navigate to="/login" replace state={{ sessionMessage: errorMessage }} />;
   }
 
   if (!hasRequiredRole(user, allowedRoles)) {
-    const fallbackHome = IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard';
+    const fallbackHome = IS_USER_SURFACE ? surfaceHomeForRole(userRole) : '/dashboard';
     if (location.pathname === fallbackHome) {
       return <Navigate to="/login" replace state={{ sessionMessage: 'You do not have permission to access this page.' }} />;
     }
@@ -101,10 +119,24 @@ const ProtectedRoute = ({
 };
 
 function AppShell() {
-  const { isAuthenticated, user, loading, initializing, logout, isPasswordRecoverySession } = useAuth();
+  const { isAuthenticated, user, session, loading, initializing, logout, isPasswordRecoverySession, registrationInProgress } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const isPublicPolicyPath = ['/privacy', '/terms'].includes(location.pathname);
+  const policyBackgroundLocation = isPublicPolicyPath &&
+    location.state?.policyBackgroundLocation?.pathname === '/login'
+    ? location.state.policyBackgroundLocation : null;
+  const isRecoveryPath = ['/auth/callback', '/reset-password'].includes(location.pathname);
+  const policyCheckEnabled = Boolean(
+    IS_USER_SURFACE && isAuthenticated && isUserSurfaceRoleOf(user?.role) &&
+    !loading && !initializing && !registrationInProgress &&
+    !isPasswordRecoverySession && !isRecoveryPath && !isPublicPolicyPath
+  );
+  const policyAgreement = useAppPolicy({
+    enabled: policyCheckEnabled,
+    accountId: session?.user?.id || user?.auth_user_id || user?.id || null,
+  });
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar();
   const autoLogoutInProgressRef = useRef(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
@@ -221,14 +253,34 @@ function AppShell() {
   );
 
   const userRole = (user?.role || '').toLowerCase();
-  const isRoleAllowedOnSurface = Boolean(
-    user && (IS_ADMIN_SURFACE ? userRole !== 'patient' : userRole === 'patient')
-  );
-  const canAccessAuthenticatedHome = isAuthenticated && isRoleAllowedOnSurface && !isPasswordRecoverySession && isWithinClinicHours();
+  const isRoleAllowedOnSurface = Boolean(user && isRoleCompatibleWithSurface(userRole));
+  const canAccessAuthenticatedHome = isAuthenticated && isRoleAllowedOnSurface && !isPasswordRecoverySession && !registrationInProgress && isWithinClinicHours();
   const roleHome = getRoleHome(user?.role);
-  const surfaceHome = IS_USER_SURFACE ? '/patient/dashboard' : '/dashboard';
+  const surfaceHome = IS_USER_SURFACE ? surfaceHomeForRole(user?.role) : '/dashboard';
 
-  const shouldRenderSidebar = canAccessAuthenticatedHome && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
+  const shouldRenderSidebar = canAccessAuthenticatedHome && !isPublicPolicyPath && (!IS_ADMIN_SURFACE || isStaffDeviceSupported);
+
+  // No dashboard, sidebar, record form, or protected page mounts until the
+  // database confirms acceptance. Failed policy checks also keep the gate shut.
+  if (policyCheckEnabled && (!policyAgreement.ready ||
+    (policyAgreement.required && !policyAgreement.accepted))) {
+    return (
+      <PolicyAgreement policy={policyAgreement.policy} checking={policyAgreement.checking}
+        error={policyAgreement.error} saving={policyAgreement.saving}
+        onRetry={policyAgreement.refresh} onAccept={policyAgreement.accept}
+        onDecline={async () => {
+          await logout({ scope: 'local' });
+          navigate('/login', { replace: true, state: {
+            sessionMessage: 'You were signed out. Agreement is required before continuing to the portal.',
+          } });
+        }}
+      />
+    );
+  }
+
+  if (registrationInProgress && !isPublicPolicyPath && !isRecoveryPath && location.pathname !== '/login') {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div
@@ -236,6 +288,7 @@ function AppShell() {
       className={[
         sidebarCollapsed ? 'sidebar-collapsed' : '',
         shouldRenderSidebar && !IS_USER_SURFACE ? 'has-staff-topbar' : '',
+        isPublicPolicyPath ? 'public-policy-view' : '',
       ].filter(Boolean).join(' ')}
     >
       {shouldRenderSidebar && (
@@ -267,7 +320,12 @@ function AppShell() {
 
       {shouldRenderSidebar && !IS_USER_SURFACE && <StaffTopBar />}
 
-      <Routes>
+      {/* Retain the auth form in memory during a same-tab policy visit. The
+          hidden screen cannot be read or focused while the policy is open. */}
+      <div className="policy-route-content" hidden={Boolean(policyBackgroundLocation)}>
+      <Routes location={policyBackgroundLocation || location}>
+        <Route path="/privacy" element={<LegalPolicy type="privacy" />} />
+        <Route path="/terms" element={<LegalPolicy type="terms" />} />
         <Route path="/" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Navigate to="/login" replace />)} />
         <Route path="/login" element={isPasswordRecoverySession ? <Navigate to="/reset-password" replace /> : (canAccessAuthenticatedHome ? <Navigate to={surfaceHome} replace /> : <Login />)} />
         <Route path="/auth/callback" element={<AuthCallback />} />
@@ -278,6 +336,9 @@ function AppShell() {
             <Route path="/dashboard" element={guard(<Dashboard />, ['admin', 'physician', 'nurse'])} />
             <Route path="/appointments" element={guard(<Appointments />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patients" element={guard(<Patients />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/enrollees" element={guard(<Enrollees />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/archive-files" element={guard(<ArchiveFiles />, ['admin', 'physician', 'nurse'])} />
+            <Route path="/enrollees/:enrolleeId/review" element={guard(<EnrolleeReview />, ['admin', 'physician', 'nurse'])} />
             <Route path="/encounter" element={guard(<Encounter />, ['admin', 'physician', 'nurse'])} />
             <Route path="/medical-log" element={guard(<MedicalLog />, ['admin', 'physician', 'nurse'])} />
             <Route path="/reports" element={guard(<Reports />, ['admin', 'physician', 'nurse'])} />
@@ -305,11 +366,16 @@ function AppShell() {
             <Route path="/patient/profile" element={guard(<PatientProfilePortal />, ['patient'])} />
             <Route path="/patient/settings" element={guard(<PatientSettings />, ['patient'])} />
             <Route path="/patient/help" element={guard(<PatientHelp />, ['patient'])} />
+            <Route path="/enrollee/home" element={guard(<EnrolleeHome />, ['enrollee'])} />
+            <Route path="/enrollee/messages" element={guard(<EnrolleeMessages />, ['enrollee'])} />
+            <Route path="/enrollee/profile" element={guard(<EnrolleeProfile />, ['enrollee'])} />
           </>
         )}
 
         <Route path="*" element={<Navigate to={isPasswordRecoverySession ? '/reset-password' : (canAccessAuthenticatedHome ? surfaceHome : '/login')} replace />} />
       </Routes>
+      </div>
+      {policyBackgroundLocation && <LegalPolicy type={location.pathname === '/privacy' ? 'privacy' : 'terms'} />}
     </div>
   );
 }
@@ -317,7 +383,9 @@ function AppShell() {
 function App() {
   return (
     <Router>
-      <AppShell />
+      <StaffPresenceProvider>
+        <AppShell />
+      </StaffPresenceProvider>
     </Router>
   );
 }

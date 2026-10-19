@@ -45,9 +45,18 @@ assert(
   authContextCode.includes('isRoleCompatibleWithSurface'),
   'AuthContext defines isRoleCompatibleWithSurface helper'
 );
+// The rule itself lives in deploySurface.js now, so that one edit covers every
+// call site. Reading it there is the point — checking AuthContext for the inline
+// ternary would only prove the rule is still duplicated.
+const deploySurfacePath = path.join(projectRoot, 'src/deploySurface.js');
+const deploySurfaceCode = fs.readFileSync(deploySurfacePath, 'utf8');
 assert(
-  authContextCode.includes("IS_ADMIN_SURFACE ? normalized !== 'patient' : normalized === 'patient'"),
+  deploySurfaceCode.includes("IS_ADMIN_SURFACE ? !isUserSurfaceRole(normalized) : isUserSurfaceRole(normalized)"),
   'isRoleCompatibleWithSurface correctly enforces admin vs user portal rules'
+);
+assert(
+  deploySurfaceCode.includes("USER_SURFACE_ROLES = ['patient', 'enrollee']"),
+  'the user surface covers both student audiences in one place'
 );
 assert(
   authContextCode.includes('!isRoleCompatibleWithSurface(parsed.role)'),
@@ -72,8 +81,9 @@ assert(
   'canAccessAuthenticatedHome strictly requires isRoleAllowedOnSurface before allowing /login -> /dashboard redirect'
 );
 assert(
-  appCode.includes('IS_ADMIN_SURFACE && userRole === \'patient\''),
-  'ProtectedRoute detects patient role on admin surface and returns error redirect to /login'
+  appCode.includes('isUserSurfaceRoleOf(userRole)') &&
+  appCode.includes('IS_ADMIN_SURFACE ? !userSurfaceRole : userSurfaceRole'),
+  'ProtectedRoute treats both student audiences as user-surface roles and still splits by surface'
 );
 assert(
   !appCode.includes('return <Navigate to={IS_USER_SURFACE ? \'/patient/dashboard\' : \'/dashboard\'} replace />;') ||
@@ -87,12 +97,12 @@ assert(
 console.log('\n[TEST GROUP 3] Login.jsx Surface Compatibility Logic');
 
 assert(
-  loginCode.includes("if (IS_ADMIN_SURFACE && userRole === 'patient') {"),
-  'Login.jsx checks IS_ADMIN_SURFACE && userRole === patient'
+  loginCode.includes('isUserSurfaceRole(userRole)'),
+  'Login.jsx allows both student audiences on the user surface'
 );
 assert(
-  loginCode.includes("setMsg('Patient accounts are not allowed on this portal.');"),
-  'Login.jsx displays exact error: "Patient accounts are not allowed on this portal."'
+  loginCode.includes("setMsg('Only student accounts can log in on this portal.');"),
+  'Login.jsx displays the current error message'
 );
 assert(
   loginCode.includes("await supabase.auth.signOut();"),
@@ -107,23 +117,28 @@ console.log('\n[TEST GROUP 4] Surface & Role Matrix Simulation');
 function simulateSurfaceAuth(surface, role) {
   const isAdminSurface = surface === 'admin';
   const isUserSurface = surface === 'user';
-  const isCompatible = isAdminSurface ? role !== 'patient' : role === 'patient';
-  
+  // Both student audiences belong on the user surface: an enrolled student, and
+  // an applicant who has signed up but is not yet elevated.
+  const isUserSurfaceRole = role === 'patient' || role === 'enrollee';
+  const isCompatible = isAdminSurface ? !isUserSurfaceRole : isUserSurfaceRole;
+
   let isAuthenticated = false;
   let routedDestination = '/login';
   let message = '';
-  
+
   if (isCompatible) {
     isAuthenticated = true;
-    routedDestination = isAdminSurface ? '/dashboard' : '/patient/dashboard';
+    routedDestination = isAdminSurface
+      ? '/dashboard'
+      : (role === 'enrollee' ? '/enrollee/home' : '/patient/dashboard');
   } else {
     isAuthenticated = false;
     routedDestination = '/login';
-    message = isAdminSurface && role === 'patient'
-      ? 'Patient accounts are not allowed on this portal.'
-      : 'Only patient accounts can log in on this portal.';
+    message = isAdminSurface
+      ? 'Student accounts are not allowed on this portal.'
+      : 'Only student accounts can log in on this portal.';
   }
-  
+
   return { isAuthenticated, routedDestination, message };
 }
 
@@ -132,7 +147,7 @@ const res1 = simulateSurfaceAuth('admin', 'patient');
 assert(
   res1.routedDestination === '/login' &&
   res1.isAuthenticated === false &&
-  res1.message === 'Patient accounts are not allowed on this portal.',
+  res1.message === 'Student accounts are not allowed on this portal.',
   '1. Patient on Admin surface -> rejected, remains on /login, message displayed'
 );
 
@@ -169,8 +184,26 @@ const res6 = simulateSurfaceAuth('user', 'admin');
 assert(
   res6.routedDestination === '/login' &&
   res6.isAuthenticated === false &&
-  res6.message === 'Only patient accounts can log in on this portal.',
+  res6.message === 'Only student accounts can log in on this portal.',
   '6. Admin on User surface -> rejected, remains on /login'
+);
+
+// 7. Enrollee on User surface. A new applicant must be able to sign in — they
+// were refused before, which meant an account could be created and then never
+// entered. They land on their own portal, not the student one.
+const res7 = simulateSurfaceAuth('user', 'enrollee');
+assert(
+  res7.routedDestination === '/enrollee/home' && res7.isAuthenticated === true,
+  '7. Enrollee on User surface -> allowed, navigates to /enrollee/home'
+);
+
+// 8. Enrollee on Admin surface
+const res8 = simulateSurfaceAuth('admin', 'enrollee');
+assert(
+  res8.routedDestination === '/login' &&
+  res8.isAuthenticated === false &&
+  res8.message === 'Student accounts are not allowed on this portal.',
+  '8. Enrollee on Admin surface -> rejected, remains on /login'
 );
 
 // -----------------------------------------------------------------------------

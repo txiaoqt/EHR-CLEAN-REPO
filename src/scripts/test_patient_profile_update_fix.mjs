@@ -79,7 +79,10 @@ assert(portalCode.includes('avatar_url: profile.avatar_url || null'), 'Preserves
 
 // Check loadProfile
 assert(!portalCode.includes('pData?.contact'), 'loadProfile does not reference non-existent pData?.contact');
-assert(portalCode.includes("contact_number: extData?.contact_number || '',"), 'loadProfile reads contact_number from patient_profiles');
+assert(
+  portalCode.includes('contact_number: digitsOnly(extData?.contact_number)'),
+  'loadProfile reads and normalizes contact_number from patient_profiles'
+);
 
 // -----------------------------------------------------------------------------
 // 3. User-Facing Messaging & Diagnostic Error Handling

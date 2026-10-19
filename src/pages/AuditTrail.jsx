@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
-import { SearchIcon, HistoryIcon, ChevronDownIcon, CloseIcon } from '../components/icons/Icons.jsx';
+import { SearchIcon, ChevronDownIcon, CloseIcon } from '../components/icons/Icons.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTableExport } from '../hooks/useTableExport.js';
@@ -200,8 +200,8 @@ const AuditTrail = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '20px 22px' }}>
-          <div className="card-header" style={{ marginBottom: 14 }}>
+        <div className="card table-section-card audit-trail-table-card">
+          <div className="card-header table-section-header">
             <div>
               <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Activity Log</h3>
               <span className="card-subtitle">Append-only record, newest first</span>
@@ -212,7 +212,7 @@ const AuditTrail = () => {
           </div>
 
           {/* Filters */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+          <div className="table-section-toolbar audit-trail-toolbar">
             <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 220 }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', display: 'inline-flex' }}>
                 <SearchIcon size={16} />
@@ -268,7 +268,7 @@ const AuditTrail = () => {
           </div>
 
           {loadError && (
-            <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--color-rose-bg)', color: 'var(--color-rose-text)', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+            <div className="table-section-feedback" style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--color-rose-bg)', color: 'var(--color-rose-text)', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
               {loadError}
             </div>
           )}
@@ -291,13 +291,8 @@ const AuditTrail = () => {
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                        <HistoryIcon size={22} />
-                        <span>{hasFilters ? 'No entries match the current filters.' : 'No activity recorded yet.'}</span>
-                      </div>
-                    </td>
+                  <tr className="table-empty-row">
+                    <td colSpan={4}>{hasFilters ? 'No matching audit entries' : 'No audit entries yet'}</td>
                   </tr>
                 ) : (
                   logs.map((row) => {
@@ -333,6 +328,7 @@ const AuditTrail = () => {
             total={total}
             onPageChange={(next) => setPage(Math.max(0, Math.min(next, totalPages - 1)))}
             itemLabel="audit entries"
+            showWhenEmpty={!loading}
           />
         </div>
       </div>

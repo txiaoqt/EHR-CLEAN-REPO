@@ -6,8 +6,10 @@ import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, canViewSensitiveField, getSensitivityLevel, isPhysician } from '../accessControl.js';
 import { CloseIcon } from '../components/icons/Icons.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
+import RecordSummaryCard from '../components/RecordSummaryCard.jsx';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { patientProfileExportConfig } from '../utils/export/configs.js';
+import { normalizePhMobile } from '../utils/courses.js';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 import { Line } from 'react-chartjs-2';
 import {
@@ -31,15 +33,30 @@ ChartJS.register(
   Legend
 );
 
-// Renders the encounter's vitals object for the expanded visit detail.
-const formatVisitVitals = (vitals) => {
-  if (!vitals || typeof vitals !== 'object') return 'Not recorded';
-  const parts = [];
-  if (vitals.temp) parts.push(`Temp ${vitals.temp}°C`);
-  if (vitals.pulse) parts.push(`Pulse ${vitals.pulse} bpm`);
-  if (vitals.bp) parts.push(`BP ${vitals.bp}`);
-  if (vitals.weight) parts.push(`Weight ${vitals.weight} kg`);
-  return parts.length ? parts.join(' · ') : 'Not recorded';
+const PATIENT_HEALTH_DISCLOSURE_LABELS = {
+  physical: 'Physical health condition',
+  mental: 'Mental or psychological health condition',
+  pwd: 'Person with disability (PWD)',
+};
+
+const StaffProfileDetailField = ({ label, value, emptyLabel = 'Not provided', className = '' }) => {
+  const normalizedValue = typeof value === 'string' ? value.trim() : value;
+  const hasValue = normalizedValue !== null && normalizedValue !== undefined && String(normalizedValue).trim() !== '';
+
+  return (
+    <div className={`patient-profile-detail-field ${className}`.trim()}>
+      <span className="patient-profile-detail-label">{label}</span>
+      <strong className={hasValue ? '' : 'is-empty'}>{hasValue ? normalizedValue : emptyLabel}</strong>
+    </div>
+  );
+};
+
+const formatPatientProfileDate = (value) => {
+  if (!value) return 'Not on file';
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
 const PatientProfile = () => {
@@ -51,6 +68,7 @@ const PatientProfile = () => {
 
   const [patient, setPatient] = useState(null);
   const [patientAvatar, setPatientAvatar] = useState(null);
+  const [patientProfile, setPatientProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [encounters, setEncounters] = useState([]);
   const [vitalsHistory, setVitalsHistory] = useState([]);
@@ -69,15 +87,13 @@ const PatientProfile = () => {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', text }
   const [showMore, setShowMore] = useState(false);
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteMessage, setDeleteMessage] = useState('');
   const [previewSrc, setPreviewSrc] = useState(null);
   const [previewType, setPreviewType] = useState(null);
-  // Which visit's full clinical note is expanded in the Encounters card.
-  const [expandedVisit, setExpandedVisit] = useState(null);
-
   useEffect(() => {
     let mounted = true;
     if (id) {
@@ -87,7 +103,7 @@ const PatientProfile = () => {
           // patient
           const { data: patientData, error: patientError } = await supabase
             .from('patients')
-            .select('id, name, year, created_at, updated_at, last_visit_date, medications, allergies, notes')
+            .select('id, name, year, date_of_birth, created_at, updated_at, last_visit_date, medications, allergies, notes')
             .eq('id', id)
             .single();
 
@@ -103,10 +119,11 @@ const PatientProfile = () => {
           try {
             const { data: ppData } = await supabase
               .from('patient_profiles')
-              .select('avatar_url')
+              .select('avatar_url, course, sex, profile_data, contact_number, address, emergency_contact, emergency_contact_number, blood_type, allergies, medications, medical_history, notes')
               .eq('patient_id', id)
               .maybeSingle();
 
+            if (mounted) setPatientProfile(ppData || null);
             let avatar = ppData?.avatar_url || null;
             if (!avatar) {
               const { data: uData } = await supabase
@@ -305,6 +322,21 @@ const PatientProfile = () => {
   if (loading) return <main className="main"><div className="card">Loading...</div></main>;
   if (!patient) return <main className="main"><div className="card">Patient not found.</div></main>;
 
+  const disclosureCategories = Array.isArray(patientProfile?.profile_data?.health_disclosure?.categories)
+    ? patientProfile.profile_data.health_disclosure.categories.filter((category) => PATIENT_HEALTH_DISCLOSURE_LABELS[category])
+    : [];
+  const healthDisclosureChoices = Array.isArray(patientProfile?.profile_data?.health_disclosure?.categories)
+    ? patientProfile.profile_data.health_disclosure.categories
+    : [];
+  const disclosureStatus = disclosureCategories.length
+    ? 'Student reported · not clinically verified'
+    : healthDisclosureChoices.includes('none')
+      ? 'Student reports no conditions'
+      : healthDisclosureChoices.includes('prefer_not_to_disclose')
+        ? 'Student chose not to disclose'
+        : 'No health information shared';
+  const healthDisclosureNotes = patientProfile?.profile_data?.health_disclosure?.notes?.trim() || '';
+
   return (
     <>
       <main className="main">
@@ -340,7 +372,7 @@ const PatientProfile = () => {
                       Student / Patient
                     </span>
                   </div>
-                  <div className="page-header-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className="page-header-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 4 }}>
                     <span>Clinical Record Profile</span>
                   </div>
                 </div>
@@ -461,41 +493,84 @@ const PatientProfile = () => {
               </div>
             </div>
 
-            {/* Bottom row: Compact metadata chips */}
+            {/* Student identifiers and signup-owned details */}
+            <div className="patient-profile-staff-facts">
+              <div><span>TUPM ID</span><strong>{patient.id || 'Not on file'}</strong></div>
+              <div><span>Birthday</span><strong>{formatPatientProfileDate(patient.date_of_birth)}</strong></div>
+              <div><span>Degree / Course</span><strong>{patientProfile?.course || 'Not on file'}</strong></div>
+              <div><span>Last visit</span><strong>{formatPatientProfileDate(patient.last_visit_date)}</strong></div>
+              <button
+                type="button"
+                className="btn secondary patient-profile-staff-details-toggle"
+                aria-expanded={showProfileDetails}
+                aria-controls="patient-profile-staff-details"
+                onClick={() => setShowProfileDetails((open) => !open)}
+              >
+                {showProfileDetails ? 'Hide details' : 'Show more details'}
+                <span className={`patient-profile-chevron${showProfileDetails ? ' is-open' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+
             <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                gap: 12,
-                paddingTop: 14,
-                borderTop: '1px solid var(--border)',
-              }}
+              className="patient-profile-staff-details"
+              id="patient-profile-staff-details"
+              hidden={!showProfileDetails}
             >
-              <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-                  TUP ID
-                </div>
-                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
-                  {patient.id}
-                </div>
-              </div>
+              <div className="patient-profile-staff-detail-groups">
+                <section className="patient-profile-detail-group">
+                  <h3>Contact info</h3>
+                  <div className="patient-profile-detail-grid">
+                    <StaffProfileDetailField label="Contact phone number" value={normalizePhMobile(patientProfile?.contact_number)} />
+                    <StaffProfileDetailField label="Current address" value={patientProfile?.address} />
+                  </div>
+                </section>
 
-              <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-                  Year Level
-                </div>
-                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
-                  {patient.year ? `Year ${patient.year}` : 'Not Specified'}
-                </div>
-              </div>
+                <section className="patient-profile-detail-group">
+                  <h3>Emergency contact</h3>
+                  <div className="patient-profile-detail-grid">
+                    <StaffProfileDetailField label="Emergency contact person" value={patientProfile?.emergency_contact} />
+                    <StaffProfileDetailField label="Emergency phone number" value={normalizePhMobile(patientProfile?.emergency_contact_number)} />
+                  </div>
+                </section>
 
-              <div style={{ padding: '8px 12px', background: 'var(--surface-raised, rgba(0,0,0,0.02))', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-                  Last Visit
-                </div>
-                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 2 }}>
-                  {patient.last_visit_date ? new Date(patient.last_visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
-                </div>
+                <section className="patient-profile-detail-group">
+                  <h3>Health information</h3>
+                  <div className="patient-profile-detail-grid">
+                    <StaffProfileDetailField label="Blood type" value={patientProfile?.blood_type} />
+                    <StaffProfileDetailField label="Known allergies" value={patientProfile?.allergies || patient.allergies} emptyLabel="None reported" />
+                    <StaffProfileDetailField label="Current active medications" value={patientProfile?.medications || patient.medications} emptyLabel="None reported" />
+                  </div>
+                  <div className="patient-profile-health-disclosure">
+                    <div>
+                      <span className="patient-profile-detail-label">Health conditions or disability</span>
+                      <p className="patient-profile-health-help">Optional information shared by the student to help clinic staff prepare.</p>
+                    </div>
+                    <div className="patient-profile-health-view">
+                      {disclosureCategories.length > 0 && (
+                        <div className="patient-profile-staff-health-tags">
+                          {disclosureCategories.map((category) => (
+                            <span className="patient-profile-staff-health-tag" key={category}>{PATIENT_HEALTH_DISCLOSURE_LABELS[category]}</span>
+                          ))}
+                        </div>
+                      )}
+                      <strong>{disclosureStatus}</strong>
+                      {healthDisclosureNotes && <p>{healthDisclosureNotes}</p>}
+                      <span>Student-reported; not a clinical diagnosis.</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="patient-profile-detail-group">
+                  <h3>Medical history</h3>
+                  <div className="patient-profile-detail-grid">
+                    <StaffProfileDetailField
+                      className="patient-profile-staff-medical-history-field"
+                      label="Medical history and special conditions"
+                      value={patientProfile?.notes || patientProfile?.medical_history || patient.notes}
+                      emptyLabel="No medical history provided"
+                    />
+                  </div>
+                </section>
               </div>
             </div>
           </div>
@@ -516,86 +591,59 @@ const PatientProfile = () => {
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 380, overflowY: 'auto', paddingRight: 2 }}>
+                <div className="patient-encounter-list">
                   {encounters.length > 0 ? (
                     encounters.map((enc) => {
-                      const isOpen = expandedVisit === enc.visit_id;
+                      const hasSavedEncounter = Boolean(enc.encounter_id);
                       const statusLabel = (enc.encounter_status || enc.appointment_status || '').toLowerCase() === 'completed'
                         ? 'Completed'
                         : enc.visit_source === 'appointment' ? 'Scheduled' : 'Recorded';
                       return (
                       <div
                         key={enc.visit_id}
-                        style={{
-                          padding: '12px 14px',
-                          background: 'var(--surface-raised, rgba(0,0,0,0.02))',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                        }}
+                        className="patient-encounter-item"
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)' }}>
-                            {enc.visit_date ? new Date(enc.visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
-                          </span>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px' }}>
-                              {statusLabel}
-                            </span>
-                            {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
-                              <span className="badge badge-warning" style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px' }}>
-                                Sensitivity: {getSensitivityLevel(enc)}
-                              </span>
+                        <div className="patient-encounter-main">
+                          <div className="patient-encounter-meta">
+                            <span>{enc.visit_date ? new Date(enc.visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Date not recorded'}</span>
+                            <div className="patient-encounter-badges">
+                              <span className={`patient-encounter-status ${statusLabel === 'Completed' ? 'is-complete' : ''}`}>{statusLabel}</span>
+                              {isPhysician(user) && getSensitivityLevel(enc) && getSensitivityLevel(enc) !== 'normal' && (
+                                <span className="patient-encounter-sensitivity">{getSensitivityLevel(enc)} sensitivity</span>
+                              )}
+                            </div>
+                          </div>
+                          <strong className="patient-encounter-title">{enc.chief_complaint || 'No complaint recorded'}</strong>
+                          <p className="patient-encounter-description">
+                            {hasSavedEncounter
+                              ? (canViewSensitiveField(user, 'assessment_plan', enc)
+                                ? enc.assessment_plan || 'Clinical encounter details are available.'
+                                : 'Clinical encounter details are available.')
+                              : 'No clinical encounter has been saved for this appointment yet.'}
+                          </p>
+                          <div className="patient-encounter-footer">
+                            <span>{enc.clinician_name || 'Clinician not assigned'}</span>
+                            {hasSavedEncounter ? (
+                              <button
+                                type="button"
+                                className="patient-encounter-open"
+                                onClick={() => navigate(`/encounter?encounterId=${encodeURIComponent(enc.encounter_id)}`, {
+                                  state: { patientId: id, patientName: patient?.name || enc.patient_name || '' },
+                                })}
+                                aria-label={`Open saved encounter for ${patient?.name || 'patient'} on ${enc.visit_date ? new Date(enc.visit_date).toLocaleDateString() : 'unknown date'}`}
+                              >
+                                Open encounter <span aria-hidden="true">→</span>
+                              </button>
+                            ) : (
+                              <span className="patient-encounter-pending">Encounter not recorded</span>
                             )}
                           </div>
                         </div>
-                        <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)', color: 'var(--text)' }}>
-                          {enc.chief_complaint || 'No complaint recorded'}
-                        </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 }}>
-                          {canViewSensitiveField(user, 'assessment_plan', enc)
-                            ? enc.assessment_plan || 'No assessment/plan details'
-                            : '[Restricted for nurse access]'}
-                        </div>
-
-                        {/* The form captures more than the summary above — without
-                            this the note cannot be read where it is reviewed. */}
-                        <button
-                          type="button"
-                          className="btn secondary small"
-                          onClick={() => setExpandedVisit(isOpen ? null : enc.visit_id)}
-                          aria-expanded={isOpen}
-                          style={{ alignSelf: 'flex-start', marginTop: 4, fontSize: 'var(--font-size-xs)', padding: '3px 10px' }}
-                        >
-                          {isOpen ? 'Hide details' : 'Show details'}
-                        </button>
-
-                        {isOpen && (
-                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {[
-                              ['Clinician', enc.clinician_name || '—'],
-                              ['History of present illness', enc.hpi || 'Not recorded'],
-                              ['Physical exam', enc.physical_exam || 'Not recorded'],
-                              ['Vitals', formatVisitVitals(enc.vitals)],
-                            ].map(([label, value]) => (
-                              <div key={label}>
-                                <div style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                  {label}
-                                </div>
-                                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
-                                  {value}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                       );
                     })
                   ) : (
-                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', background: 'var(--surface-raised)', borderRadius: 8, border: '1px dashed var(--border)' }}>
+                    <div className="patient-encounter-empty">
                       No encounters found — click New Encounter to record a visit.
                     </div>
                   )}
@@ -907,6 +955,19 @@ const PatientProfile = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Patient Record Form (F-MDC-8.1c-PRF) Card */}
+              <div className="card" style={{ padding: 20 }}>
+                <div style={{ marginBottom: 14 }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
+                    Patient Record Form
+                  </h3>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
+                    Answers submitted on F-MDC-8.1c-PRF and downloadable form
+                  </div>
+                </div>
+                <RecordSummaryCard subjectType="patient" subjectId={patient.id} person={patient} />
               </div>
             </div>
           </div>

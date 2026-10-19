@@ -3,7 +3,8 @@ import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord } from '../accessControl.js';
-import { SearchIcon, AlertIcon, CloseIcon, ChevronDownIcon, HistoryIcon } from '../components/icons/Icons.jsx';
+import { SearchIcon, AlertIcon, CloseIcon, ChevronDownIcon, HistoryIcon, InventoryIcon, CheckIcon } from '../components/icons/Icons.jsx';
+import KpiCard from '../components/KpiCard.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
@@ -529,28 +530,20 @@ const Inventory = () => {
 
         {/* 2. Summary Metrics (4 Mini Cards) */}
         <div className="inventory-kpi-grid">
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Total Cataloged Items</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Low Stock Alerts</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: reorderItems.length > 0 ? 'var(--danger)' : 'var(--color-emerald-text)' }}>
-              {reorderItems.length}
-            </div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>In Stock</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-emerald-text)' }}>
-              {items.length - reorderItems.length}
-            </div>
-          </div>
-          <div className="kpi-card" style={{ minHeight: 90, padding: '14px 18px' }}>
-            <div className="kpi-title" style={{ fontSize: 'var(--font-size-xs)' }}>Recent Log Entries</div>
-            <div className="kpi-value" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-extrabold)', fontVariantNumeric: 'tabular-nums', color: 'var(--color-purple-text)' }}>
-              {transactions.length}
-            </div>
-          </div>
+          {[
+            { title: 'Total Cataloged Items', value: items.length, description: 'Items in the inventory', Icon: InventoryIcon },
+            { title: 'Low Stock Alerts', value: reorderItems.length, description: 'At or below reorder level', Icon: AlertIcon },
+            { title: 'In Stock', value: items.length - reorderItems.length, description: 'Above reorder level', Icon: CheckIcon },
+            { title: 'Recent Log Entries', value: transactions.length, description: 'Recorded inventory activity', Icon: HistoryIcon },
+          ].map((kpi) => (
+            <KpiCard
+              key={kpi.title}
+              title={kpi.title}
+              value={kpi.value}
+              description={kpi.description}
+              Icon={kpi.Icon}
+            />
+          ))}
         </div>
 
         {/* Reorder Alerts */}
@@ -576,8 +569,8 @@ const Inventory = () => {
         )}
 
         {/* 3. Stock Levels & Inventory Directory Workspace */}
-        <div className="card" style={{ padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+        <div className="card table-section-card inventory-table-card">
+          <div className="table-section-header">
             <div>
               <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.01em' }}>
                 Stock Levels & Inventory Directory
@@ -589,7 +582,7 @@ const Inventory = () => {
           </div>
 
           {/* Stock Toolbar: Fluid Search + All Categories Dropdown */}
-          <div className="inventory-toolbar">
+          <div className="inventory-toolbar table-section-toolbar">
             {/* 1. Full-Width Search Input (Single visible input shell) */}
             <div className="inventory-search-wrapper">
               <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
@@ -653,10 +646,8 @@ const Inventory = () => {
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No inventory items found matching filters.
-                    </td>
+                  <tr className="table-empty-row">
+                    <td colSpan={7}>{items.length === 0 ? 'No inventory items yet' : 'No matching inventory items'}</td>
                   </tr>
                 ) : (
                   itemPagination.pageRows.map(item => {
@@ -708,6 +699,7 @@ const Inventory = () => {
             total={itemPagination.total}
             onPageChange={itemPagination.goToPage}
             itemLabel="items"
+            showWhenEmpty={!loading}
           />
         </div>
 
@@ -775,7 +767,7 @@ const Inventory = () => {
 
               {/* Modal Body: Scrollable Table */}
               <div style={{ overflowY: 'auto', padding: '16px 24px', flex: 1 }}>
-                <div className="table-responsive">
+                <div className="table-responsive table-edge-bleed table-edge-bleed--fixed-24">
                   <table className="table" aria-label="Inventory transactions history table">
                     <thead>
                       <tr>
@@ -789,10 +781,8 @@ const Inventory = () => {
                     </thead>
                     <tbody>
                       {transactions.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
-                            No transaction records logged.
-                          </td>
+                        <tr className="table-empty-row">
+                          <td colSpan={6}>No transactions yet</td>
                         </tr>
                       ) : (
                         transactionPagination.pageRows.map(t => (
@@ -822,6 +812,7 @@ const Inventory = () => {
                   total={transactionPagination.total}
                   onPageChange={transactionPagination.goToPage}
                   itemLabel="transactions"
+                  showWhenEmpty
                 />
               </div>
 

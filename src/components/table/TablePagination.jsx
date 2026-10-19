@@ -15,8 +15,10 @@ const TablePagination = ({
   onPageChange,
   itemLabel = 'records',
   selectedCount = 0,
+  showWhenEmpty = false,
+  disabled = false,
 }) => {
-  if (!total) return null;
+  if (!total && !showWhenEmpty) return null;
 
   const canPrev = page > 0;
   const canNext = page < totalPages - 1;
@@ -25,9 +27,15 @@ const TablePagination = ({
   return (
     <div className="table-pagination">
       <p className="table-pagination-info">
-        Showing <span className="table-pagination-count">{startIndex}</span>–
-        <span className="table-pagination-count">{endIndex}</span> of{' '}
-        <span className="table-pagination-count">{total}</span> {itemLabel}
+        {total === 0 ? (
+          <>Showing 0 of 0 {itemLabel}</>
+        ) : (
+          <>
+            Showing <span className="table-pagination-count">{startIndex}</span>–
+            <span className="table-pagination-count">{endIndex}</span> of{' '}
+            <span className="table-pagination-count">{total}</span> {itemLabel}
+          </>
+        )}
         {selectedCount > 0 && (
           <span className="table-pagination-selected">({selectedCount} selected)</span>
         )}
@@ -39,7 +47,7 @@ const TablePagination = ({
             type="button"
             className="table-pagination-btn"
             onClick={() => onPageChange(page - 1)}
-            disabled={!canPrev}
+            disabled={disabled || !canPrev}
             aria-label="Go to previous page"
           >
             <ChevronLeftIcon size={16} />
@@ -56,6 +64,7 @@ const TablePagination = ({
                   onClick={() => onPageChange(item)}
                   aria-label={`Go to page ${item + 1}`}
                   aria-current={item === page ? 'page' : undefined}
+                  disabled={disabled}
                 >
                   {item + 1}
                 </button>
@@ -71,7 +80,7 @@ const TablePagination = ({
             type="button"
             className="table-pagination-btn"
             onClick={() => onPageChange(page + 1)}
-            disabled={!canNext}
+            disabled={disabled || !canNext}
             aria-label="Go to next page"
           >
             Next

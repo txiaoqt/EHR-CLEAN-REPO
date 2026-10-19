@@ -47,6 +47,15 @@ const fail = (code: string, message: string, status: number) => json({ code, err
 
 type Config = { token: string; repository: string; workflow: string; ref: string; dispatchEnabled: boolean };
 
+/**
+ * Reads and validates the GitHub settings.
+ *
+ * Every failure names the offending variable and the shape it should have, and
+ * never the value — a bare "not configured" for four different variables sends
+ * the reader checking all of them, and two of the commonest mistakes are shapes
+ * that look plausible at a glance: a repository given as a URL, and a workflow
+ * given as a path.
+ */
 function readConfig(): Config {
   const token = Deno.env.get("GITHUB_BACKUP_TOKEN")?.trim();
   const repository = Deno.env.get("GITHUB_BACKUP_REPOSITORY")?.trim();
@@ -54,14 +63,27 @@ function readConfig(): Config {
   const ref = Deno.env.get("GITHUB_BACKUP_REF")?.trim();
   const dispatchEnabled = Deno.env.get("GITHUB_BACKUP_DISPATCH_ENABLED") === "true";
 
-  const okRepo = Boolean(repository) && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository!);
-  const okWorkflow = Boolean(workflow) && /^[A-Za-z0-9_-]+\.ya?ml$/.test(workflow!);
-  const okRef = Boolean(ref) && ref!.length <= 200 &&
-    !/[\s~^:?*[\\]/.test(ref!) && !ref!.includes("..") && !ref!.startsWith("-") && !ref!.endsWith("/");
+  if (!token) throw new Error("missing:GITHUB_BACKUP_TOKEN");
+  if (!repository) throw new Error("missing:GITHUB_BACKUP_REPOSITORY");
+  if (!workflow) throw new Error("missing:GITHUB_BACKUP_WORKFLOW");
+  if (!ref) throw new Error("missing:GITHUB_BACKUP_REF");
 
-  if (!token || !okRepo || !okWorkflow || !okRef) {
-    throw new Error("not_configured");
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository!)) {
+    throw new Error("shape:GITHUB_BACKUP_REPOSITORY must be owner/repo, e.g. txiaoqt/EHR-CLEAN-REPO — not a URL");
   }
+  if (!/^[A-Za-z0-9_-]+\.ya?ml$/.test(workflow!)) {
+    throw new Error("shape:GITHUB_BACKUP_WORKFLOW must be the filename only, e.g. backup.yml — not .github/workflows/backup.yml");
+  }
+  if (
+    ref!.length > 200 ||
+    /[\s~^:?*[\\]/.test(ref!) ||
+    ref!.includes("..") ||
+    ref!.startsWith("-") ||
+    ref!.endsWith("/")
+  ) {
+    throw new Error("shape:GITHUB_BACKUP_REF must be a branch name, e.g. main");
+  }
+
   return { token: token!, repository: repository!, workflow: workflow!, ref: ref!, dispatchEnabled };
 }
 
@@ -109,14 +131,39 @@ Deno.serve(async (req: Request) => {
 
     // Staff only. The sidebar hides the page, but a hidden link is not access
     // control — this is.
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("auth_user_id", user.id)
+    //
+    // The staff table is `admins`, not `users`: AuthContext checks `admins`
+    // first for admin/physician/nurse and only falls back to `users` for patient
+    // accounts. Querying `users` finds nothing for a physician and refuses a
+    // legitimate user — which is exactly what happened here.
+    //
+    // Matched on auth_user_id OR email, again as AuthContext does. Many rows have
+    // auth_user_id NULL until that person first signs in, so matching on
+    // auth_user_id alone would refuse a legitimate admin.
+    const { data: profile, error: profileError } = await supabase
+      .from("admins")
+      .select("role, auth_user_id, email")
+      .or(`auth_user_id.eq.${user.id},email.ilike.${user.email}`)
+      .limit(1)
       .maybeSingle();
-    const role = String(profile?.role ?? "").toLowerCase();
+
+    if (profileError) {
+      // A real query failure is not the same as "no profile", and saying so
+      // saves the reader hunting for a permissions problem that does not exist.
+      return fail("lookup_failed", `Could not read the staff record (${profileError.code ?? "error"}).`, 500);
+    }
+
+    if (!profile) {
+      return fail(
+        "no_profile",
+        "No staff record matches this account. An administrator may need to set the email on your staff record to match your sign-in address.",
+        403
+      );
+    }
+
+    const role = String(profile.role ?? "").toLowerCase();
     if (!["admin", "physician"].includes(role)) {
-      return fail("forbidden", "You do not have permission to view backups.", 403);
+      return fail("forbidden", `Backups are limited to administrators and physicians. Your role is "${role || "unset"}".`, 403);
     }
 
     let body: Record<string, unknown> = {};
@@ -133,8 +180,15 @@ Deno.serve(async (req: Request) => {
     let config: Config;
     try {
       config = readConfig();
-    } catch {
-      return fail("not_configured", "Backup service is not configured.", 503);
+    } catch (configError) {
+      const detail = configError instanceof Error ? configError.message : "";
+      if (detail.startsWith("missing:")) {
+        return fail("not_configured", `The function is missing the ${detail.slice(8)} secret.`, 503);
+      }
+      if (detail.startsWith("shape:")) {
+        return fail("not_configured", detail.slice(6), 503);
+      }
+      return fail("not_configured", "Backup is not configured yet.", 503);
     }
 
     const base = `https://api.github.com/repos/${config.repository}`;
@@ -170,17 +224,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const workflow = await github(workflowRoute);
-    if (typeof workflow.id !== "number" || workflow.state !== "active") {
-      throw new Error("workflow_unavailable");
-    }
-    const workflowId = workflow.id as number;
-
+    /**
+     * Queries each active status directly, because with a long history a single
+     * page of recent runs could miss an older queued one.
+     *
+     * The five calls run CONCURRENTLY. Sequentially they were the bulk of the
+     * page's load time — five round-trips to GitHub before the history could be
+     * shown, on top of the cold start. Together they cost one round-trip.
+     */
     async function anyActiveRun(): Promise<boolean> {
-      // Query each active status directly: with a long history, a single page of
-      // recent runs could miss an older queued one.
-      for (const status of ACTIVE_STATUSES) {
-        const result = await github(`${workflowRoute}/runs?status=${status}&per_page=1`);
+      const results = await Promise.all(
+        ACTIVE_STATUSES.map((status) => github(`${workflowRoute}/runs?status=${status}&per_page=1`))
+      );
+      for (const result of results) {
         if (!Array.isArray(result.workflow_runs)) throw new Error("github_unavailable");
         if (result.workflow_runs.length > 0) return true;
       }
@@ -188,15 +244,28 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "list_runs") {
-      const result = await github(
-        `${workflowRoute}/runs?event=workflow_dispatch&branch=${encodeURIComponent(config.ref)}&per_page=25`
-      );
-      if (!Array.isArray(result.workflow_runs)) throw new Error("github_unavailable");
-      const runs = result.workflow_runs
+      // The workflow lookup, the history and the active-run checks are
+      // independent of one another, so they all go out together. Only the
+      // normalisation below needs the workflow id, which is why it is awaited
+      // first rather than sequenced.
+      const [workflow, runsResponse, active] = await Promise.all([
+        github(workflowRoute),
+        github(`${workflowRoute}/runs?event=workflow_dispatch&branch=${encodeURIComponent(config.ref)}&per_page=25`),
+        anyActiveRun(),
+      ]);
+
+      if (typeof workflow.id !== "number" || workflow.state !== "active") {
+        throw new Error("workflow_unavailable");
+      }
+      const workflowId = workflow.id as number;
+
+      if (!Array.isArray(runsResponse.workflow_runs)) throw new Error("github_unavailable");
+      const runs = runsResponse.workflow_runs
         .map((run: Record<string, unknown>) => normalizeRun(run, config, workflowId))
         .filter(Boolean);
-      const active = runs.some((r: { status: string }) => ACTIVE_STATUSES.includes(r.status)) || (await anyActiveRun());
-      return json({ runs, activeBackup: active, dispatchEnabled: config.dispatchEnabled });
+
+      const activeBackup = active || runs.some((r: { status: string }) => ACTIVE_STATUSES.includes(r.status));
+      return json({ runs, activeBackup, dispatchEnabled: config.dispatchEnabled });
     }
 
     // dispatch

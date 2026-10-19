@@ -9,7 +9,11 @@
 // html2canvas screenshot of the DOM, and carry the official university
 // letterhead as the header of every page.
 
-import jsPDF from 'jspdf';
+// Named import, not default. jsPDF's browser build has a default export but its
+// Node build (dist/jspdf.node.min.js, which a Node build resolves to) exposes
+// jsPDF as a named export — so the default becomes the module namespace and
+// `new jsPDF()` throws. The named form works in both.
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import tupSealUrl from '../../assets/images/tup-seal.jpg';
 import clinicLogoUrl from '../../assets/images/clinic-ehr-logo.png';
@@ -100,32 +104,56 @@ const EMBED_MAX_PX = 256;
 const imageCache = new Map();
 const loadImageAsDataUrl = (src) => {
   if (imageCache.has(src)) return imageCache.get(src);
-  const promise = new Promise((resolve) => {
-    try {
-      const img = new Image();
-      let done = false;
-      const finish = (value) => { if (!done) { done = true; resolve(value); } };
-      img.onload = () => {
-        try {
-          const scale = Math.min(1, EMBED_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
-          const width = Math.max(1, Math.round(img.naturalWidth * scale));
-          const height = Math.max(1, Math.round(img.naturalHeight * scale));
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          finish({ dataUrl: canvas.toDataURL('image/png'), width, height });
-        } catch {
-          finish(null);
-        }
-      };
-      img.onerror = () => finish(null);
-      img.src = src;
-      setTimeout(() => finish(null), 5000);
-    } catch {
-      resolve(null);
+  const promise = (async () => {
+    // Node path, for tests and for generating a sample outside the browser.
+    // There is no canvas here, so the downscale step is skipped — jsPDF scales
+    // on draw regardless. If the asset cannot be resolved the seal is simply
+    // absent, which is the same outcome the browser path produces on error.
+    if (typeof document === 'undefined') {
+      try {
+        const { readFile } = await import('node:fs/promises');
+        const file = src.startsWith('file:') ? src : src;
+        const bytes = await readFile(file);
+        const ext = String(src).toLowerCase().endsWith('.jpg') || String(src).toLowerCase().endsWith('.jpeg')
+          ? 'jpeg'
+          : 'png';
+        return {
+          dataUrl: `data:image/${ext};base64,${bytes.toString('base64')}`,
+          width: EMBED_MAX_PX,
+          height: EMBED_MAX_PX,
+        };
+      } catch {
+        return null;
+      }
     }
-  });
+
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        let done = false;
+        const finish = (value) => { if (!done) { done = true; resolve(value); } };
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, EMBED_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+            const width = Math.max(1, Math.round(img.naturalWidth * scale));
+            const height = Math.max(1, Math.round(img.naturalHeight * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            finish({ dataUrl: canvas.toDataURL('image/png'), width, height });
+          } catch {
+            finish(null);
+          }
+        };
+        img.onerror = () => finish(null);
+        img.src = src;
+        setTimeout(() => finish(null), 5000);
+      } catch {
+        resolve(null);
+      }
+    });
+  })();
   imageCache.set(src, promise);
   return promise;
 };
@@ -165,11 +193,12 @@ const drawLetterhead = (doc, pageWidth, margin) => {
   return Math.max(LETTERHEAD_TOP + SEAL_SIZE, y) + 16;
 };
 
-const buildDetailLines = ({ rows, metadataLines, filterSummaryLines }) => {
-  const lines = [
-    `Generated: ${formatGeneratedAt()}`,
-    `Total Records: ${rows.length}`,
-  ];
+const buildDetailLines = ({ rows, metadataLines, filterSummaryLines, config }) => {
+  const lines = [`Generated: ${formatGeneratedAt()}`];
+  // "Total Records" belongs on a list. This config renders a single form, where
+  // the row count is the number of fields — a number that means nothing and
+  // reads as though the clinic has 26 patients.
+  if (!config?.hideRecordCount) lines.push(`Total Records: ${rows.length}`);
   if (metadataLines?.length) lines.push(...metadataLines);
   // Each active filter gets its own line — no "Filters —" prefix, which just
   // added a word without saying anything the line did not already say.
@@ -320,6 +349,12 @@ export const buildPdfDocument = async ({
   pageConfig,
 }) => {
   const paperSize = pageConfig?.paperSize ?? config.paperSize ?? 'a4';
+  // The official Medicine Log has its own controlled paper-form layout. All
+  // other reports continue through the shared renderer below.
+  if (config.pdfTemplate === 'medicine-log') {
+    const { buildMedicineLogPdf } = await import('./medicineLogPdf.js');
+    return buildMedicineLogPdf({ config, rows, format: getJsPdfFormat(paperSize), safeText: pdfSafeText });
+  }
   // Some reports are only ever printed one way — the Medical Log's medicine
   // columns collapse to a few points in portrait, so its config locks landscape.
   const orientation = config.lockOrientation
@@ -341,7 +376,7 @@ export const buildPdfDocument = async ({
   const margin = 34;
 
   const letterheadBottom = drawLetterhead(doc, pageWidth, margin);
-  const tableStartY = drawTitleBlock(doc, pageWidth, margin, config, { rows, metadataLines, filterSummaryLines }, letterheadBottom);
+  const tableStartY = drawTitleBlock(doc, pageWidth, margin, config, { rows, metadataLines, filterSummaryLines, config }, letterheadBottom);
 
   const pdfColumns = config.columns.filter((column) => !column.excludeFromPdf);
 

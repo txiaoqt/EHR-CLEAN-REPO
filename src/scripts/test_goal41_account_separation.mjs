@@ -160,7 +160,15 @@ const loginCode = fs.readFileSync(loginPath, 'utf8');
 assert(loginCode.includes("patient_id: 'TUPM-XX-XXXX'"), 'USER_TEST_ACCOUNT in Login.jsx uses generic sample Student ID TUPM-XX-XXXX');
 assert(loginCode.includes('placeholder="e.g. TUPM-XX-XXXX"'), 'Login.jsx signup form uses placeholder e.g. TUPM-XX-XXXX');
 assert(loginCode.includes('isValidStudentId'), 'Login.jsx validates studentId with isValidStudentId');
-assert(loginCode.includes('targetTable = userRole === \'patient\' ? \'users\' : \'admins\''), 'Login.jsx routes failed login clearance to users for patients and admins for staff');
+// The rule moved into deploySurface.js so it is stated once. Assert the call
+// site AND the rule itself, so this still fails if either half is removed.
+const deploySurfacePath = path.join(projectRoot, 'src/deploySurface.js');
+const deploySurfaceCode = fs.readFileSync(deploySurfacePath, 'utf8');
+assert(loginCode.includes('accountTableForRole(userRole)'), 'Login.jsx routes failed login clearance through the shared role helper');
+assert(
+  deploySurfaceCode.includes("normalizeRole(role) === 'patient' || normalizeRole(role) === 'enrollee' ? 'users' : 'admins'"),
+  'accountTableForRole sends students and enrollees to users, staff to admins'
+);
 
 // MyProfile.jsx
 const myProfilePath = path.join(projectRoot, 'src/pages/MyProfile.jsx');

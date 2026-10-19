@@ -1,0 +1,68 @@
+.medical-log-table-card {
+  --medlog-field-border: color-mix(in srgb, var(--text) 50%, var(--panel));
+  --medlog-active-surface: color-mix(in srgb, var(--color-primary) 7%, var(--panel));
+}
+.medlog-legend { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 24px; padding: 0 18px 14px; color: var(--muted); font-size: var(--font-size-xs); line-height: 1.5; }
+.medlog-legend strong { color: var(--text); font-weight: 600; }
+.medlog-save-summary { font-size: inherit; }
+.medical-log-table-card .medlog-scroll-region { max-height: 68vh; max-height: 68dvh; overflow: auto; position: relative; isolation: isolate; overscroll-behavior: contain; }
+.medlog-scroll-region:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.medical-log-table-card table.table.medlog-grid { width: var(--medlog-grid-width); min-width: var(--medlog-grid-width); table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.medical-log-table-card table.medlog-grid :is(th, td) { box-sizing: border-box; padding-inline: 8px; }
+.medical-log-table-card .medlog-grid thead th { position: sticky; top: 0; z-index: 4; color: var(--text); background: var(--surface-raised); font-size: 12px; white-space: nowrap; }
+.medical-log-table-card .medlog-grid tbody td { height: 58px; padding-block: 10px 8px; vertical-align: top; background: var(--panel); overflow-wrap: anywhere; }
+.medical-log-table-card .medlog-grid :is(.medlog-frozen-date, .medlog-frozen-id, .medlog-frozen-name) { position: sticky; z-index: 2; }
+.medlog-grid .medlog-frozen-date { left: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.medlog-grid .medlog-frozen-id { left: var(--medlog-date-width); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.medlog-grid .medlog-frozen-name { left: var(--medlog-id-offset); font-weight: 600; border-right: 1px solid var(--border); }
+.medical-log-table-card .medlog-grid thead :is(.medlog-frozen-date, .medlog-frozen-id, .medlog-frozen-name) { z-index: 6; }
+.medical-log-table-card .medlog-grid tbody tr:hover > td { background: var(--surface-raised); }
+.medical-log-table-card .medlog-grid tbody tr[data-active="true"] > td { background: var(--medlog-active-surface); }
+.medical-log-table-card .medlog-grid th.medlog-medicine-header { padding: 8px 6px; vertical-align: bottom; text-align: center; text-transform: none; letter-spacing: normal; }
+.medical-log-table-card .medlog-grid th.medlog-medicine-header[data-active="true"] { background: var(--medlog-active-surface); color: var(--color-primary-text); border-bottom-color: var(--color-primary); }
+.medlog-medicine-heading { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.medlog-medicine-name { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.medlog-stock-count { writing-mode: horizontal-tb; color: var(--muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.medical-log-table-card .medlog-grid td.medlog-quantity-cell { padding: 4px 6px; vertical-align: top; }
+.medlog-quantity-editor { position: relative; width: 100%; }
+.medical-log-table-card .medlog-cell-input {
+  display: block;
+  width: 36px;
+  max-width: 100%;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  margin-inline: auto;
+  padding: 3px 1px;
+  border: 1px solid var(--medlog-field-border);
+  border-radius: 4px;
+  background: var(--input-bg, var(--panel));
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  caret-color: var(--color-primary);
+}
+.medical-log-table-card .medlog-cell-input:hover { border-color: var(--text); background: var(--input-bg, var(--panel)); }
+.medical-log-table-card table.medlog-grid input.medlog-cell-input:focus { border-color: var(--color-primary); outline: 2px solid var(--color-primary); outline-offset: 1px; box-shadow: none; background: var(--input-bg, var(--panel)); }
+.medical-log-table-card .medlog-cell-input:disabled { opacity: 1; background: var(--surface-raised); cursor: progress; }
+.medical-log-table-card .medlog-cell-input[aria-invalid="true"] { border-color: var(--color-rose-text); }
+.medlog-status-row { position: relative; height: 14px; margin-top: 2px; margin-inline: -6px; width: calc(100% + 12px); }
+.medlog-cell-status { min-height: 14px; text-align: center; color: var(--muted); font-size: 11px; line-height: 14px; white-space: nowrap; }
+.medlog-quantity-editor[data-state="saved"] .medlog-cell-status { color: var(--color-emerald-text); }
+.medlog-quantity-editor[data-state="error"] .medlog-cell-status { color: var(--color-rose-text); font-weight: 600; }
+.medlog-retry { position: absolute; top: -1px; inset-inline-start: 0; display: flex; align-items: center; justify-content: center; height: 20px; min-height: 20px; width: 100%; padding: 0 1px; border: 0; background: transparent; color: var(--color-rose-text); font-family: inherit; font-size: 11px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.medlog-retry:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.medlog-cell-error { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 224px; padding: 10px 12px; border: 1px solid var(--color-rose-text); border-radius: var(--radius-control); color: var(--text); background: var(--panel); font-size: 12px; line-height: 1.5; z-index: 8; pointer-events: none; }
+.medlog-quantity-editor[data-state="error"]:is(:hover, :focus-within) .medlog-cell-error { display: block; }
+@media (pointer: coarse) {
+  .medical-log-table-card .medlog-grid tbody td { height: 72px; padding-block: 16px 10px; }
+  .medical-log-table-card .medlog-grid td.medlog-quantity-cell { padding: 4px 2px; }
+  .medical-log-table-card .medlog-cell-input { width: 44px; height: 44px; min-height: 44px; font-size: 16px; }
+  .medlog-status-row { width: calc(100% + 4px); margin-inline: -2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .medical-log-table-card .medlog-cell-input { transition: none; }
+}

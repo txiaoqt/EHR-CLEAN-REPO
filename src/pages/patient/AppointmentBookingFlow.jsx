@@ -1,5 +1,5 @@
 // src/pages/patient/AppointmentBookingFlow.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
@@ -8,6 +8,10 @@ import { emailEnabled } from '../../utils.js';
 const SLOT_TIMES = ['09:00-12:00', '13:00-16:00', '16:00-19:00'];
 const SLOT_CAPACITY = 1;
 const DAILY_PATIENT_LIMIT = SLOT_TIMES.length * SLOT_CAPACITY;
+const APPOINTMENT_PHOTO_BUCKET = 'appointment-photos';
+const MAX_APPOINTMENT_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_APPOINTMENT_DESCRIPTION_LENGTH = 1000;
+const APPOINTMENT_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -107,6 +111,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [appointmentDescription, setAppointmentDescription] = useState('');
+  const [appointmentPhoto, setAppointmentPhoto] = useState(null);
+  const [appointmentPhotoPreview, setAppointmentPhotoPreview] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const appointmentPhotoInputRef = useRef(null);
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [viewMonth, setViewMonth] = useState(startOfMonth(new Date()));
   const [form, setForm] = useState(() => {
@@ -122,6 +131,42 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       patient_name: user?.name || '',
     };
   });
+
+  useEffect(() => {
+    if (!appointmentPhoto) {
+      setAppointmentPhotoPreview('');
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(appointmentPhoto);
+    setAppointmentPhotoPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [appointmentPhoto]);
+
+  const handleAppointmentPhotoChange = (event) => {
+    const file = event.target.files?.[0];
+    setPhotoError('');
+    if (!file) return;
+
+    if (!APPOINTMENT_PHOTO_TYPES.has(file.type)) {
+      setPhotoError('Choose a JPG, PNG, or WebP image.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_APPOINTMENT_PHOTO_BYTES) {
+      setPhotoError('The image must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    setAppointmentPhoto(file);
+  };
+
+  const removeAppointmentPhoto = () => {
+    setAppointmentPhoto(null);
+    setPhotoError('');
+    if (appointmentPhotoInputRef.current) appointmentPhotoInputRef.current.value = '';
+  };
 
   const loadActiveAppointment = async (patientId) => {
     if (!patientId) {
@@ -526,6 +571,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
     setSaving(true);
     setNotice('');
+    let stagedPhotoPath = null;
 
     try {
       // Level 2: Authoritative pre-insert database verification (guards against multi-tab stale state)
@@ -607,7 +653,33 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         referenceCode = createReferenceCode(form.appointment_date);
       }
 
+      const appointmentId = crypto.randomUUID();
+      if (appointmentPhoto && source === 'portal' && !kioskMode) {
+        const authUserId = user?.auth_user_id || (await supabase.auth.getUser()).data?.user?.id;
+        if (!authUserId) throw new Error('Your session expired. Sign in again before uploading a photo.');
+
+        const extension = appointmentPhoto.type === 'image/png'
+          ? 'png'
+          : appointmentPhoto.type === 'image/webp'
+            ? 'webp'
+            : 'jpg';
+        stagedPhotoPath = `${authUserId}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase
+          .storage
+          .from(APPOINTMENT_PHOTO_BUCKET)
+          .upload(stagedPhotoPath, appointmentPhoto, {
+            cacheControl: '3600',
+            contentType: appointmentPhoto.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error('The photo could not be uploaded. Your appointment was not submitted; please try again.');
+        }
+      }
+
       const payload = {
+        id: appointmentId,
         patient_id: form.patient_id.trim(),
         patient_name: form.patient_name.trim(),
         clinician_name: form.clinician_name || 'To be assigned',
@@ -620,10 +692,17 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         service_type: form.service_type,
         reference_code: referenceCode,
         status,
+        photo_path: stagedPhotoPath,
+        problem_description: appointmentDescription.trim() || null,
       };
 
       const { error } = await supabase.from('appointments').insert([payload]);
       if (error) {
+        if (stagedPhotoPath) {
+          const { error: cleanupError } = await supabase.storage.from(APPOINTMENT_PHOTO_BUCKET).remove([stagedPhotoPath]);
+          if (cleanupError) console.warn('Could not remove the unlinked appointment photo:', cleanupError);
+          stagedPhotoPath = null;
+        }
         const errMsg = String(error.message || '').toLowerCase();
 
         // Catch database date/mode and slot-expiration rule validation
@@ -673,6 +752,14 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         throw error;
       }
 
+      // The private photo is now linked to its appointment row and may be read
+      // by the patient and authorized clinic staff.
+      stagedPhotoPath = null;
+      setAppointmentPhoto(null);
+      setPhotoError('');
+      setAppointmentDescription('');
+      if (appointmentPhotoInputRef.current) appointmentPhotoInputRef.current.value = '';
+
       setForm((p) => ({ ...p, appointment_time: '' }));
       await loadAppointments();
       // The queue number is assigned by the database trigger — read it back
@@ -721,6 +808,10 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       }
     } catch (e) {
       console.error(e);
+      if (stagedPhotoPath) {
+        const { error: cleanupError } = await supabase.storage.from(APPOINTMENT_PHOTO_BUCKET).remove([stagedPhotoPath]);
+        if (cleanupError) console.warn('Could not remove the unlinked appointment photo:', cleanupError);
+      }
       setNotice(`Booking failed: ${e.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
@@ -1145,11 +1236,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     Additional Information
                   </h3>
                   <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 3 }}>
-                    Appointment details and institutional record confirmation
+                    Choose your service and share details for your visit.
                   </div>
                 </div>
 
-                {/* Form Fields: Service Type & Student Identity Records */}
+                {/* Service Type and Visit Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Service Type */}
                   <div>
@@ -1181,79 +1272,88 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                     </div>
                   </div>
 
-                  {/* Institutional Student Record Verification Block */}
-                  <div
-                    className="booking-student-card"
-                    style={{
-                      background: 'var(--surface-raised, #f8fafc)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 12,
-                      padding: '16px 18px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 14,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
-                        Institutional Record
+                </div>
+
+                {source === 'portal' && !kioskMode && (
+                  <section className="appointment-description-field" aria-labelledby="appointment-description-title">
+                    <div className="appointment-description-heading">
+                      <div className="appointment-photo-heading">
+                        <label id="appointment-description-title" htmlFor="appointment-description-input">
+                          What would you like the clinic to know?
+                        </label>
+                        <span className="appointment-photo-optional">Optional</span>
                       </div>
-                      <span className="immutable-record-badge" style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', background: 'var(--panel, #ffffff)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                        Immutable • Student Record
+                      <span className="appointment-description-count" aria-live="polite">
+                        {appointmentDescription.length}/{MAX_APPOINTMENT_DESCRIPTION_LENGTH}
                       </span>
                     </div>
+                    <p id="appointment-description-help" className="appointment-description-help">
+                      Briefly describe what you’re feeling or what you’d like help with. Clinic staff can read this before your visit.
+                    </p>
+                    <textarea
+                      id="appointment-description-input"
+                      className="appointment-description-input"
+                      value={appointmentDescription}
+                      onChange={(event) => setAppointmentDescription(event.target.value)}
+                      maxLength={MAX_APPOINTMENT_DESCRIPTION_LENGTH}
+                      rows={4}
+                      placeholder="For example: I’ve had a headache since yesterday..."
+                      aria-describedby="appointment-description-help"
+                      disabled={saving || Boolean(activeAppointment)}
+                    />
+                  </section>
+                )}
 
-                    {/* Student ID Number */}
-                    <div>
-                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                        Student ID Number
-                      </label>
-                      <input
-                        className="patient-input-accessible"
-                        style={{
-                          width: '100%',
-                          fontSize: 'var(--font-size-base)',
-                          fontWeight: 'var(--font-weight-semibold)',
-                          background: 'var(--panel, #ffffff)',
-                          cursor: 'not-allowed',
-                          color: 'var(--text)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                        }}
-                        placeholder="Student ID"
-                        value={form.patient_id}
-                        readOnly
-                        disabled={true}
-                      />
+                {source === 'portal' && !kioskMode && (
+                  <section className="appointment-photo-upload" aria-labelledby="appointment-photo-title">
+                    <div className="appointment-photo-copy">
+                      <div className="appointment-photo-heading">
+                        <label id="appointment-photo-title" htmlFor="appointment-photo-input">
+                          Photo for the clinic
+                        </label>
+                        <span className="appointment-photo-optional">Optional</span>
+                      </div>
+                      <p id="appointment-photo-help">
+                        Share a photo that may help the clinic prepare for your visit. JPG, PNG, or WebP up to 5 MB.
+                      </p>
                     </div>
 
-                    {/* Patient Full Name */}
-                    <div>
-                      <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                        Patient Full Name
-                      </label>
-                      <input
-                        className="patient-input-accessible"
-                        style={{
-                          width: '100%',
-                          fontSize: 'var(--font-size-base)',
-                          fontWeight: 'var(--font-weight-semibold)',
-                          background: 'var(--panel, #ffffff)',
-                          cursor: 'not-allowed',
-                          color: 'var(--text)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                        }}
-                        placeholder="Full Name"
-                        value={form.patient_name}
-                        readOnly
-                        disabled={true}
-                      />
-                    </div>
-                  </div>
-                </div>
+                    <input
+                      ref={appointmentPhotoInputRef}
+                      id="appointment-photo-input"
+                      className="appointment-photo-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      aria-describedby={`appointment-photo-help${photoError ? ' appointment-photo-error' : ''}`}
+                      disabled={saving || Boolean(activeAppointment)}
+                      onChange={handleAppointmentPhotoChange}
+                    />
+
+                    {photoError && (
+                      <p id="appointment-photo-error" className="appointment-photo-error" role="alert">
+                        {photoError}
+                      </p>
+                    )}
+
+                    {appointmentPhoto && appointmentPhotoPreview && (
+                      <div className="appointment-photo-preview">
+                        <img src={appointmentPhotoPreview} alt="Selected photo for your appointment" />
+                        <div className="appointment-photo-file-details">
+                          <strong title={appointmentPhoto.name}>{appointmentPhoto.name}</strong>
+                          <span>{(appointmentPhoto.size / (1024 * 1024)).toFixed(1)} MB</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn secondary small"
+                          onClick={removeAppointmentPhoto}
+                          disabled={saving}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
 
                 {/* Booking Summary: Removed per user request to streamline confirmation */}
 

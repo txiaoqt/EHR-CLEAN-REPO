@@ -23,8 +23,7 @@
   width: var(--sidebar-width);
   height: 100vh;
   z-index: 100;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--panel);
   border-right: 1px solid var(--border-subtle);
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
@@ -40,9 +39,22 @@
 
 #sidebar-container .sidebar {
   width: 100%;
-  min-height: 100%;
-  height: auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   box-sizing: border-box;
+}
+
+#sidebar-container .sidebar > .sidebar-header,
+#sidebar-container .sidebar > .sidebar-user-widget,
+#sidebar-container .sidebar > .sidebar-footer {
+  flex: 0 0 auto;
+}
+
+#sidebar-container .sidebar > .menu {
+  min-height: 0;
+  overscroll-behavior-y: contain;
 }
 
 /* Scrollable Main Content Container */
@@ -1466,15 +1478,6 @@ main.login-page-main,
     margin-bottom: 16px;
   }
 
-  .dashboard-kpis-grid .kpi-card {
-    padding: 12px 14px !important;
-    min-height: 86px !important;
-  }
-
-  .dashboard-kpis-grid .kpi-value {
-    font-size: var(--font-size-xl) !important;
-  }
-
   .dashboard-analytics-grid {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -1566,6 +1569,7 @@ main.login-page-main,
   grid-template-columns: 1.4fr 1fr;
   grid-template-areas:
     "header header"
+    "notice notice"
     "kpis kpis"
     "next quick"
     "consultations inquiries";
@@ -1576,6 +1580,7 @@ main.login-page-main,
 }
 
 .patient-page-header { grid-area: header; width: 100%; box-sizing: border-box; }
+.patient-dashboard-record-notice { grid-area: notice; width: 100%; box-sizing: border-box; }
 .patient-dashboard-page .patient-kpi-grid { grid-area: kpis; width: 100%; box-sizing: border-box; }
 .patient-next-appt-card { grid-area: next; width: 100%; box-sizing: border-box; }
 .patient-quick-actions-card { grid-area: quick; width: 100%; box-sizing: border-box; }
@@ -1652,6 +1657,12 @@ main.login-page-main,
     box-sizing: border-box !important;
   }
 
+  .patient-dashboard-record-notice {
+    order: 2 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
   /* Suppress redundant top header button & Quick Actions on tablet/mobile */
   .patient-desktop-header-action {
     display: none !important;
@@ -1664,7 +1675,7 @@ main.login-page-main,
   /* 1. Summary 2x2 Grid placed BEFORE Next Appointment on Mobile & Tablet */
   .patient-dashboard-page .patient-kpi-grid,
   .patient-kpi-grid {
-    order: 2 !important;
+    order: 3 !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     width: 100% !important;
@@ -1685,20 +1696,20 @@ main.login-page-main,
 
   /* 2. Contextual Hero Appointment Card placed AFTER Summary Grid */
   .patient-next-appt-card {
-    order: 3 !important;
+    order: 4 !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
   /* 3. Recent Activity Sections */
   .patient-consultations-card {
-    order: 4 !important;
+    order: 5 !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
   .patient-inquiries-card {
-    order: 5 !important;
+    order: 6 !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
@@ -2064,6 +2075,10 @@ main.login-page-main,
   .patient-messages-table-view,
   .patient-slots-table-view {
     display: none !important;
+  }
+
+  .patient-records-table-view.patient-records-table-view--empty {
+    display: block !important;
   }
 
   .patient-records-cards-view,

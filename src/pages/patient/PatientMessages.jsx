@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import { useStaffPresence } from '../../StaffPresenceContext.jsx';
+import StaffAvailability from '../../components/StaffAvailability.jsx';
 import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIcon, AlertIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 import MessageAttachment from '../../components/MessageAttachment.jsx';
@@ -63,6 +65,10 @@ const getDateDividerLabel = (isoString) => {
 
 const PatientMessages = () => {
   const { user } = useAuth();
+  const {
+    staffList, onlineStaff, checking: checkingStaff, availabilityUnavailable,
+    statusForAuthId, findConversationStaff, conversationStatus, refreshStaff,
+  } = useStaffPresence();
 
   // Tab state: 'active' (Open) vs 'history' (Past Inquiries / Resolved)
   const [activeTab, setActiveTab] = useState('active');
@@ -72,7 +78,6 @@ const PatientMessages = () => {
   const [messages, setMessages] = useState([]);
   // messageId -> [{ id, emoji, reactor_auth_user_id, reactor_name }]
   const [reactions, setReactions] = useState({});
-  const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -88,10 +93,11 @@ const PatientMessages = () => {
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     recipient_staff_id: '',
-    recipient_name: 'Clinic Personnel (General)',
     concern_type: CONCERN_TYPES[0],
     message_text: '',
   });
+  const [inquiryRecipientError, setInquiryRecipientError] = useState('');
+  const [inquirySendError, setInquirySendError] = useState('');
 
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -154,39 +160,23 @@ const PatientMessages = () => {
     };
   }, [mobileViewingChat]);
 
-  // 1. Load registered staff from safe staff_directory view
+  // Refresh account details when opening the form; availability stays live.
   useEffect(() => {
-    let mounted = true;
-    const loadStaff = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('staff_directory')
-          .select('id, auth_user_id, name, role, avatar, department')
-          .in('role', ['physician', 'nurse', 'admin'])
-          .order('name');
+    if (inquiryModalOpen) void refreshStaff();
+  }, [inquiryModalOpen, refreshStaff]);
 
-        if (!error && mounted && data) {
-          setStaffList(data);
-        }
-      } catch (err) {
-        console.warn('Load staff error:', err);
-      }
-    };
-    loadStaff();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  useEffect(() => {
+    if (!inquiryModalOpen || !inquiryForm.recipient_staff_id || sending) return;
+    const selected = staffList.find((staff) => staff.id === inquiryForm.recipient_staff_id);
+    if (selected && statusForAuthId(selected.auth_user_id) === 'online') return;
+    setInquiryForm((previous) => ({ ...previous, recipient_staff_id: '' }));
+    setInquiryRecipientError(selected && statusForAuthId(selected.auth_user_id) === 'offline'
+      ? `${selected.name} went offline. Choose another online staff member. Your message is saved here.`
+      : 'Staff availability changed. Choose an online staff member. Your message is saved here.');
+  }, [inquiryModalOpen, inquiryForm.recipient_staff_id, sending, staffList, statusForAuthId]);
 
   const getStaffAvatar = (conv) => {
-    if (!conv) return avatarPlaceholder;
-    const staff = staffList.find(
-      (s) =>
-        (conv.recipient_staff_id && s.id === conv.recipient_staff_id) ||
-        (conv.recipient_auth_user_id && s.auth_user_id === conv.recipient_auth_user_id) ||
-        (conv.recipient_name && s.name && conv.recipient_name.toLowerCase().includes(s.name.toLowerCase()))
-    );
-    return staff?.avatar || avatarPlaceholder;
+    return findConversationStaff(conv)?.avatar || avatarPlaceholder;
   };
 
   // 2. Load conversations for this student
@@ -273,6 +263,8 @@ const PatientMessages = () => {
   }, [conversations, activeConversationId]);
 
   const isCurrentConversationResolved = (activeConversation?.status || 'open').toLowerCase() !== 'open';
+  const activeStaffStatus = conversationStatus(activeConversation);
+  const selectedOnlineStaff = onlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
 
   // 3. Load messages for the currently active conversation only
   useEffect(() => {
@@ -633,84 +625,27 @@ const PatientMessages = () => {
   const handleSendNewInquiry = async (e) => {
     e.preventDefault();
     if (!inquiryForm.message_text.trim() || !user?.patient_id || sending) return;
+    const staffTarget = onlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
+    if (!staffTarget || statusForAuthId(staffTarget.auth_user_id) !== 'online') {
+      setInquiryRecipientError('Choose an online staff member before sending your inquiry.');
+      return;
+    }
 
+    setInquiryRecipientError('');
+    setInquirySendError('');
     setSending(true);
     try {
-      const staffTarget = staffList.find((s) => s.id === inquiryForm.recipient_staff_id);
-      const recipientName = staffTarget?.name || 'Clinic Personnel (General)';
-      const recipientStaffId = staffTarget?.id || null;
-
-      // 1. Try atomic create_patient_inquiry RPC
+      // The server resolves the selected staff ID to its Auth account and
+      // creates the conversation and first message in the same transaction.
       const { data: rpcData, error: rpcError } = await supabase.rpc('create_patient_inquiry', {
-        p_recipient_staff_id: recipientStaffId,
+        p_recipient_staff_id: staffTarget.id,
         p_concern_type: inquiryForm.concern_type,
         p_message_text: inquiryForm.message_text.trim(),
-        p_recipient_name: recipientName,
+        p_recipient_name: staffTarget.name,
       });
-
-      let newConvId = null;
-
-      if (!rpcError && rpcData?.conversation_id) {
-        newConvId = rpcData.conversation_id;
-      } else {
-        // Fallback: Try insert into patient_message_conversations
-        const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || null;
-
-        const { data: convData, error: convError } = await supabase
-          .from('patient_message_conversations')
-          .insert([
-            {
-              patient_id: user.patient_id,
-              patient_name: user?.name || 'Student',
-              recipient_staff_id: recipientStaffId,
-              recipient_auth_user_id: staffTarget?.auth_user_id || null,
-              recipient_name: recipientName,
-              recipient_role: staffTarget?.role || 'clinic',
-              concern_type: inquiryForm.concern_type,
-              status: 'open',
-            },
-          ])
-          .select();
-
-        if (!convError && convData?.[0]?.id) {
-          newConvId = convData[0].id;
-          await supabase.from('patient_messages').insert([
-            {
-              conversation_id: newConvId,
-              patient_id: user.patient_id,
-              auth_user_id: authUid,
-              patient_name: user?.name || 'Student',
-              sender_role: 'patient',
-              sender_name: user?.name || 'Student',
-              recipient_name: recipientName,
-              concern_type: inquiryForm.concern_type,
-              message_text: inquiryForm.message_text.trim(),
-              status: 'sent',
-            },
-          ]);
-        } else {
-          // Direct insert into patient_messages
-          const { data: msgData, error: msgError } = await supabase
-            .from('patient_messages')
-            .insert([
-              {
-                patient_id: user.patient_id,
-                auth_user_id: authUid,
-                patient_name: user?.name || 'Student',
-                sender_role: 'patient',
-                sender_name: user?.name || 'Student',
-                recipient_name: recipientName,
-                concern_type: inquiryForm.concern_type,
-                message_text: inquiryForm.message_text.trim(),
-                status: 'sent',
-              },
-            ])
-            .select();
-
-          if (msgError) throw msgError;
-          newConvId = `${user.patient_id}_${recipientName}_${inquiryForm.concern_type}`;
-        }
-      }
+      if (rpcError) throw rpcError;
+      if (!rpcData?.conversation_id) throw new Error('The inquiry could not be created.');
+      const newConvId = rpcData.conversation_id;
 
       await loadConversations();
       setActiveTab('active'); // Switch to active tab
@@ -724,7 +659,6 @@ const PatientMessages = () => {
       setInquiryModalOpen(false);
       setInquiryForm({
         recipient_staff_id: '',
-        recipient_name: 'Clinic Personnel (General)',
         concern_type: CONCERN_TYPES[0],
         message_text: '',
       });
@@ -739,12 +673,11 @@ const PatientMessages = () => {
         setTimeout(resetMobileScroll, 300);
       }
 
-      setNotice('Your new inquiry has been initiated with clinic personnel.');
+      setNotice(`Your inquiry has been sent to ${rpcData.recipient_name || staffTarget.name}.`);
       setNoticeOpen(true);
     } catch (err) {
       console.error('Send inquiry error:', err);
-      setNotice('Unable to start inquiry right now. Please try again later.');
-      setNoticeOpen(true);
+      setInquirySendError('Unable to send your inquiry. Your message is still here; please try again.');
     } finally {
       setSending(false);
     }
@@ -960,10 +893,11 @@ const PatientMessages = () => {
                           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-medium)', marginTop: 1 }}>
                             {c.concern_type}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px 8px', justifyContent: 'space-between', marginTop: 3, fontSize: 'var(--font-size-2xs)' }}>
                             <span className={`badge ${!isResolved ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: 'var(--font-size-2xs)', padding: '1px 6px', textTransform: 'capitalize' }}>
                               {c.status || 'open'}
                             </span>
+                            <StaffAvailability status={conversationStatus(c)} />
                           </div>
                         </div>
                       </button>
@@ -1006,7 +940,7 @@ const PatientMessages = () => {
                       {activeConversation?.recipient_name || 'Clinic Personnel (General)'}
                     </div>
                     <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
-                      <span className="tup-status-dot" style={{ flexShrink: 0 }} />
+                      <StaffAvailability status={activeStaffStatus} live />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         Clinic Staff · {activeConversation?.concern_type || 'General inquiry'}
                       </span>
@@ -1244,7 +1178,7 @@ const PatientMessages = () => {
                     Start New Inquiry
                   </h3>
                   <div className="patient-inquiry-modal-sub">
-                    Creates an independent consultation thread with clinic personnel
+                    Send a new inquiry directly to an online clinic staff member.
                   </div>
                 </div>
                 <button
@@ -1261,20 +1195,34 @@ const PatientMessages = () => {
               <form onSubmit={handleSendNewInquiry}>
                 <div className="patient-inquiry-modal-body">
                   <div className="patient-form-field">
-                    <label className="patient-form-label">
+                    <label className="patient-form-label" htmlFor="inquiry-recipient">
                       Recipient Clinician / Staff *
                     </label>
                     <div className="patient-select-wrapper">
                       <select
+                        id="inquiry-recipient"
                         className="input"
                         style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
                         value={inquiryForm.recipient_staff_id}
-                        onChange={(e) => setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }))}
+                        onChange={(e) => {
+                          setInquiryForm((p) => ({ ...p, recipient_staff_id: e.target.value }));
+                          setInquiryRecipientError('');
+                          setInquirySendError('');
+                        }}
+                        required
+                        disabled={sending || onlineStaff.length === 0}
+                        aria-invalid={Boolean(inquiryRecipientError)}
+                        aria-describedby="inquiry-recipient-help inquiry-recipient-error"
                       >
-                        <option value="">Clinic Personnel (General)</option>
-                        {staffList.map((s) => (
+                        <option value="" disabled>
+                          {onlineStaff.length > 0 ? 'Select an online staff member'
+                            : checkingStaff ? 'Checking staff availability…'
+                            : availabilityUnavailable ? 'Staff availability unavailable'
+                            : 'No staff currently online'}
+                        </option>
+                        {onlineStaff.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)})
+                            {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)}) — Online
                           </option>
                         ))}
                       </select>
@@ -1282,19 +1230,35 @@ const PatientMessages = () => {
                         <ChevronDownIcon size={14} />
                       </span>
                     </div>
+                    <p id="inquiry-recipient-help" className="staff-presence-note" aria-live="polite">
+                      {onlineStaff.length > 0 ? 'Only online staff are listed. Your inquiry goes directly to the person you select.'
+                        : checkingStaff ? 'Checking who is available…'
+                        : availabilityUnavailable ? 'Unable to check availability. Check your connection and try again.'
+                        : 'No clinic staff are online right now. You can write your message here and send it when someone is available.'}
+                    </p>
+                    {availabilityUnavailable && (
+                      <button type="button" className="btn secondary" onClick={() => refreshStaff({ retryPresence: true })} disabled={sending}>
+                        Refresh availability
+                      </button>
+                    )}
+                    <p id="inquiry-recipient-error" className="staff-presence-note" data-error="true" role="alert">
+                      {inquiryRecipientError}
+                    </p>
                   </div>
 
                   <div className="patient-form-field">
-                    <label className="patient-form-label">
+                    <label className="patient-form-label" htmlFor="inquiry-concern">
                       Concern Category *
                     </label>
                     <div className="patient-select-wrapper">
                       <select
+                        id="inquiry-concern"
                         className="input"
                         style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
                         value={inquiryForm.concern_type}
                         onChange={(e) => setInquiryForm((p) => ({ ...p, concern_type: e.target.value }))}
                         required
+                        disabled={sending}
                       >
                         {CONCERN_TYPES.map((c) => (
                           <option key={c} value={c}>{c}</option>
@@ -1307,18 +1271,21 @@ const PatientMessages = () => {
                   </div>
 
                   <div className="patient-form-field">
-                    <label className="patient-form-label">
+                    <label className="patient-form-label" htmlFor="inquiry-message">
                       Initial Message *
                     </label>
                     <textarea
+                      id="inquiry-message"
                       className="input"
                       style={{ width: '100%', minHeight: 120, lineHeight: 1.4, fontSize: 'var(--font-size-md)' }}
                       placeholder="Describe your inquiry, follow-up, or question in detail..."
                       value={inquiryForm.message_text}
                       onChange={(e) => setInquiryForm((p) => ({ ...p, message_text: e.target.value }))}
                       required
+                      disabled={sending}
                     />
                   </div>
+                  {inquirySendError && <p className="staff-presence-note" data-error="true" role="alert">{inquirySendError}</p>}
                 </div>
 
                 {/* Modal Footer */}
@@ -1334,7 +1301,7 @@ const PatientMessages = () => {
                   <button
                     type="submit"
                     className="btn primary"
-                    disabled={sending || !inquiryForm.message_text.trim()}
+                    disabled={sending || !selectedOnlineStaff || !inquiryForm.message_text.trim()}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   >
                     <SendIcon size={15} />

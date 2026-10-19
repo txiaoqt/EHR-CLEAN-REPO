@@ -199,7 +199,9 @@ const ExportDialog = ({ open, config, rowCount = 0, itemLabel = 'rows', busy = f
         </div>
 
         <p style={{ margin: '14px 0 0', fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)' }}>
-          This export is recorded in the audit trail with your name, the format and the row count.
+          {format === 'pdf' && config.pdfReadOnly
+            ? 'The PDF includes the visits matching your selected filters.'
+            : 'This export is recorded in the audit trail with your name, the format and the row count.'}
         </p>
       </div>
     </div>

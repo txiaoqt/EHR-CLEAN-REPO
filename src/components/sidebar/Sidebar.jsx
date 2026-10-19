@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { translate } from '../../utils';
 import { useAuth } from '../../AuthContext.jsx';
+import { useStaffPresence } from '../../StaffPresenceContext.jsx';
+import StaffAvailability from '../StaffAvailability.jsx';
 import { supabase } from '../../supabaseClient.js';
 import { isPhysician } from '../../accessControl.js';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
@@ -13,6 +15,7 @@ import {
   DashboardIcon,
   CalendarIcon,
   UsersIcon,
+  UserIcon,
   InventoryIcon,
   ReportsIcon,
   MessagesIcon,
@@ -23,6 +26,7 @@ import {
   HistoryIcon,
   MedicalLogIcon,
   BackupIcon,
+  ArchiveIcon,
   LogoutIcon
 } from '../icons/Icons.jsx';
 
@@ -35,12 +39,14 @@ export const NAV_GROUPS = [
       { page: 'dashboard', label: 'dashboard', icon: DashboardIcon },
       { page: 'appointments', label: 'appointments', icon: CalendarIcon },
       { page: 'patients', label: 'patients', icon: UsersIcon },
+      { page: 'enrollees', label: 'Enrollees', icon: UserIcon, roles: ['admin', 'physician', 'nurse'] },
+      { page: 'archive-files', label: 'Archive Files', icon: ArchiveIcon, roles: ['admin', 'physician', 'nurse'] },
     ]
   },
   {
     label: 'CLINICAL',
     items: [
-      { page: 'medical-log', label: 'Medical Log', icon: MedicalLogIcon },
+      { page: 'medical-log', label: 'Medicine Log', icon: MedicalLogIcon },
       { page: 'inventory', label: 'inventory', icon: InventoryIcon },
       { page: 'reports', label: 'reports', icon: ReportsIcon },
     ]
@@ -72,6 +78,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
+  const { selfStatus } = useStaffPresence();
   const [languageChange, setLanguageChange] = useState(0);
 
   // Confirmation popup state
@@ -210,8 +217,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
             </div>
             <div className="sidebar-user-role">
               <span>{formattedRole}</span>
-              <span className="status-dot"></span>
-              <span style={{ color: 'var(--success, #10b981)', fontWeight: 'var(--font-weight-semibold)' }}>Online</span>
+              <StaffAvailability status={selfStatus} live />
             </div>
           </div>
         </div>
@@ -227,7 +233,9 @@ const Sidebar = ({ collapsed = false, toggle }) => {
                 // of the sidebar, which otherwise grows past the viewport.
                 !item.paletteOnly
               ).map(({ page, label, icon: IconComponent }) => {
-                const isActive = location.pathname === `/${page}` || (page === 'dashboard' && location.pathname === '/');
+                const isActive = location.pathname === `/${page}`
+                  || location.pathname.startsWith(`/${page}/`)
+                  || (page === 'dashboard' && location.pathname === '/');
                 const navTitle = translate(label) || label;
                 return (
                   <div

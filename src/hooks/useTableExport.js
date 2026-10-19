@@ -34,7 +34,7 @@ export const useTableExport = ({ config, getRows, getFilterLines, itemLabel = 'r
 
         // Recorded even if the download is cancelled afterwards — the data left
         // the database, which is the auditable event.
-        await logAudit(
+        if (!(format === 'pdf' && config.pdfReadOnly)) await logAudit(
           'EXPORT',
           `Exported ${config.title} — ${rows.length} ${itemLabel} as ${format.toUpperCase()}`,
           undefined,

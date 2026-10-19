@@ -11,6 +11,7 @@ import {
   AlertIcon,
   CloseIcon
 } from '../components/icons/Icons.jsx';
+import KpiCard from '../components/KpiCard.jsx';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -98,20 +99,6 @@ const Dashboard = () => {
   const [showWeatherModal, setShowWeatherModal] = useState(false);
 
   const [showExportSuccessModal, setShowExportSuccessModal] = useState(false);
-
-  const [showNewApptModal, setShowNewApptModal] = useState(false);
-  const [patientSearch, setPatientSearch] = useState('');
-  const [patientSuggestions, setPatientSuggestions] = useState([]);
-  const [selectedName, setSelectedName] = useState('');
-  const [newAppt, setNewAppt] = useState({
-    patient_id: '',
-    appointment_date: new Date().toISOString().split('T')[0],
-    appointment_time: '09:00',
-    reason: 'General Checkup',
-    clinician_name: '',
-    status: 'Scheduled'
-  });
-  const [savingAppt, setSavingAppt] = useState(false);
 
   const updateDateTime = useCallback(() => {
     const now = new Date();
@@ -252,15 +239,6 @@ const Dashboard = () => {
     };
     run();
   }, []);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!patientSearch) { setPatientSuggestions([]); return; }
-      const { data } = await supabase.from('students').select('id,name').or(`name.ilike.%${patientSearch}%,id.ilike.%${patientSearch}%`).limit(10);
-      setPatientSuggestions(data || []);
-    };
-    run();
-  }, [patientSearch]);
 
   const weatherCodeToEmoji = (code) => {
     if (code === 0) return '☀️';
@@ -418,90 +396,6 @@ const Dashboard = () => {
     }
   };
 
-  const resolveClinicianName = async () => {
-    try {
-      if (user) return user.name || user.full_name || user.email || '';
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user) {
-        const su = userData.user;
-        let name = (su.user_metadata?.name || su.user_metadata?.full_name) || su.email || '';
-        try {
-          const { data: profile } = await supabase.from('profiles').select('full_name, name').eq('id', su.id).single();
-          if (profile) name = profile.full_name || profile.name || name;
-        } catch (e) {}
-        return name;
-      }
-      return '';
-    } catch (err) { return ''; }
-  };
-
-  const openNewModal = async () => {
-    const clinicianName = await resolveClinicianName();
-    setNewAppt(p => ({ ...p, clinician_name: clinicianName || '' }));
-    setShowNewApptModal(true);
-  };
-
-  const closeNewModal = () => {
-    setShowNewApptModal(false);
-    setNewAppt({ patient_id:'', appointment_date:'', appointment_time:'', type:'Consult', clinician_name: '', status:'Scheduled' });
-  };
-
-  const submitNewAppointment = async () => {
-    if (!newAppt.patient_id || !newAppt.appointment_date || !newAppt.appointment_time) return;
-    setSavingAppt(true);
-
-    const todayManila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
-    if (newAppt.appointment_date < todayManila) {
-      alert('Cannot schedule an appointment for a past date.');
-      setSavingAppt(false);
-      return;
-    }
-    const apptType = newAppt.appointment_type || (newAppt.appointment_date === todayManila ? 'Same-day Appointment' : 'Future Appointment');
-    const payload = {
-      ...newAppt,
-      appointment_type: apptType,
-    };
-
-    const { error } = await supabase.from('appointments').insert([payload]);
-    if (error) {
-      const errMsg = String(error.message || '').toLowerCase();
-      if (errMsg.includes('this time slot has already ended') || errMsg.includes('slot has already ended')) {
-        alert('Failed to save appointment: This time slot has already ended. Please select an upcoming or future time slot.');
-        setSavingAppt(false);
-        return;
-      }
-      if (errMsg.includes('same-day appointments are only available') || errMsg.includes('future appointments must be scheduled')) {
-        alert(errMsg.includes('future')
-          ? 'Future appointments must be scheduled for tomorrow or a later date.'
-          : 'Same-day appointments are only available for today.');
-        setSavingAppt(false);
-        return;
-      }
-      if (error.code === '23505' && (errMsg.includes('slot') || errMsg.includes('idx_appointments_one_active_per_slot') || errMsg.includes('check_slot_capacity'))) {
-        alert('Failed to save appointment: This time slot is no longer available. Please select another available slot.');
-        setSavingAppt(false);
-        return;
-      }
-      if (error.code === '23505' || errMsg.includes('active appointment') || errMsg.includes('duplicate')) {
-        alert('Failed to save appointment: This student already has an active appointment.');
-        setSavingAppt(false);
-        return;
-      }
-      alert('Error saving appointment: ' + (error.message || error));
-      setSavingAppt(false);
-      return;
-    }
-    window.dispatchEvent(new Event('appointmentAdded'));
-    setSavingAppt(false);
-    closeNewModal();
-  };
-
-  const pickPatientSuggestion = (s) => {
-    setPatientSearch(`${s.name} (${s.id})`);
-    setNewAppt(prev => ({ ...prev, patient_id: s.id }));
-    setPatientSuggestions([]);
-  };
-
   const openAlertsModal = (e) => { e?.stopPropagation?.(); setShowAlertsModal(true); };
   const closeAlertsModal = () => setShowAlertsModal(false);
 
@@ -559,8 +453,8 @@ const Dashboard = () => {
                 favour of the top bar's page palette: two search fields on one
                 screen, doing different things, is a coin flip for whoever is
                 using it. */}
-            <button className="btn" onClick={openNewModal} style={{ height: 42, padding: '0 20px', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', whiteSpace: 'nowrap' }}>
-              New Appointment
+            <button className="btn" onClick={() => navigate('/appointments', { state: { openWalkInModal: true } })} style={{ height: 42, padding: '0 20px', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)', whiteSpace: 'nowrap' }}>
+              New Walk-in
             </button>
           </div>
         </div>
@@ -572,17 +466,14 @@ const Dashboard = () => {
             { title: 'Future Appointments', val: futureScheduledAppointments, sub: futureScheduledAppointments === 0 ? 'No future appointments' : `${futureScheduledAppointments} scheduled`, Icon: ClockIcon },
             { title: 'Visits This Week', val: totalVisitsWeek, sub: totalVisitsWeek === 0 ? 'No visits this week' : `${totalVisitsWeek} total visits`, Icon: ReportsIcon },
             { title: 'Total Patients', val: totalPatients, sub: 'Registered patients', Icon: UsersIcon }
-          ].map((kpi, i) => (
-            <div className="kpi-card" key={i} style={{ padding: '16px 18px', minHeight: 98, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div className="kpi-title" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)' }}>{kpi.title}</div>
-                <span style={{ color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' }}>
-                  <kpi.Icon size={18} />
-                </span>
-              </div>
-              <div className="kpi-value" style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-extrabold)', lineHeight: 1.15, margin: '4px 0 2px', color: 'var(--text)' }}>{kpi.val}</div>
-              <div className="kpi-subtitle" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>{kpi.sub}</div>
-            </div>
+          ].map((kpi) => (
+            <KpiCard
+              key={kpi.title}
+              title={kpi.title}
+              value={kpi.val}
+              description={kpi.sub}
+              Icon={kpi.Icon}
+            />
           ))}
         </section>
 
@@ -800,53 +691,6 @@ const Dashboard = () => {
           <div>© {new Date().getFullYear()} TUP Clinic. All rights reserved.</div>
           <div>Staff Portal v1.0.0</div>
         </footer>
-
-        {/* New Appointment Modal */}
-        {showNewApptModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:1300, background:'var(--overlay-bg, rgba(0,0,0,0.65))', backdropFilter: 'blur(2px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <div style={{ width: 560, maxWidth:'94%', background:'var(--panel)', color:'var(--text)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>New Appointment</h3>
-                <button type="button" className="modal-close-btn" onClick={closeNewModal} aria-label="Close modal">
-                  <CloseIcon size={18} />
-                </button>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Search Patient (ID or Name)</label>
-                <input className="input" placeholder="Type name or student ID..." value={patientSearch} onChange={(e)=>setPatientSearch(e.target.value)} style={{ width: '100%' }} />
-                {patientSuggestions.length > 0 && (
-                  <div style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 150, overflowY: 'auto', marginTop: 4 }}>
-                    {patientSuggestions.map(p => (
-                      <div key={p.id} onClick={() => pickPatientSuggestion(p)} style={{ padding: '8px 12px', fontSize: 'var(--font-size-xs)', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
-                        <strong>{p.name}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.id})</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Date</label>
-                  <input id="appointment_date" type="date" className="input" value={newAppt.appointment_date} onChange={(e) => setNewAppt(prev => ({ ...prev, appointment_date: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 4 }}>Time</label>
-                  <input id="appointment_time" type="time" className="input" value={newAppt.appointment_time} onChange={(e) => setNewAppt(prev => ({ ...prev, appointment_time: e.target.value }))} style={{ width: '100%' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button className="btn secondary" onClick={closeNewModal}>Cancel</button>
-                <button className="btn" onClick={submitNewAppointment} disabled={savingAppt || !newAppt.patient_id || !newAppt.appointment_date || !newAppt.appointment_time}>
-                  {savingAppt ? 'Saving...' : 'Save Appointment'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
 
         {/* Export Success Modal */}
         {showExportSuccessModal && (

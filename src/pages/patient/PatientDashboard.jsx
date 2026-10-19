@@ -3,13 +3,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import { RecordIncompleteBanner } from '../../components/RecordGate.jsx';
+import { CalendarIcon, ClockIcon, CheckIcon, MessagesIcon } from '../../components/icons/Icons.jsx';
+import KpiCard from '../../components/KpiCard.jsx';
+import { isVisitCompleted } from '../../utils/visitStatus.js';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [encounters, setEncounters] = useState([]);
+  const [completedVisitsCount, setCompletedVisitsCount] = useState(0);
   const [recentMessages, setRecentMessages] = useState([]);
+  const [inquiryCounts, setInquiryCounts] = useState({ total: 0, active: 0, past: 0 });
   const [loading, setLoading] = useState(true);
 
   const studentName = user?.name || 'Angel Keith Carbon';
@@ -23,7 +29,12 @@ const PatientDashboard = () => {
       }
       setLoading(true);
       try {
-        const [{ data: appts }, { data: encs }, { data: msgs }] = await Promise.all([
+        const [
+          { data: appts },
+          { data: visits, error: visitsError },
+          { data: msgs },
+          { data: inquiryConversations, error: inquiryError },
+        ] = await Promise.all([
           supabase
             .from('appointments')
             .select('*')
@@ -31,23 +42,60 @@ const PatientDashboard = () => {
             .order('appointment_date', { ascending: true })
             .order('appointment_time', { ascending: true }),
           supabase
-            .from('encounters')
-            .select('id, encounter_date, clinician_name, chief_complaint, assessment_plan, status')
+            .from('medical_log_visits')
+            .select('visit_id, visit_source, appointment_id, encounter_id, appointment_status, encounter_status, visit_date, clinician_name, chief_complaint, assessment_plan')
             .eq('patient_id', user.patient_id)
-            .eq('status', 'completed')
-            .order('encounter_date', { ascending: false })
-            .limit(3),
+            .order('visit_date', { ascending: false }),
           supabase
             .from('patient_messages')
             .select('id, created_at, recipient_name, concern_type, message_text, status')
             .eq('patient_id', user.patient_id)
             .order('created_at', { ascending: false })
             .limit(3),
+          supabase
+            .from('patient_message_conversations')
+            .select('id, status')
+            .eq('patient_id', user.patient_id),
         ]);
 
+        if (visitsError) throw visitsError;
         if (!mounted) return;
+
+        // The KPI counts inquiry threads, matching the Active and Past Inquiries
+        // folders in Messages. Recent message rows are still used for the preview.
+        let conversations = inquiryConversations || [];
+        if (inquiryError?.code === 'PGRST205') {
+          const { data: rawMessages } = await supabase
+            .from('patient_messages')
+            .select('id, conversation_id, patient_id, recipient_name, concern_type, created_at')
+            .eq('patient_id', user.patient_id)
+            .order('created_at', { ascending: false });
+
+          const threadMap = new Map();
+          (rawMessages || []).forEach((message) => {
+            const key = message.conversation_id || `${message.patient_id}_${message.recipient_name || 'Clinic'}_${message.concern_type}`;
+            if (!threadMap.has(key)) threadMap.set(key, { id: key, status: 'open' });
+          });
+          conversations = Array.from(threadMap.values());
+        }
+
+        const activeInquiryCount = conversations.filter(
+          (conversation) => (conversation.status || 'open').toLowerCase() === 'open'
+        ).length;
+        setInquiryCounts({
+          total: conversations.length,
+          active: activeInquiryCount,
+          past: conversations.length - activeInquiryCount,
+        });
+
+        const completedVisits = (visits || []).filter(isVisitCompleted);
         setAppointments(appts || []);
-        setEncounters(encs || []);
+        setCompletedVisitsCount(completedVisits.length);
+        setEncounters(completedVisits.slice(0, 3).map((visit) => ({
+          ...visit,
+          id: visit.visit_id,
+          encounter_date: visit.visit_date,
+        })));
         setRecentMessages(msgs || []);
       } catch (err) {
         console.warn('Dashboard data fetch error:', err);
@@ -67,7 +115,6 @@ const PatientDashboard = () => {
     return (appointments || []).find((a) => a.appointment_date >= today && a.status === 'Scheduled') || null;
   }, [appointments]);
 
-  const completedVisitsCount = encounters.length;
   const pendingCount = (appointments || []).filter((a) => a.status === 'Scheduled').length;
 
   return (
@@ -90,47 +137,42 @@ const PatientDashboard = () => {
           </button>
         </div>
 
+        {/* The form is optional for enrolled students, so keep the reminder
+            near the page heading without gating portal actions. */}
+        <RecordIncompleteBanner
+          className="patient-dashboard-record-notice"
+          onOpen={() => navigate('/patient/profile')}
+        />
+
         {/* 4-Item KPI Metrics / 2x2 Summary Grid (Full Width) */}
         <div className="patient-kpi-grid" style={{ width: '100%', boxSizing: 'border-box', marginBottom: 18 }}>
-          <div className="card patient-kpi-card" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)', overflow: 'hidden', textOverflow: 'ellipsis' }}>Next Clinic Visit</div>
-            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: nextAppointment ? 'var(--color-rose-text, #fda4af)' : 'var(--text)', marginTop: 4 }}>
-              {loading ? '...' : nextAppointment ? nextAppointment.appointment_date : 'None'}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {nextAppointment ? `${nextAppointment.department || 'Clinic'} (${nextAppointment.appointment_time || 'General'})` : 'Schedule is clear'}
-            </div>
-          </div>
-
-          <div className="card patient-kpi-card" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)', overflow: 'hidden', textOverflow: 'ellipsis' }}>Active Appointments</div>
-            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 4 }}>
-              {loading ? '...' : pendingCount}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Scheduled or checked-in
-            </div>
-          </div>
-
-          <div className="card patient-kpi-card" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)', overflow: 'hidden', textOverflow: 'ellipsis' }}>Completed Visits</div>
-            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 4 }}>
-              {loading ? '...' : completedVisitsCount}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Recorded consultations
-            </div>
-          </div>
-
-          <div className="card patient-kpi-card" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', fontWeight: 'var(--font-weight-semibold)', overflow: 'hidden', textOverflow: 'ellipsis' }}>Clinic Inquiries</div>
-            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', marginTop: 4 }}>
-              {loading ? '...' : recentMessages.length}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Messages to clinic staff
-            </div>
-          </div>
+          {[
+            {
+              title: 'Next Clinic Visit',
+              value: loading ? '...' : nextAppointment ? nextAppointment.appointment_date : 'None',
+              description: nextAppointment ? `${nextAppointment.department || 'Clinic'} visit` : 'No upcoming visit',
+              Icon: CalendarIcon,
+              valueClassName: 'kpi-value-compact',
+            },
+            { title: 'Active Appointments', value: loading ? '...' : pendingCount, description: 'Scheduled or checked in', Icon: ClockIcon },
+            { title: 'Completed Visits', value: loading ? '...' : completedVisitsCount, description: 'Recorded consultations', Icon: CheckIcon },
+            {
+              title: 'Clinic Inquiries',
+              value: loading ? '...' : inquiryCounts.total,
+              description: loading ? 'Loading inquiries' : `${inquiryCounts.active} active · ${inquiryCounts.past} past`,
+              Icon: MessagesIcon,
+            },
+          ].map((kpi) => (
+            <KpiCard
+              key={kpi.title}
+              title={kpi.title}
+              value={kpi.value}
+              description={kpi.description}
+              Icon={kpi.Icon}
+              className="patient-kpi-card"
+              valueClassName={kpi.valueClassName}
+            />
+          ))}
         </div>
 
         {/* Next Scheduled Appointment (Contextual Hero Card) */}
@@ -390,6 +432,7 @@ const PatientDashboard = () => {
           )}
         </div>
       </section>
+
     </main>
   );
 };

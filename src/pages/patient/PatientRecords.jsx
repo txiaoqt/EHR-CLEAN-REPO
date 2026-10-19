@@ -4,7 +4,9 @@ import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import SignaturePad from '../../components/SignaturePad.jsx';
 import SignatureImage from '../../components/SignatureImage.jsx';
+import TablePagination from '../../components/table/TablePagination.jsx';
 import { CloseIcon } from '../../components/icons/Icons.jsx';
+import { isVisitCompleted } from '../../utils/visitStatus.js';
 
 // Patient acknowledgements live in the same public bucket as clinician
 // signatures, under a distinct folder so the two can never be confused.
@@ -19,12 +21,6 @@ const signatureUrl = (path) => {
     return null;
   }
 };
-
-// A visit counts as completed when either side of it says so — a completed
-// appointment with no clinical note is still a visit that happened.
-const isVisitCompleted = (r) =>
-  (r.appointment_status || '').toLowerCase() === 'completed' ||
-  (r.encounter_status || '').toLowerCase() === 'completed';
 
 const visitStatusLabel = (r) => {
   if (isVisitCompleted(r)) return 'Completed';
@@ -58,8 +54,9 @@ const PatientRecords = () => {
     }
     setLoading(true);
     try {
-      // Read the visit view: a completed appointment is a visit even when no
-      // clinical note was written, so reading encounters alone hid it.
+      // The shared visit view includes completed appointments even when no
+      // clinical note was written. Evaluate each row by its source so a
+      // scheduled appointment cannot inherit a completed same-day encounter.
       const { data, error } = await supabase
         .from('medical_log_visits')
         .select('visit_id, visit_source, appointment_id, encounter_id, patient_id, visit_date, visit_time, chief_complaint, assessment_plan, clinician_name, appointment_status, encounter_status, patient_signature_path, patient_signed_at, vitals')
@@ -67,7 +64,7 @@ const PatientRecords = () => {
         .order('visit_date', { ascending: false });
 
       if (error) throw error;
-      const visits = data || [];
+      const visits = (data || []).filter(isVisitCompleted);
 
       // Medicines given on each visit, keyed by whichever record holds them.
       const appointmentIds = visits.map((v) => v.appointment_id).filter(Boolean);
@@ -112,15 +109,17 @@ const PatientRecords = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.patient_id]);
 
-  // Record the patient's acknowledgement of what they were given. Only a
-  // booked visit (an appointment) can be acknowledged — a walk-in has no
-  // appointment row to hold the signature.
+  // Acknowledge any completed visit. Booked visits store the signature on the
+  // appointment; walk-ins store it on the encounter.
   const handleSaveSignature = async () => {
     if (!signingRecord || !signature) {
       setSignError('Please sign before saving.');
       return;
     }
-    if (!signingRecord.appointment_id) {
+    const appointmentId = signingRecord.appointment_id || null;
+    const encounterId = appointmentId ? null : signingRecord.encounter_id || null;
+    const signatureRecordId = appointmentId || encounterId;
+    if (!signatureRecordId) {
       setSignError('This visit cannot be acknowledged. Please contact the clinic.');
       return;
     }
@@ -131,14 +130,15 @@ const PatientRecords = () => {
       // Upload first: a failed upload must not leave a visit marked as
       // acknowledged with no signature behind it.
       const blob = await (await fetch(signature)).blob();
-      const path = `${PATIENT_SIGNATURE_PREFIX}/${signingRecord.appointment_id}.png`;
+      const path = `${PATIENT_SIGNATURE_PREFIX}/${signatureRecordId}.png`;
       const { error: uploadErr } = await supabase.storage
         .from(SIGNATURE_BUCKET)
         .upload(path, blob, { upsert: true, contentType: 'image/png' });
       if (uploadErr) throw new Error(uploadErr.message || 'The signature could not be uploaded.');
 
       const { data, error } = await supabase.rpc('patient_acknowledge_visit', {
-        p_appointment_id: signingRecord.appointment_id,
+        p_appointment_id: appointmentId,
+        p_encounter_id: encounterId,
         p_signature_path: path,
       });
       if (error) throw error;
@@ -191,8 +191,8 @@ const PatientRecords = () => {
         </div>
 
         {/* Encounter History Container */}
-        <div className="card" style={{ padding: 22, border: '1px solid var(--border)', borderRadius: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div className="card table-section-card patient-records-section">
+          <div className="table-section-header">
             <div>
               <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
                 Encounter History
@@ -206,50 +206,41 @@ const PatientRecords = () => {
             </span>
           </div>
 
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
-              Loading medical encounter history...
-            </div>
-          ) : records.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 16px', background: 'var(--bg, #f8fafc)', borderRadius: 10, border: '1px dashed var(--border)' }}>
-              <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>No completed visits yet</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 4, maxWidth: 440, margin: '4px auto 0' }}>
-                Your completed clinic consultations and visit summaries will appear here once finalized by your clinician.
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Desktop / Tablet Table View (>= 768px) */}
-              <div className="patient-records-table-view table-responsive" style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          {/* Desktop / Tablet Table View (>= 768px) */}
+          <div className={`patient-records-table-view table-responsive${records.length === 0 ? ' patient-records-table-view--empty' : ''}`}>
+                <table className="table">
                   <thead>
-                    <tr style={{ background: 'var(--table-header-bg, #f8fafc)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>
                         Visit Date
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Attending Clinician
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Chief Complaint / Reason
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Assessment & Plan Summary
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Vitals Summary
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Medicines Given
                       </th>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-bold)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left' }}>
                         Acknowledgement
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {records.map((r) => (
-                      <tr key={r.visit_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    {loading ? (
+                      <tr className="table-empty-row"><td colSpan={7}>Loading medical records…</td></tr>
+                    ) : records.length === 0 ? (
+                      <tr className="table-empty-row"><td colSpan={7}>No completed visits yet</td></tr>
+                    ) : records.map((r) => (
+                      <tr key={r.visit_id}>
                         <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', whiteSpace: 'nowrap' }}>
                           {r.visit_date ? new Date(r.visit_date).toLocaleDateString() : '—'}
                         </td>
@@ -291,16 +282,13 @@ const PatientRecords = () => {
                             if (!isVisitCompleted(r)) {
                               return <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)' }}>After your visit</span>;
                             }
-                            if (!r.appointment_id) {
-                              return <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)' }}>Clinic record</span>;
-                            }
                             return (
                               <button
                                 type="button"
                                 className="btn secondary small"
                                 onClick={() => { setSigningRecord(r); setSignature(null); setSignError(''); }}
                                 style={{ fontSize: 'var(--font-size-xs)', padding: '4px 12px' }}
-                                title="Confirm the treatment and medicines you received"
+                                title="Acknowledge that you reviewed this visit record"
                               >
                                 Sign
                               </button>
@@ -313,8 +301,21 @@ const PatientRecords = () => {
                 </table>
               </div>
 
+              {!loading && (
+                <TablePagination
+                  page={0}
+                  totalPages={1}
+                  startIndex={records.length ? 1 : 0}
+                  endIndex={records.length}
+                  total={records.length}
+                  onPageChange={() => {}}
+                  itemLabel="visits"
+                  showWhenEmpty
+                />
+              )}
+
               {/* Mobile Card List View (< 768px) */}
-              <div className="patient-records-cards-view" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {!loading && records.length > 0 && <div className="patient-records-cards-view" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {records.map((r) => (
                   <div
                     key={r.visit_id}
@@ -406,9 +407,6 @@ const PatientRecords = () => {
                         if (!isVisitCompleted(r)) {
                           return <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)' }}>Available after your visit</span>;
                         }
-                        if (!r.appointment_id) {
-                          return <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)' }}>Clinic record</span>;
-                        }
                         return (
                           <button
                             type="button"
@@ -423,9 +421,7 @@ const PatientRecords = () => {
                     </div>
                   </div>
                 ))}
-              </div>
-            </>
-          )}
+              </div>}
         </div>
       </section>
 
@@ -477,9 +473,9 @@ const PatientRecords = () => {
             </div>
 
             <p style={{ margin: '0 0 12px 0', fontSize: 'var(--font-size-sm)', color: 'var(--muted)', lineHeight: 1.5 }}>
-              Visit on <strong>{signingRecord.encounter_date ? new Date(signingRecord.encounter_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'record'}</strong>
+              Visit on <strong>{signingRecord.visit_date ? new Date(`${signingRecord.visit_date}T12:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'record'}</strong>
               {signingRecord.clinician_name ? <> with <strong>{signingRecord.clinician_name}</strong></> : null}.
-              By signing you confirm that this record reflects the treatment and medicines you received.
+              Sign to acknowledge that you reviewed this visit record, including any medicines listed.
             </p>
 
             <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginBottom: 14, fontSize: 'var(--font-size-xs)', color: 'var(--text)' }}>

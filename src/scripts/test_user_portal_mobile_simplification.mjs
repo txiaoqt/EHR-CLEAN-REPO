@@ -31,12 +31,23 @@ console.log('[TEST GROUP 1] Navigation Simplification & Profile Access Audit');
 
 const sidebarCode = fs.readFileSync(path.join(projectRoot, 'src/components/sidebar/PatientSidebar.jsx'), 'utf8');
 assert(!sidebarCode.includes('nav-group-label'), 'Sidebar contains no artificial category group labels');
-assert(sidebarCode.includes("label: 'Home'"), 'Includes Home in flat navigation');
-assert(sidebarCode.includes("label: 'Events'"), 'Includes Events in flat navigation');
-assert(sidebarCode.includes("label: 'Schedule'"), 'Includes Schedule in flat navigation');
-assert(sidebarCode.includes("label: 'Messages'"), 'Includes Messages in flat navigation');
-assert(sidebarCode.includes("label: 'Records'"), 'Includes Records in flat navigation');
-assert(!sidebarCode.includes("label: 'Profile'"), 'Profile removed from primary navigation list');
+// Scoped to the PATIENT_NAV array, not the whole file. The sidebar also holds
+// ENROLLEE_NAV, which legitimately contains a Profile entry — an applicant's
+// portal has three destinations and Profile is one of them. Searching the whole
+// file for "label: 'Profile'" therefore failed on a correct addition.
+const patientNavBlock = (() => {
+  const start = sidebarCode.indexOf('PATIENT_NAV');
+  if (start < 0) return '';
+  const open = sidebarCode.indexOf('[', start);
+  const end = sidebarCode.indexOf('];', open);
+  return open < 0 || end < 0 ? '' : sidebarCode.slice(open, end);
+})();
+assert(patientNavBlock.includes("label: 'Home'"), 'Includes Home in flat navigation');
+assert(patientNavBlock.includes("label: 'Events'"), 'Includes Events in flat navigation');
+assert(patientNavBlock.includes("label: 'Schedule'"), 'Includes Schedule in flat navigation');
+assert(patientNavBlock.includes("label: 'Messages'"), 'Includes Messages in flat navigation');
+assert(patientNavBlock.includes("label: 'Records'"), 'Includes Records in flat navigation');
+assert(!patientNavBlock.includes("label: 'Profile'"), 'Profile removed from primary navigation list');
 
 const headerCode = fs.readFileSync(path.join(projectRoot, 'src/components/header/PatientHeader.jsx'), 'utf8');
 assert(headerCode.includes('patient-profile-dropdown'), 'Profile is accessed through Header Avatar menu');

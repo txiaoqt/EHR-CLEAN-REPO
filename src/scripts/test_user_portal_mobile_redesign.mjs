@@ -47,12 +47,23 @@ assert(headerCode.includes('handleClickOutside'), 'Profile menu handles click ou
 console.log('\n[TEST GROUP 2] Primary Navigation Streamlining Audit');
 
 const sidebarCode = fs.readFileSync(path.join(projectRoot, 'src/components/sidebar/PatientSidebar.jsx'), 'utf8');
-assert(sidebarCode.includes("label: 'Home'"), 'PATIENT_NAV includes Home');
-assert(sidebarCode.includes("label: 'Events'"), 'PATIENT_NAV includes Events');
-assert(sidebarCode.includes("label: 'Schedule'"), 'PATIENT_NAV includes Schedule');
-assert(sidebarCode.includes("label: 'Messages'"), 'PATIENT_NAV includes Messages');
-assert(sidebarCode.includes("label: 'Records'"), 'PATIENT_NAV includes Records');
-assert(!sidebarCode.includes("label: 'Profile'"), 'PATIENT_NAV has Profile removed from primary nav list (accessed via Avatar)');
+// Scoped to the PATIENT_NAV array, not the whole file. The sidebar also holds
+// ENROLLEE_NAV, which legitimately contains a Profile entry — an applicant's
+// portal has three destinations and Profile is one of them. Searching the whole
+// file for "label: 'Profile'" therefore failed on a correct addition.
+const patientNavBlock = (() => {
+  const start = sidebarCode.indexOf('PATIENT_NAV');
+  if (start < 0) return '';
+  const open = sidebarCode.indexOf('[', start);
+  const end = sidebarCode.indexOf('];', open);
+  return open < 0 || end < 0 ? '' : sidebarCode.slice(open, end);
+})();
+assert(patientNavBlock.includes("label: 'Home'"), 'PATIENT_NAV includes Home');
+assert(patientNavBlock.includes("label: 'Events'"), 'PATIENT_NAV includes Events');
+assert(patientNavBlock.includes("label: 'Schedule'"), 'PATIENT_NAV includes Schedule');
+assert(patientNavBlock.includes("label: 'Messages'"), 'PATIENT_NAV includes Messages');
+assert(patientNavBlock.includes("label: 'Records'"), 'PATIENT_NAV includes Records');
+assert(!patientNavBlock.includes("label: 'Profile'"), 'PATIENT_NAV has Profile removed from primary nav list (accessed via Avatar)');
 assert(sidebarCode.includes("onClick={() => handleNavigation('/patient/profile')}"), 'Sidebar user widget links to Profile');
 
 // -----------------------------------------------------------------------------

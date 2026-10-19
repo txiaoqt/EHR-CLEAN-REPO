@@ -63,7 +63,7 @@ const loginContent = fs.readFileSync(loginPath, 'utf8');
 
 // Login-First Presentation
 assert(loginContent.includes("authMode === 'login'"), 'Login-first default presentation');
-assert(loginContent.includes('Patient Log In'), 'Patient Log In title for user surface');
+assert(loginContent.includes('Student Log In'), 'Student Log In title for user surface');
 assert(loginContent.includes('Staff Log In'), 'Staff Log In title for staff surface');
 assert(loginContent.includes('Forgot password?'), 'Forgot password link present');
 assert(loginContent.includes("authMode === 'forgot'"), 'Forgot password state mode supported');

@@ -1,0 +1,1543 @@
+{
+  "cases": [
+    {
+      "name": "Medicine_Log_Sample",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\output\\pdf\\Medicine_Log_Sample.pdf",
+      "rows": [
+        {
+          "visit_id": "test-visit-1",
+          "patient_id": "TEST-REPEAT",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student A",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Headache",
+          "dispensed": {
+            "Mefenamic": 1,
+            "Band Aid": 2
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-2",
+          "patient_id": "TEST-REPEAT",
+          "visit_date": "2026-10-17",
+          "patient_name": "Sample Student A",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Cough",
+          "dispensed": {
+            "Amoxicillin": 3,
+            "Paracetamol Biogesic": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-3",
+          "patient_id": "TEST-STUDENT-3",
+          "visit_date": "2026-10-17",
+          "patient_name": "Sample Student 3",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Follow-up",
+          "dispensed": {},
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-4",
+          "patient_id": "TEST-STUDENT-4",
+          "visit_date": "2026-10-16",
+          "patient_name": "Sample Student 4",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Fever",
+          "dispensed": {
+            "Paracetamol Biogesic": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-5",
+          "patient_id": "TEST-STUDENT-5",
+          "visit_date": "2026-10-10",
+          "patient_name": "Sample Student 5",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Allergic rhinitis",
+          "dispensed": {
+            "Cetirizine": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-6",
+          "patient_id": "TEST-STUDENT-6",
+          "visit_date": "2026-10-09",
+          "patient_name": "Sample Student 6",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Ankle review",
+          "dispensed": {
+            "Salompas": 2,
+            "Elastic Bandage": 1
+          }
+        }
+      ],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        }
+      ]
+    },
+    {
+      "name": "Medicine_Log_Blank",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\output\\pdf\\Medicine_Log_Blank.pdf",
+      "rows": [],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        }
+      ]
+    },
+    {
+      "name": "one-visit",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\tmp\\pdfs\\medicine-log-tests\\one-visit.pdf",
+      "rows": [
+        {
+          "visit_id": "test-visit-1",
+          "patient_id": "TEST-REPEAT",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student A",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Headache",
+          "dispensed": {
+            "Mefenamic": 1,
+            "Band Aid": 2
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        }
+      ],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        }
+      ]
+    },
+    {
+      "name": "Medicine_Log_Multipage",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\output\\pdf\\Medicine_Log_Multipage.pdf",
+      "rows": [
+        {
+          "visit_id": "test-visit-1",
+          "patient_id": "TEST-STUDENT-1",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 1",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 1",
+          "dispensed": {
+            "Amoxicillin": 1
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-2",
+          "patient_id": "TEST-STUDENT-2",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 2",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 2",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-3",
+          "patient_id": "TEST-STUDENT-3",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 3",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 3",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-4",
+          "patient_id": "TEST-STUDENT-4",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 4",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 4",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-5",
+          "patient_id": "TEST-STUDENT-5",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 5",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 5",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-6",
+          "patient_id": "TEST-STUDENT-6",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 6",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 6",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-7",
+          "patient_id": "TEST-STUDENT-7",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 7",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 7",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-8",
+          "patient_id": "TEST-STUDENT-8",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 8",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 8",
+          "dispensed": {
+            "Amoxicillin": 2
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-9",
+          "patient_id": "TEST-STUDENT-9",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 9",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 9",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-10",
+          "patient_id": "TEST-STUDENT-10",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 10",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 10",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-11",
+          "patient_id": "TEST-STUDENT-11",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 11",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 11",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-12",
+          "patient_id": "TEST-STUDENT-12",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 12",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 12",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-13",
+          "patient_id": "TEST-STUDENT-13",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 13",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 13",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-14",
+          "patient_id": "TEST-STUDENT-14",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 14",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 14",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-15",
+          "patient_id": "TEST-STUDENT-15",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 15",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 15",
+          "dispensed": {
+            "Amoxicillin": 3
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-16",
+          "patient_id": "TEST-STUDENT-16",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 16",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 16",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-17",
+          "patient_id": "TEST-STUDENT-17",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 17",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 17",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-18",
+          "patient_id": "TEST-STUDENT-18",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 18",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 18",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-19",
+          "patient_id": "TEST-STUDENT-19",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 19",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 19",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-20",
+          "patient_id": "TEST-STUDENT-20",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 20",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 20",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-21",
+          "patient_id": "TEST-STUDENT-21",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 21",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 21",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-22",
+          "patient_id": "TEST-STUDENT-22",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 22",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 22",
+          "dispensed": {
+            "Amoxicillin": 1
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-23",
+          "patient_id": "TEST-STUDENT-23",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 23",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 23",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-24",
+          "patient_id": "TEST-STUDENT-24",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 24",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 24",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-25",
+          "patient_id": "TEST-STUDENT-25",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 25",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 25",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-26",
+          "patient_id": "TEST-STUDENT-26",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 26",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 26",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-27",
+          "patient_id": "TEST-STUDENT-27",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 27",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 27",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-28",
+          "patient_id": "TEST-STUDENT-28",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 28",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 28",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-29",
+          "patient_id": "TEST-STUDENT-29",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 29",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 29",
+          "dispensed": {
+            "Amoxicillin": 2
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-30",
+          "patient_id": "TEST-STUDENT-30",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 30",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 30",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-31",
+          "patient_id": "TEST-STUDENT-31",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 31",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 31",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-32",
+          "patient_id": "TEST-STUDENT-32",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 32",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 32",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-33",
+          "patient_id": "TEST-STUDENT-33",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 33",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 33",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-34",
+          "patient_id": "TEST-STUDENT-34",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 34",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 34",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-35",
+          "patient_id": "TEST-STUDENT-35",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 35",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 35",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-36",
+          "patient_id": "TEST-STUDENT-36",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 36",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 36",
+          "dispensed": {
+            "Amoxicillin": 3
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-37",
+          "patient_id": "TEST-STUDENT-37",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 37",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 37",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-38",
+          "patient_id": "TEST-STUDENT-38",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 38",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 38",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-39",
+          "patient_id": "TEST-STUDENT-39",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 39",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 39",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-40",
+          "patient_id": "TEST-STUDENT-40",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 40",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 40",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-41",
+          "patient_id": "TEST-STUDENT-41",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 41",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 41",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-42",
+          "patient_id": "TEST-STUDENT-42",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 42",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 42",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-43",
+          "patient_id": "TEST-STUDENT-43",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 43",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 43",
+          "dispensed": {
+            "Amoxicillin": 1
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-44",
+          "patient_id": "TEST-STUDENT-44",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 44",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 44",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-45",
+          "patient_id": "TEST-STUDENT-45",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 45",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 45",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-46",
+          "patient_id": "TEST-STUDENT-46",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 46",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 46",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-47",
+          "patient_id": "TEST-STUDENT-47",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 47",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 47",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-48",
+          "patient_id": "TEST-STUDENT-48",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 48",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 48",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-49",
+          "patient_id": "TEST-STUDENT-49",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 49",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 49",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-50",
+          "patient_id": "TEST-STUDENT-50",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 50",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 50",
+          "dispensed": {
+            "Amoxicillin": 2
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        },
+        {
+          "visit_id": "test-visit-51",
+          "patient_id": "TEST-STUDENT-51",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 51",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 51",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-52",
+          "patient_id": "TEST-STUDENT-52",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 52",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 52",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        },
+        {
+          "visit_id": "test-visit-53",
+          "patient_id": "TEST-STUDENT-53",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 53",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 53",
+          "dispensed": {
+            "Amoxicillin": 2
+          }
+        },
+        {
+          "visit_id": "test-visit-54",
+          "patient_id": "TEST-STUDENT-54",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 54",
+          "profile": {
+            "sex": "Female",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 54",
+          "dispensed": {
+            "Amoxicillin": 3
+          }
+        },
+        {
+          "visit_id": "test-visit-55",
+          "patient_id": "TEST-STUDENT-55",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 55",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 55",
+          "dispensed": {
+            "Amoxicillin": 1
+          }
+        }
+      ],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        }
+      ]
+    },
+    {
+      "name": "long-visit",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\tmp\\pdfs\\medicine-log-tests\\long-visit.pdf",
+      "rows": [
+        {
+          "visit_id": "test-visit-1",
+          "patient_id": "TEST-STUDENT-1",
+          "visit_date": "2026-10-19",
+          "patient_name": "Maria Alejandra Isabel Concepcion Dela Cruz-Santos",
+          "profile": {
+            "sex": "Female",
+            "course": "Bachelor of Engineering Technology major in Electronics and Communications Technology"
+          },
+          "chief_complaint": "Intermittent headache since yesterday with associated dizziness after prolonged standing. The student reports that symptoms improve with rest and fluids and recur during afternoon laboratory sessions. Full clinical text is preserved in this exported visit.",
+          "dispensed": {
+            "Salbutamol Neb": 2,
+            "Tetanus Toxoid": 1
+          },
+          "signatureImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAABaCAAAAADswdA/AAAFfElEQVR42u2de3BMVxzHPzc2ianIw3pVhSpRNR3qnZYRaUTURGRCHkPSiJpO32qKmUyf4w/VdqhOVSthBDWjIYlgiFJ20BqknY4Z6hEkxTRKyEO0ItnTP3Y3926SNbsiJTu/71/n/M753T372d+553fP3r2rKUStkY8gaJ1MoAmF+5aSCHwAEQhyHrw/aXIOlEVEAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoKiNAe7UmmgyzHa29LR3Lf00IrSjeXB6fr1LT4eKNS0VYJymacmGV9vj1O12oKZ93mQ8V1dO6x/g12vkwsMOi4vRtF5KgWq1djQ9bIxS6c6WHkoppazv+zsMQ4658nToOMxSSqmxQMA/un2OU7cNwACrcTTV7zS+CBNO2mwtjqaVAqVMD+ZjGPgxAJfXMjQegAEAvNJb7xIAwLyv0UYNN985/1P1iRd/HuLSs5luFcU7ine3ObXkEHauZH+UbrgYcw5T9KTQzteO5JVbxhWNttubj+bRiUC7jkB6YyUdjjTtcBT6/qqUUqomAwY2tOzZPAL9upHaaN7NY4YILPNhdTBJuteN/jDxrK18az48WetqNA8iAv/nRSQLNg+3hcDaaM5ud9dPi2dHnaOSS6yhab2ViXFsu9ZomH+e6bvDbOVOy9+g9EsvWoX/IDDcwSQTfnTbMZGqffoMNq4oG3j2qSTqchz1kxsIXaefmZYEsd6LAPpRfdVRHhvQu8Ftx0gzefbivpuBMXrDoRISmNSVbMeN3qsUmZ319qDUiIw73gMwHObUOGDWXFrttqMpnsJ6xwyO9zcuIczCN5lzB+zn9AK06UbPlZZMf+8B+FYwu/q8vvuW554zqLDYZnAhSbr59hbGDIQ0yLIZSv5iWHevuRJ53pC6lgM8sS2Eyu+mhIyev6PWs0NFhdjn8N6bIdG6Oa+GVGDM0xRcB+C0y0So+Wja46VcxKnZHaH++Io4c/IZTxx9p1Fgtc9gP+MM9k0BSHMsIxXQ3ZikWa3WBtXWP7RpM7WQuvZc99WuIksZ3MktWLLAkzmcc/XweKgrNK7Bf1qY3BUg7UOVvQDAqjembrIXvljQdol02wKcG96CMTAlhbL9e3bW3l0Y8Jr7x4oOrswbD3srzVFOSWAqAH0iLGcPRAJBUO7JaB5tgC7VNyOjIjObD9I6uZ8BTd2Yv0IjlwSTMQkkuTEgsyKBMLhirycMADi1BdrtFL6XzFl/F1YcjnHfIXHj5aPhdU5r8KESY4f8611hcFDV8RtdbAATALZu8aL9wE/6BZQYMxPKPHCeFEgee6u6RTolgVkH7Eqibj1gmkp9gdduqJpKaw2Xv7Xgybacfyz5bGV6B2MSGDp3gl3zIBvgbVj6r7cCjIOlFxyV+jX4jfLEO5ELv203rsF5NaQ0/lz8hTDOWIDRMymZXe+lAIckcG3sOtu7uxhXTPrjnnhPDuC9Gz3HO83gmXrtZfvVyDfP8EPUCUeQ5iykHS8ia4oMldiRkHPlaPmcdyf07Xzz92MNDFvu0dE6xm62MMPHmAQOek5vTvtI5VeYIXj/tGMHh46M79etquyXfdX4vDrXxWh45DdUnfStUkpVvql/ZLOuK3c3VP2VUkptBQ4qpdRdiFFqMSw2do+EZUoppeo+M+sRkljsejTtb0OVoJWnl70U1sW3x4hFxd+bPXSe0ole45ySwBRjc7p9GcF30aVNqYMDO3QZlLSqNHdEm74hTaHJMxPu+5kJ8tQO+WJdAApAASgSgAJQAApAkQAUgAJQAIoEoAAUgAJQJAAFoAAUgCIBKAAFoAAUCUABKAAFoIh73GAp/6okEfjQpMm9gRKBD1X/ASqZEWoPetQmAAAAAElFTkSuQmCC"
+        }
+      ],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        }
+      ]
+    },
+    {
+      "name": "long-medicine",
+      "filename": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\tmp\\pdfs\\medicine-log-tests\\long-medicine.pdf",
+      "rows": [
+        {
+          "visit_id": "test-visit-1",
+          "patient_id": "TEST-STUDENT-1",
+          "visit_date": "2026-10-19",
+          "patient_name": "Sample Student 1",
+          "profile": {
+            "sex": "Male",
+            "course": "BS Computer Science"
+          },
+          "chief_complaint": "Review 1",
+          "dispensed": {
+            "Additional catalogue medicine with a long name 10 mg": 4
+          }
+        }
+      ],
+      "labels": [
+        {
+          "label": "Aluminum Hydroxide",
+          "key": "Aluminum Hydroxide"
+        },
+        {
+          "label": "Amoxicillin",
+          "key": "Amoxicillin"
+        },
+        {
+          "label": "Band Aid",
+          "key": "Band Aid"
+        },
+        {
+          "label": "Bioflu",
+          "key": "Bioflu"
+        },
+        {
+          "label": "Captopril",
+          "key": "Captopril"
+        },
+        {
+          "label": "Cefalexin",
+          "key": "Cefalexin"
+        },
+        {
+          "label": "Cetirizine",
+          "key": "Cetirizine"
+        },
+        {
+          "label": "Chlorphe maleate",
+          "key": "Chlorphe maleate"
+        },
+        {
+          "label": "Cinnarizine",
+          "key": "Cinnarizine"
+        },
+        {
+          "label": "Clonidine",
+          "key": "Clonidine"
+        },
+        {
+          "label": "Doxycycline",
+          "key": "Doxycycline"
+        },
+        {
+          "label": "Elastic Bandage",
+          "key": "Elastic Bandage"
+        },
+        {
+          "label": "Face Mask",
+          "key": "Face Mask"
+        },
+        {
+          "label": "Gauze",
+          "key": "Gauze"
+        },
+        {
+          "label": "Loperamide",
+          "key": "Loperamide"
+        },
+        {
+          "label": "Meclizine Tablet",
+          "key": "Mecilizine Tablet"
+        },
+        {
+          "label": "Mefenamic",
+          "key": "Mefenamic"
+        },
+        {
+          "label": "Metronidazole",
+          "key": "Metronidazole"
+        },
+        {
+          "label": "Omeprazole",
+          "key": "Omeprazole"
+        },
+        {
+          "label": "Paracetamol/Biogesic",
+          "key": "Paracetamol Biogesic"
+        },
+        {
+          "label": "Salbutamol Neb",
+          "key": "Salbutamol Neb"
+        },
+        {
+          "label": "Symdex tablet",
+          "key": "Symdex tablet"
+        },
+        {
+          "label": "Tetrus Toxoid",
+          "key": "Tetanus Toxoid"
+        },
+        {
+          "label": "Salompas",
+          "key": "Salompas"
+        },
+        {
+          "label": "Additional catalogue medicine with a long name 10 mg",
+          "key": "Additional catalogue medicine with a long name 10 mg"
+        }
+      ]
+    }
+  ],
+  "genericFile": "C:\\Users\\Christopher x Angel\\Documents\\EHR-PROJECT1\\tmp\\pdfs\\medicine-log-tests\\unchanged-generic-export.pdf"
+}

@@ -30,14 +30,26 @@ const PATIENT_NAV = [
   { path: '/patient/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+// An enrollee has three destinations because they have one job: send a medical
+// certificate. Offering them Events, Schedule and Records would be a list of
+// doors that do not open — the gate blocks them until their record is complete,
+// and even then those pages are for enrolled students.
+const ENROLLEE_NAV = [
+  { path: '/enrollee/home', label: 'Home', icon: DashboardIcon },
+  { path: '/enrollee/messages', label: 'Messages', icon: MessagesIcon },
+  { path: '/enrollee/profile', label: 'Profile', icon: UserIcon },
+];
+
 const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const isEnrollee = (user?.role || '').toLowerCase() === 'enrollee';
   const displayName = user?.name || 'Angel Keith Carbon';
-  const displayRole = 'Student / Patient';
+  const displayRole = isEnrollee ? 'Enrollee' : 'Student / Patient';
+  const navItems = isEnrollee ? ENROLLEE_NAV : PATIENT_NAV;
 
   const handleNavigation = (path) => {
     if (onClose) onClose();
@@ -143,7 +155,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
         {/* Flat Simplified Navigation List */}
         <nav className="menu" role="navigation" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           <div className="nav-group">
-            {PATIENT_NAV.map(({ path, label, icon: IconComponent }) => {
+            {navItems.map(({ path, label, icon: IconComponent }) => {
               const isActive = location.pathname === path;
               return (
                 <div

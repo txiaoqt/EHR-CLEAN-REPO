@@ -660,8 +660,8 @@ const Reports = () => {
           {/* Main Visuals & Drill-down Table */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Analytics Visualization Card */}
-            <div className="card" style={{ padding: '20px 22px' }}>
-              <div className="card-header" style={{ marginBottom: 12 }}>
+            <div className="card">
+              <div className="card-header">
                 <div>
                   <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Analytics Visualization</h3>
                   <span className="card-subtitle">
@@ -704,46 +704,44 @@ const Reports = () => {
             </div>
 
             {/* Raw Encounters Drill-Down Card */}
-            <div className="card" style={{ padding: '20px 22px' }}>
-              <div className="card-header" style={{ marginBottom: 12 }}>
+            <div className="card table-section-card reports-data-table-card">
+              <div className="card-header table-section-header">
                 <div>
                   <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Raw Encounters Data</h3>
                   <span className="card-subtitle">Granular clinical records within active date filter</span>
                 </div>
               </div>
 
-              {(!reportData || reportData.length === 0) ? (
-                <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
-                  No data records found for the selected date range.
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table" aria-label="Report data table">
-                    <thead>
-                      <tr>
-                        <th>Date & Time</th>
-                        <th>Patient ID / Name</th>
-                        <th>Clinician</th>
-                        <th>Chief Complaint</th>
+              <div className="table-responsive">
+                <table className="table" aria-label="Report data table">
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Patient ID / Name</th>
+                      <th>Clinician</th>
+                      <th>Chief Complaint</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr className="table-empty-row"><td colSpan={4}>Loading report data…</td></tr>
+                    ) : reportPagination.total === 0 ? (
+                      <tr className="table-empty-row"><td colSpan={4}>No records found</td></tr>
+                    ) : reportPagination.pageRows.map(enc => (
+                      <tr key={enc.id}>
+                        <td style={{ color: 'var(--text-muted)' }}>{new Date(enc.encounter_date).toLocaleString()}</td>
+                        <td>
+                          <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{enc.patient_name || enc.patient_id}</span>
+                        </td>
+                        <td>{enc.clinician_name || 'Staff'}</td>
+                        <td style={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {enc.chief_complaint || 'N/A'}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {reportPagination.pageRows.map(enc => (
-                        <tr key={enc.id || Math.random()}>
-                          <td style={{ color: 'var(--text-muted)' }}>{new Date(enc.encounter_date).toLocaleString()}</td>
-                          <td>
-                            <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{enc.patient_name || enc.patient_id}</span>
-                          </td>
-                          <td>{enc.clinician_name || 'Staff'}</td>
-                          <td style={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {enc.chief_complaint || 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <TablePagination
                 page={reportPagination.page}
@@ -753,6 +751,7 @@ const Reports = () => {
                 total={reportPagination.total}
                 onPageChange={reportPagination.goToPage}
                 itemLabel="records"
+                showWhenEmpty={!loading}
               />
             </div>
           </div>

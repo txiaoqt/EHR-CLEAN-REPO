@@ -16,7 +16,7 @@ const PatientHeader = ({ onToggleNav }) => {
   const menuRef = useRef(null);
 
   const displayName = user?.name || 'Angel Keith Carbon';
-  const displayRole = 'Student / Patient';
+  const displayRole = (user?.role || '').toLowerCase() === 'enrollee' ? 'Enrollee' : 'Student / Patient';
   const studentId = user?.patient_id || 'TUPM-XX-XXXX';
   const avatarSrc = user?.avatar || avatarPlaceholder;
 

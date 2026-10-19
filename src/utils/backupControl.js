@@ -9,11 +9,16 @@ import { supabase } from '../supabaseClient.js';
  */
 
 export const SAFE_BACKUP_ERRORS = {
+  // Fallbacks, used only when the function does not send a more specific message.
   not_configured: 'Backup is not configured yet. Add the GitHub secrets to the backup function.',
   dispatch_disabled:
     'Starting a backup from here is not enabled yet. Run the workflow once from GitHub to validate it, then turn dispatch on.',
-  forbidden: 'You do not have permission to manage backups.',
+  forbidden: 'Backups are limited to administrators and physicians.',
+  no_profile:
+    'No staff record matches this account. An administrator may need to set the email on your staff record to match your sign-in address.',
+  lookup_failed: 'The staff record could not be read. Try again, and check the function logs if it persists.',
   unauthorized: 'Your session has expired. Please sign in again.',
+  invalid_request: 'The backup request was rejected as malformed. This is a bug — please report it.',
   active_backup: 'A backup is already running.',
   workflow_unavailable: 'The backup workflow is not available. It must exist on the configured branch.',
   github_unavailable: 'GitHub is not reachable right now. Try refreshing in a moment.',
@@ -23,8 +28,12 @@ export const SAFE_BACKUP_ERRORS = {
 };
 
 export class BackupControlError extends Error {
-  constructor(code) {
-    super(SAFE_BACKUP_ERRORS[code] ?? SAFE_BACKUP_ERRORS.control_unavailable);
+  constructor(code, detail) {
+    // Prefer the function's own message when it sends one. It knows which
+    // variable is wrong or which role you hold, and the generic text here cannot
+    // — that is the whole reason four different problems used to look identical.
+    // It never contains a secret value; the function only ever names variables.
+    super(detail || SAFE_BACKUP_ERRORS[code] || SAFE_BACKUP_ERRORS.control_unavailable);
     this.code = code;
   }
 }
@@ -36,13 +45,15 @@ const invoke = async (action) => {
       // The function returns { code, error }; prefer its code so the message
       // matches the real cause rather than a generic one.
       let code = 'control_unavailable';
+      let detail = null;
       try {
         const body = error.context instanceof Response ? await error.context.clone().json() : null;
         if (body?.code && SAFE_BACKUP_ERRORS[body.code]) code = body.code;
+        if (typeof body?.error === 'string' && body.error.trim()) detail = body.error.trim();
       } catch (_) {
         // Keep the generic code.
       }
-      throw new BackupControlError(code);
+      throw new BackupControlError(code, detail);
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new BackupControlError('control_unavailable');
