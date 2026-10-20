@@ -21,7 +21,8 @@ import {
 } from './loginSecurity.js';
 import { EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import VerificationCodeField from '../components/VerificationCodeField.jsx';
-import PolicyAgreement, { PolicyLinks } from '../components/PolicyAgreement.jsx';
+import { PolicyLinks } from '../components/PolicyAgreement.jsx';
+import SignupPolicyConsent from '../components/SignupPolicyConsent.jsx';
 import useAppPolicy from '../hooks/useAppPolicy.js';
 import bg1Image from '../assets/images/bg1.jpg';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
@@ -1025,27 +1026,20 @@ const Login = () => {
     boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.04)',
   };
 
-  if (IS_USER_SURFACE && authMode === 'signup' && !signupPolicyAgreed) {
-    return (
-      <PolicyAgreement mode="signup" policy={signupPolicy.policy} checking={signupPolicy.checking}
-        error={signupPolicy.error} onRetry={signupPolicy.refresh}
-        onAccept={({ acceptedTerms, acceptedPrivacy }) => {
-          if (signupPolicy.ready && acceptedTerms && acceptedPrivacy) {
-            setSignupAgreement({
-              version: signupPolicy.policy.version,
-              accepted_terms: true,
-              accepted_privacy: true,
-            });
-          }
-        }}
-        onDecline={async () => {
-          await logout({ scope: 'local' });
-          setAuthMode('login');
-          setMsg('');
-        }}
-      />
-    );
-  }
+  // The form opens immediately. Agreement is requested inside the form, before
+  // sending a code, because that action starts account creation with Auth.
+  const signupConsent = (
+    <SignupPolicyConsent policy={signupPolicy.policy} ready={signupPolicy.ready}
+      checking={signupPolicy.checking} error={signupPolicy.error}
+      checked={signupPolicyAgreed} busy={loading || otpSending}
+      onRetry={signupPolicy.refresh} onChange={(checked) => {
+        setSignupAgreement(checked && signupPolicy.ready ? {
+          version: signupPolicy.policy.version,
+          accepted_terms: true,
+          accepted_privacy: true,
+        } : null);
+      }} />
+  );
 
   return (
     <main
@@ -1296,11 +1290,6 @@ const Login = () => {
                   >
                     Create Account
                   </h2>
-                  <div className="signup-policy-summary">
-                    <span>Policies reviewed · Version {signupAgreement?.version}</span>
-                    <button type="button" onClick={() => setSignupAgreement(null)}>Review again</button>
-                  </div>
-
                   {/* Which kind of account. An enrollee has no TUP address and no
                       student number yet, so the two sign-ups ask for different
                       things and cannot share one form. */}
@@ -1833,6 +1822,8 @@ const Login = () => {
                   </div>
                 </>
               )}
+
+              {signupConsent}
 
               {/* Shared by both paths. These used to sit inside the student
                   branch, so the enrollee form had no submit button at all —

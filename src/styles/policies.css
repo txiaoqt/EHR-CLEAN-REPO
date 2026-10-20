@@ -80,26 +80,101 @@
 .policy-links a, .policy-source-note a { color: var(--color-primary, #cf242a); text-decoration: underline; text-underline-offset: 3px; }
 .policy-links-on-login { margin-top: 20px; }
 .policy-links-on-login a { color: #fff; }
-.signup-policy-summary {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgb(255 255 255 / 25%);
-  font-size: var(--font-size-xs);
-  color: #fff;
+.signup-policy-consent {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: var(--radius-control);
+  color: var(--text-on-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
 }
-.signup-policy-summary button {
+.signup-policy-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+}
+.signup-policy-choice input[type="checkbox"] {
+  appearance: auto;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 4px 0 0;
+  padding: 0;
+  accent-color: var(--text-on-primary);
+  cursor: pointer;
+}
+.signup-policy-choice label { cursor: pointer; }
+.signup-policy-consent button {
   padding: 0;
   border: 0;
   color: inherit;
   font: inherit;
+  font-weight: var(--font-weight-semibold);
   background: transparent;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+.signup-policy-consent :is(input, button):focus-visible {
+  outline: 2px solid var(--text-on-primary);
+  outline-offset: 3px;
+}
+.signup-policy-hint { margin: 6px 0 0; font-size: var(--font-size-xs); }
+.signup-policy-load-error { margin-top: 10px; }
+.signup-policy-load-error p { margin: 0 0 4px; }
+.signup-policy-load-error button { min-height: 44px; }
+.signup-policy-reader {
+  box-sizing: border-box;
+  width: min(780px, calc(100vw - 32px));
+  max-width: none;
+  height: min(760px, calc(100vh - 32px));
+  height: min(760px, calc(100dvh - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+.signup-policy-reader[open] { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.signup-policy-reader::backdrop { background: var(--overlay-bg); }
+.signup-policy-reader-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+}
+.signup-policy-reader-header h2 { margin: 0; font-size: var(--font-size-xl); line-height: 1.4; }
+.signup-policy-reader-header h2:focus { outline: none; }
+.signup-policy-reader-header p { margin: 6px 0 0; font-size: var(--font-size-xs); color: var(--text-muted); }
+.signup-policy-reader-header .modal-close-btn { flex-shrink: 0; min-width: 44px; min-height: 44px; }
+.signup-policy-reader-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+}
+.signup-policy-reader-footer .btn { min-height: 44px; }
+.signup-policy-reader :is(button, [tabindex="0"]):focus-visible {
+  outline: 2px solid var(--color-primary-text);
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .signup-policy-reader-header { padding: 16px; }
+  .signup-policy-reader .policy-tabs { padding-inline: 16px; }
+  .signup-policy-reader .policy-tabs button { flex: 1; padding-inline: 8px; font-size: var(--font-size-sm); }
+  .signup-policy-reader .policy-reading-area { padding: 16px; }
+  .signup-policy-reader-footer { padding: 12px 16px; }
 }
 .policy-gate :is(button, input, a, [tabindex="0"]):focus-visible,
 .policy-public-page :is(button, a, select, [tabindex="0"]):focus-visible {
