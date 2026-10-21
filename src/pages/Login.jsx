@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import {
   IS_ADMIN_SURFACE,
+  isRoleCompatibleWithSurface,
   IS_USER_SURFACE,
   accountTableForRole,
   isUserSurfaceRole,
@@ -368,7 +369,7 @@ const Login = () => {
         setMsg(
           profile.elevated
             ? `This enrollee account has been elevated to an enrolled student account. Please sign in with your official TUP email${profile.tup_email ? ` (${profile.tup_email})` : ''}.`
-            : 'Your account has been deactivated. Please contact an administrator.'
+            : profile.access_message || 'Your account has been deactivated. Please contact an administrator.'
         );
         await supabase.auth.signOut();
         return;
@@ -381,8 +382,8 @@ const Login = () => {
       const userSurfaceRole = isUserSurfaceRole(userRole);
 
       // Surface compatibility check
-      if (IS_ADMIN_SURFACE && userSurfaceRole) {
-        setMsg('Student accounts are not allowed on this portal.');
+      if (!isRoleCompatibleWithSurface(userRole)) {
+        setMsg('This account belongs to a different portal. Please use the correct sign-in page.');
         await supabase.auth.signOut();
         return;
       }
@@ -417,6 +418,10 @@ const Login = () => {
 
       // 5. Update AuthContext & navigate
       login(profile);
+      if (profile.staff_setup_required) {
+        navigate('/staff/setup');
+        return;
+      }
       // An enrollee has their own three-page portal, so sending them to
       // /dashboard put an applicant on the staff dashboard.
       navigate(

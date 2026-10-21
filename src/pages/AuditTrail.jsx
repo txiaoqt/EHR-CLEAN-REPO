@@ -57,7 +57,20 @@ const actionTone = (action) => {
   return { bg: 'var(--color-blue-bg)', color: 'var(--color-blue-text)' };
 };
 
-const AuditTrail = () => {
+const AuditTrail = ({ administration = false, accountId = null, accountLabel = '', onClearAccount }) => {
+  const actionFilters = administration ? [
+    { value: 'all', label: 'All actions' },
+    { value: 'ADMIN_SUSPEND', label: 'Account suspensions' },
+    { value: 'ADMIN_REACTIVATE', label: 'Account reactivations' },
+    { value: 'ADMIN_CHANGE_ROLE', label: 'Staff role changes' },
+    { value: 'ADMIN_UNLOCK', label: 'Account unlocks' },
+    { value: 'STAFF_INVITATION_SENT', label: 'Invitations sent' },
+    { value: 'STAFF_INVITATION_ACCEPTED', label: 'Invitations accepted' },
+    { value: 'STAFF_INVITATION_REVOKE', label: 'Invitations revoked' },
+    { value: 'ADMIN_LOGIN_SUCCEEDED', label: 'Admin sign-ins' },
+    { value: 'ADMIN_LOGIN_FAILED', label: 'Failed admin sign-ins' },
+    ...ACTION_FILTERS.slice(1),
+  ] : ACTION_FILTERS;
   const { user } = useAuth();
 
   const [logs, setLogs] = useState([]);
@@ -83,6 +96,7 @@ const AuditTrail = () => {
   const applyFilters = useCallback(
     (query) => {
       let q = query;
+      if (accountId) q = q.eq('meta->>target_user_id', accountId);
       if (actionFilter !== 'all') q = q.eq('action', actionFilter);
       if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00+08:00`);
       if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59+08:00`);
@@ -94,7 +108,7 @@ const AuditTrail = () => {
       }
       return q;
     },
-    [actionFilter, dateFrom, dateTo, search]
+    [actionFilter, dateFrom, dateTo, search, accountId]
   );
 
   const fetchPage = useCallback(async () => {
@@ -136,18 +150,19 @@ const AuditTrail = () => {
   // Any filter change restarts at page 1.
   useEffect(() => {
     setPage(0);
-  }, [search, actionFilter, dateFrom, dateTo]);
+  }, [search, actionFilter, dateFrom, dateTo, accountId]);
 
   const activeFilterLines = useMemo(() => {
     const lines = [];
+    if (accountId) lines.push(`Account: ${accountLabel || 'Selected account'}`);
     if (actionFilter !== 'all') {
-      lines.push(`Action: ${ACTION_FILTERS.find((f) => f.value === actionFilter)?.label || actionFilter}`);
+      lines.push(`Action: ${actionFilters.find((f) => f.value === actionFilter)?.label || actionFilter}`);
     }
     if (dateFrom) lines.push(`From: ${dateFrom}`);
     if (dateTo) lines.push(`To: ${dateTo}`);
     if (search.trim()) lines.push(`Search: "${search.trim()}"`);
     return lines;
-  }, [actionFilter, dateFrom, dateTo, search]);
+  }, [actionFilter, dateFrom, dateTo, search, accountId, accountLabel]);
 
   const fetchAllForExport = useCallback(async () => {
     const { data, error } = await applyFilters(
@@ -174,6 +189,7 @@ const AuditTrail = () => {
   const hasFilters = activeFilterLines.length > 0;
 
   const clearFilters = () => {
+    onClearAccount?.();
     setSearch('');
     setActionFilter('all');
     setDateFrom('');
@@ -187,7 +203,7 @@ const AuditTrail = () => {
           <div className="page-header-title-block">
             <h1 className="page-header-title">Audit Trail</h1>
             <div className="page-header-subtitle">
-              Every recorded action across the staff portal — logins, record changes and data exports.
+              {administration ? 'Recorded account, invitation, and system activity.' : 'Every recorded action across the staff portal — logins, record changes and data exports.'}
             </div>
           </div>
           <div className="page-header-actions">
@@ -236,7 +252,7 @@ const AuditTrail = () => {
                 onChange={(e) => setActionFilter(e.target.value)}
                 aria-label="Filter by action"
               >
-                {ACTION_FILTERS.map((f) => (
+                {actionFilters.map((f) => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
               </select>

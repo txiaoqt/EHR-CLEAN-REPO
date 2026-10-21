@@ -5,7 +5,7 @@ import { registerStaffPresenceStop } from './utils/staffPresenceLifecycle.js';
 
 const StaffPresenceContext = createContext(null);
 const EMPTY = [];
-const STAFF_ROLES = ['physician', 'nurse', 'admin'];
+const STAFF_ROLES = ['physician', 'nurse'];
 const TOPIC_PREFIX = 'clinic-staff-presence:';
 
 export const useStaffPresence = () => {
@@ -19,7 +19,7 @@ export const StaffPresenceProvider = ({ children }) => {
   const authId = session?.user?.id || null;
   const enabled = Boolean(
     isAuthenticated && authId && !loading && !initializing &&
-    !isPasswordRecoverySession && user?.active !== false &&
+    !isPasswordRecoverySession && user?.active !== false && !user?.staff_setup_required &&
     (!user?.auth_user_id || user.auth_user_id === authId)
   );
   const isStaff = enabled && STAFF_ROLES.includes((user?.role || '').toLowerCase());

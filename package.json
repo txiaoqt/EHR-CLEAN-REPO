@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js --mode admin",
     "dev:admin": "node ./node_modules/vite/bin/vite.js --mode admin --port 5173 --strictPort",
+    "dev:staff": "node ./node_modules/vite/bin/vite.js --mode staff --port 5175 --strictPort",
     "dev:user": "node ./node_modules/vite/bin/vite.js --mode user --port 5174 --strictPort",
     "build": "node ./node_modules/vite/bin/vite.js build --mode admin",
     "build:admin": "node ./node_modules/vite/bin/vite.js build --mode admin",
+    "build:staff": "node ./node_modules/vite/bin/vite.js build --mode staff",
     "build:user": "node ./node_modules/vite/bin/vite.js build --mode user",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -29,6 +31,7 @@
     "react-router-dom": "^7.9.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "@vitejs/plugin-react": "^5.1.1",
     "supabase": "^2.116.0",
     "vite": "^7.2.4",

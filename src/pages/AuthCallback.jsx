@@ -39,6 +39,12 @@ const AuthCallback = () => {
       const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
 
+      if (type === 'invite' || user?.staff_setup_required) {
+        setIsPasswordRecoverySession(false);
+        if (mounted) navigate(`/staff/setup${window.location.search}${window.location.hash}`, { replace: true });
+        return;
+      }
+
       const isRecoveryRequest =
         type === 'recovery' ||
         rawHash.includes('type=recovery') ||

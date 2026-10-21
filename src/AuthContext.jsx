@@ -142,196 +142,16 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Helper to fetch user profile from public.admins (staff) or public.users (patients)
+  // Identity is resolved by the database, including suspension and invitation
+  // setup status. Cached roles and user-editable Auth metadata grant no access.
   const fetchUserProfile = useCallback(async (authUser) => {
     if (!authUser) return null;
-    try {
-      // 1. Check public.admins first for Staff accounts (admin, physician, nurse)
-      try {
-        const { data: adminData } = await supabase
-          .from('admins')
-          .select('id, name, email, avatar, role, auth_user_id, active, locked_until, department, clearance_level')
-          .or(`auth_user_id.eq.${authUser.id},email.ilike.${authUser.email}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (adminData) {
-          const role = (adminData.role || '').toLowerCase();
-          if (['admin', 'physician', 'nurse'].includes(role)) {
-            // Background link auth_user_id if not set
-            if (!adminData.auth_user_id) {
-              supabase
-                .from('admins')
-                .update({ auth_user_id: authUser.id })
-                .eq('id', adminData.id)
-                .then(() => {})
-                .catch(() => {});
-            }
-
-            return {
-              id: adminData.id,
-              auth_user_id: adminData.auth_user_id || authUser.id,
-              name: adminData.name || authUser.user_metadata?.name || authUser.email,
-              email: adminData.email || authUser.email,
-              avatar: adminData.avatar || null,
-              role,
-              patient_id: null,
-              active: adminData.active !== false,
-              locked_until: adminData.locked_until || null,
-              department: adminData.department || null,
-              clearance_level: adminData.clearance_level || null,
-            };
-          }
-        }
-      } catch (adminErr) {
-        console.warn('Error querying admins table:', adminErr);
-      }
-
-      // 2. Check public.users for Patient accounts
-      try {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, name, email, avatar, role, patient_id, auth_user_id, active, locked_until')
-          .or(`auth_user_id.eq.${authUser.id},email.ilike.${authUser.email}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (userData) {
-          // Background link auth_user_id if not set
-          if (!userData.auth_user_id) {
-            supabase
-              .from('users')
-              .update({ auth_user_id: authUser.id })
-              .eq('id', userData.id)
-              .then(() => {})
-              .catch(() => {});
-          }
-
-          let resolvedAvatar = userData.avatar || null;
-          if (!resolvedAvatar && userData.patient_id) {
-            try {
-              const { data: ppData } = await supabase
-                .from('patient_profiles')
-                .select('avatar_url')
-                .eq('patient_id', userData.patient_id)
-                .maybeSingle();
-              if (ppData?.avatar_url) resolvedAvatar = ppData.avatar_url;
-            } catch (_) {}
-          }
-
-          return {
-            id: userData.id,
-            auth_user_id: userData.auth_user_id || authUser.id,
-            name: userData.name || authUser.user_metadata?.name || authUser.email,
-            email: userData.email || authUser.email,
-            avatar: resolvedAvatar,
-            role: 'patient',
-            patient_id: userData.patient_id || null,
-            active: userData.active !== false,
-            locked_until: userData.locked_until || null,
-          };
-        }
-      } catch (userErr) {
-        console.warn('Error querying users table:', userErr);
-      }
-
-      // 3. Check public.enrollees — an applicant who has no TUP account yet.
-      //
-      // Checked after users and before the metadata fallback, because an
-      // enrollee is deliberately not in either of the other tables:
-      // sync_public_user_from_auth skips an unrecognised role, so signing up
-      // with role 'enrollee' creates no patient row. This is what makes that
-      // account usable without making it look like a patient.
-      try {
-        const { data: enrolleeData } = await supabase
-          .from('enrollees')
-          .select('id, auth_user_id, first_name, middle_name, surname, suffix, personal_email, applicant_id, status, tup_email, elevated_student_id')
-          .eq('auth_user_id', authUser.id)
-          .maybeSingle();
-
-        if (enrolleeData) {
-          const fullName = [
-            enrolleeData.first_name,
-            enrolleeData.middle_name,
-            enrolleeData.surname,
-            enrolleeData.suffix,
-          ]
-            .filter(Boolean)
-            .join(' ');
-          const isElevated = enrolleeData.status === 'elevated';
-
-          return {
-            id: enrolleeData.id,
-            auth_user_id: enrolleeData.auth_user_id || authUser.id,
-            name: fullName || authUser.email,
-            email: enrolleeData.personal_email || authUser.email,
-            avatar: null,
-            role: 'enrollee',
-            enrollee_status: enrolleeData.status || 'enrollee',
-            elevated: isElevated,
-            tup_email: enrolleeData.tup_email || null,
-            elevated_student_id: enrolleeData.elevated_student_id || null,
-            applicant_id: enrolleeData.applicant_id || null,
-            patient_id: null,
-            // An elevated enrollee account is retired; they sign in with their
-            // official @tup.edu.ph student account from then on.
-            active: !isElevated,
-            locked_until: null,
-          };
-        }
-      } catch (enrolleeErr) {
-        // A failure here must not block sign-in: the enrollee may simply not
-        // have completed registration yet, and the next step tells them so.
-        console.warn('Error querying enrollees table:', enrolleeErr);
-      }
-
-      // 4. Fallback: Check metadata if explicitly a patient (NEVER default to nurse!)
-      const metaRole = (authUser.user_metadata?.role || '').toLowerCase();
-      if (metaRole === 'patient') {
-        return {
-          id: authUser.id,
-          auth_user_id: authUser.id,
-          name: authUser.user_metadata?.name || authUser.email,
-          email: authUser.email,
-          avatar: null,
-          role: 'patient',
-          patient_id: authUser.user_metadata?.patient_id || null,
-          active: true,
-          locked_until: null,
-        };
-      }
-
-      // Signed up as an enrollee but no record yet: the OTP was confirmed and
-      // the registration RPC has not completed. Recognising this is better than
-      // returning null, which would sign them out with no explanation — instead
-      // the portal can tell them their registration is unfinished.
-      if (metaRole === 'enrollee') {
-        return {
-          id: authUser.id,
-          auth_user_id: authUser.id,
-          name: authUser.user_metadata?.name || authUser.email,
-          email: authUser.email,
-          avatar: null,
-          role: 'enrollee',
-          enrollee_status: 'incomplete',
-          first_name: authUser.user_metadata?.first_name || null,
-          middle_name: authUser.user_metadata?.middle_name || null,
-          surname: authUser.user_metadata?.surname || null,
-          suffix: authUser.user_metadata?.suffix || null,
-          date_of_birth: authUser.user_metadata?.date_of_birth || null,
-          applicant_id: authUser.user_metadata?.applicant_id || null,
-          patient_id: null,
-          active: true,
-          locked_until: null,
-        };
-      }
-
-      // Unknown or missing role — fail safely without granting staff access
-      return null;
-    } catch (err) {
-      console.warn('Error fetching user profile:', err);
+    const { data, error } = await supabase.rpc('get_my_portal_identity');
+    if (error) {
+      console.warn('[Auth] Could not verify account access:', error.code);
       return null;
     }
+    return data;
   }, []);
 
   useEffect(() => {
@@ -357,8 +177,8 @@ export const AuthProvider = ({ children }) => {
 
         if (initSession?.user) {
           const profile = await fetchUserProfile(initSession.user);
-          if (mounted && profile && sessionUserId.current === initSession.user.id) {
-            if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
+          if (mounted && sessionUserId.current === initSession.user.id) {
+            if (profile && isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
               setUser(profile);
               try {
                 localStorage.setItem('ehr_user', JSON.stringify(profile));
@@ -371,9 +191,7 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('ehr_user');
                 localStorage.removeItem('authUser');
               } catch (_) {}
-              if (!isRoleCompatibleWithSurface(profile.role)) {
-                supabase.auth.signOut().catch(() => {});
-              }
+              supabase.auth.signOut({ scope: 'local' }).catch(() => {});
             }
           }
         } else {
@@ -510,6 +328,31 @@ export const AuthProvider = ({ children }) => {
       } catch (_) {}
     }
   }, [setIsPasswordRecoverySession]);
+
+  // Backend policies revoke access immediately. This refresh also updates an
+  // already-open portal when an administrator suspends an account or changes its role.
+  useEffect(() => {
+    if (!session?.user?.id || !user || registrationInProgress) return;
+    let mounted = true;
+    let pending = false;
+    const refreshAccess = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const { data, error } = await supabase.rpc('get_my_portal_identity');
+        if (!mounted || error) return;
+        if (!data || data.active === false || !isRoleCompatibleWithSurface(data.role)) {
+          await logout({ scope: 'local' });
+        } else {
+          setUser(data);
+          try { localStorage.setItem('ehr_user', JSON.stringify(data)); localStorage.setItem('authUser', JSON.stringify(data)); } catch (_) {}
+        }
+      } finally { pending = false; }
+    };
+    const interval = setInterval(refreshAccess, 30000);
+    window.addEventListener('focus', refreshAccess);
+    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', refreshAccess); };
+  }, [session?.user?.id, Boolean(user), registrationInProgress, logout]);
 
   const updateUser = (partial) => {
     setUser((prev) => {

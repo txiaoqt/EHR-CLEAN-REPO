@@ -13,6 +13,7 @@
 
 export const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').toLowerCase();
 export const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
+export const IS_STAFF_SURFACE = DEPLOY_SURFACE === 'staff';
 export const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
 
 /** The two audiences of the student portal. */
@@ -27,12 +28,15 @@ export const isUserSurfaceRole = (role) => USER_SURFACE_ROLES.includes(normalize
 export const isRoleCompatibleWithSurface = (role) => {
   const normalized = normalizeRole(role);
   if (!normalized) return false;
-  return IS_ADMIN_SURFACE ? !isUserSurfaceRole(normalized) : isUserSurfaceRole(normalized);
+  if (IS_ADMIN_SURFACE) return normalized === 'admin';
+  if (IS_STAFF_SURFACE) return ['physician', 'nurse'].includes(normalized);
+  return IS_USER_SURFACE && isUserSurfaceRole(normalized);
 };
 
 /** Where a role lands after signing in on this deployment. */
 export const surfaceHomeForRole = (role) => {
   const normalized = normalizeRole(role);
+  if (normalized === 'admin') return '/admin/overview';
   if (normalized === 'enrollee') return '/enrollee/home';
   if (normalized === 'patient') return '/patient/dashboard';
   return '/dashboard';

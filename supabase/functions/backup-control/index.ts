@@ -129,36 +129,14 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (userError || !user) return fail("unauthorized", "Your session is invalid or expired.", 401);
 
-    // Staff only. The sidebar hides the page, but a hidden link is not access
-    // control — this is.
-    //
-    // The staff table is `admins`, not `users`: AuthContext checks `admins`
-    // first for admin/physician/nurse and only falls back to `users` for patient
-    // accounts. Querying `users` finds nothing for a physician and refuses a
-    // legitimate user — which is exactly what happened here.
-    //
-    // Matched on auth_user_id OR email, again as AuthContext does. Many rows have
-    // auth_user_id NULL until that person first signs in, so matching on
-    // auth_user_id alone would refuse a legitimate admin.
-    const { data: profile, error: profileError } = await supabase
-      .from("admins")
-      .select("role, auth_user_id, email")
-      .or(`auth_user_id.eq.${user.id},email.ilike.${user.email}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (profileError) {
-      // A real query failure is not the same as "no profile", and saying so
-      // saves the reader hunting for a permissions problem that does not exist.
-      return fail("lookup_failed", `Could not read the staff record (${profileError.code ?? "error"}).`, 500);
-    }
-
-    if (!profile) {
-      return fail(
-        "no_profile",
-        "No staff record matches this account. An administrator may need to set the email on your staff record to match your sign-in address.",
-        403
-      );
+    // Check the same live-session/account boundary as the portals. A valid
+    // signed JWT alone is insufficient after an administrator revokes access.
+    const caller = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      auth: { persistSession: false }, global: { headers: { Authorization: authHeader } },
+    });
+    const { data: profile, error: profileError } = await caller.rpc("get_my_portal_identity");
+    if (profileError || !profile || !profile.active || profile.staff_setup_required) {
+      return fail("forbidden", "Account access is unavailable. Sign in again or contact the administrator.", 403);
     }
 
     const role = String(profile.role ?? "").toLowerCase();

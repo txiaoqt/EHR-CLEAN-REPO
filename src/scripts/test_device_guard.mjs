@@ -44,7 +44,7 @@ const appPath = path.resolve('src/App.jsx');
 const appContent = fs.readFileSync(appPath, 'utf8');
 assert(appContent.includes('import PCAccessRequired'), 'PCAccessRequired imported in App.jsx');
 assert(appContent.includes('import { useStaffDeviceCheck }'), 'useStaffDeviceCheck imported in App.jsx');
-assert(appContent.includes('if (IS_ADMIN_SURFACE && !isStaffDeviceSupported)'), 'AppShell enforces PC Access safeguard before session load & Login');
+assert(appContent.includes('if (IS_STAFF_SURFACE && !isStaffDeviceSupported)'), 'AppShell enforces the clinical staff PC safeguard before Login');
 assert(appContent.includes('shouldRenderSidebar'), 'AppShell gates Sidebar from rendering on unsupported devices');
 
 console.log('\n========================================================================');

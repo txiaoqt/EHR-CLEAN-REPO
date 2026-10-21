@@ -1,19 +1,23 @@
 # Project notes for agents
 
-## Running both portals at once
+## Running the three portals
 
-The app ships as **two deployments** — the staff portal and the patient/enrollee
-portal — selected by the `VITE_DEPLOY_SURFACE` value, which Vite bakes into the
+The app ships as **three deployments** — system administration, clinic staff,
+and patients/enrollees — selected by `VITE_DEPLOY_SURFACE`, which Vite bakes into the
 bundle at build time. It is set by **mode**, not in `.env`:
 
 ```bash
-npm run dev:admin     # .env.admin -> staff portal   on :5173
+npm run dev:admin     # .env.admin -> system admin   on :5173
+npm run dev:staff     # .env.staff -> clinic staff   on :5175
 npm run dev:user      # .env.user  -> patient portal on :5174
 ```
 
-Run both in separate terminals to have them open simultaneously.
+Run each in a separate terminal to keep independent sessions. `npm run dev`
+defaults to system administration. Matching builds: `build:admin`, `build:staff`,
+and `build:user`. Only role `admin` may use the admin surface; `physician` and
+`nurse` use staff; `patient` and `enrollee` use user.
 
-**Why two ports rather than one combined value.** The surfaces are the same
+**Why separate ports rather than one combined value.** The surfaces are the same
 origin only if they share a port, and Supabase auth sessions live in
 `localStorage` — so two portals on one port share one session and signing in as
 staff would replace the patient session. Different ports are different origins,
@@ -21,7 +25,7 @@ so both sessions stay live in ordinary windows. A single server serving both
 would work for browsing but not for being signed in as both at once.
 
 Do **not** put `VITE_DEPLOY_SURFACE` in `.env`: that file is loaded for every
-mode and would override `.env.admin` / `.env.user`. Verified by building each
+mode and would override the mode files. Verified by building each
 mode and confirming the inlined literal — `npm run build:user` produces
 `"user".toLowerCase()`.
 

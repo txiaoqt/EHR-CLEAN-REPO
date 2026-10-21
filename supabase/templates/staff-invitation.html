@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Set Up Your Staff Account</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f4f6f8;">
+    <tr>
+      <td align="center" style="padding:28px 14px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+               style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e1e6ec;border-radius:14px;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="padding:28px 24px 24px;background:#ffffff;border-bottom:1px solid #e8ecf1;">
+              <img src="https://bvvzrrcyulbezzexlmav.supabase.co/storage/v1/object/public/TUP-LOGO/tupehrlogo.jpg" width="58" alt="TUP Manila Clinic"
+                   style="display:block;width:58px;height:auto;margin:0 auto 12px;border:0;outline:none;text-decoration:none;">
+              <div style="font-size:24px;line-height:30px;font-weight:700;color:#a7191f;">
+                TUP MANILA CLINIC
+              </div>
+              <div style="font-size:13px;line-height:18px;color:#65748a;margin-top:4px;letter-spacing:.35px;">
+                STAFF PORTAL
+              </div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:34px 36px 30px;">
+              <div style="font-size:24px;line-height:30px;font-weight:700;color:#172033;text-align:center;">
+                Set Up Your Staff Account
+              </div>
+
+              <div style="font-size:15px;line-height:24px;color:#52627a;text-align:center;margin-top:12px;">
+                Hello {{ .Data.name }}, you have been invited to the TUP Manila Clinic Staff Portal.
+                Set your own password to activate your {{ .Data.staff_role_label }} account.
+              </div>
+
+              <!-- Invitation confirmation happens only after the recipient opens setup. -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:26px auto 18px;">
+                <tr><td align="center" style="background:#a7191f;border-radius:6px;">
+                  <a href="{{ .Data.staff_setup_url }}?token_hash={{ .TokenHash }}&amp;type=invite" style="display:inline-block;padding:15px 26px;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;text-decoration:none;">Set up staff account</a>
+                </td></tr>
+              </table>
+              <!-- Expiration notice -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="width:100%;background:#fff7f7;border:1px solid #f0d9db;border-radius:8px;">
+                <tr>
+                  <td align="center" style="padding:11px 14px;">
+                    <div style="font-size:13px;line-height:20px;color:#6f4a4d;">
+                      <strong style="color:#a51c22;">This invitation expires in {{ .Data.invitation_minutes }} minutes.</strong>
+                      Open the link and finish setting your password before it expires.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security note -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="width:100%;background:#f6f8fa;border:1px solid #e4e9ef;border-radius:8px;margin-top:12px;">
+                <tr>
+                  <td style="padding:13px 15px;">
+                    <div style="font-size:13px;line-height:21px;color:#52627a;">
+                      <strong style="color:#172033;">Security note:</strong>
+                      Never share this invitation link or your password with anyone.
+                      Your account role is assigned by the clinic administrator.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="font-size:13px;line-height:21px;color:#7a879a;text-align:center;margin-top:20px;">
+                If you were not expecting this staff invitation, you can safely ignore this email.
+                No staff access is activated until account setup is completed.
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="background:#f3f6f9;border-top:1px solid #e1e6ec;padding:18px 24px 20px;">
+              <div style="font-size:12px;line-height:18px;color:#5f7087;">
+                Technological University of the Philippines — Manila Clinic
+              </div>
+              <div style="font-size:12px;line-height:18px;margin-top:2px;">
+                <a href="https://www.google.com/maps/search/?api=1&query=Ayala%20Boulevard%2C%20Ermita%2C%20Manila%2C%20Philippines" style="color:#1259b3;text-decoration:underline;">
+                  Ayala Boulevard, Ermita, Manila, Philippines
+                </a>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

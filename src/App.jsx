@@ -37,6 +37,8 @@ import PatientHelp from './pages/patient/PatientHelp.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
+import AdminPortal from './admin/AdminPortal.jsx';
+import StaffSetup from './admin/StaffSetup.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import PolicyAgreement from './components/PolicyAgreement.jsx';
 import LegalPolicy from './pages/LegalPolicy.jsx';
@@ -52,6 +54,7 @@ import { getClinicHoursMessage, hasRequiredRole, isWithinClinicHours } from './a
 import {
   DEPLOY_SURFACE,
   IS_ADMIN_SURFACE,
+  IS_STAFF_SURFACE,
   IS_USER_SURFACE,
   isRoleCompatibleWithSurface,
   isUserSurfaceRole as isUserSurfaceRoleOf,
@@ -97,13 +100,15 @@ const ProtectedRoute = ({
   // and they sign in with a personal address on the same portal patients use.
   // The rule comes from deploySurface.js rather than being restated here.
   const userSurfaceRole = isUserSurfaceRoleOf(userRole);
-  const isRoleAllowedOnSurface = IS_ADMIN_SURFACE ? !userSurfaceRole : userSurfaceRole;
+  const isRoleAllowedOnSurface = isRoleCompatibleWithSurface(userRole);
   if (!isRoleAllowedOnSurface) {
     const errorMessage = IS_ADMIN_SURFACE
       ? 'Student accounts are not allowed on this portal.'
       : 'Only student accounts can log in on this portal.';
     return <Navigate to="/login" replace state={{ sessionMessage: errorMessage }} />;
   }
+
+  if (user?.staff_setup_required) return <Navigate to="/staff/setup" replace />;
 
   if (!hasRequiredRole(user, allowedRoles)) {
     const fallbackHome = IS_USER_SURFACE ? surfaceHomeForRole(userRole) : '/dashboard';
@@ -210,8 +215,13 @@ function AppShell() {
     return () => { mounted = false; clearInterval(intervalId); };
   }, [isAuthenticated, isPasswordRecoverySession, logout, navigate]);
 
+  // Invitation setup can be completed on a phone. Clinical pages retain their
+  // existing desktop safeguard and do not mount during account setup.
+  if (IS_STAFF_SURFACE && (location.pathname === '/staff/setup' || user?.staff_setup_required)) {
+    return <StaffSetup />;
+  }
   // Gating order: Evaluate PC/Laptop Access Safeguard BEFORE session initialization and Login
-  if (IS_ADMIN_SURFACE && !isStaffDeviceSupported) {
+  if (IS_STAFF_SURFACE && !isStaffDeviceSupported) {
     return <PCAccessRequired viewport={viewport} onLogout={isAuthenticated ? logout : undefined} />;
   }
 
@@ -243,7 +253,7 @@ function AppShell() {
       loading={loading}
       initializing={initializing}
       allowedRoles={allowedRoles}
-      isStaffProtected={IS_ADMIN_SURFACE}
+      isStaffProtected={IS_STAFF_SURFACE}
       isStaffDeviceSupported={isStaffDeviceSupported}
       viewport={viewport}
       logout={logout}
@@ -331,7 +341,7 @@ function AppShell() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {IS_ADMIN_SURFACE && (
+        {IS_STAFF_SURFACE && (
           <>
             <Route path="/dashboard" element={guard(<Dashboard />, ['admin', 'physician', 'nurse'])} />
             <Route path="/appointments" element={guard(<Appointments />, ['admin', 'physician', 'nurse'])} />
@@ -383,9 +393,9 @@ function AppShell() {
 function App() {
   return (
     <Router>
-      <StaffPresenceProvider>
+      {IS_ADMIN_SURFACE ? <AdminPortal /> : <StaffPresenceProvider>
         <AppShell />
-      </StaffPresenceProvider>
+      </StaffPresenceProvider>}
     </Router>
   );
 }

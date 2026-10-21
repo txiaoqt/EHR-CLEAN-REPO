@@ -34,7 +34,7 @@ export const normalizeRole = (role) => (role || '').toString().trim().toLowerCas
 
 export const isPhysician = (user) => {
   const role = normalizeRole(user?.role);
-  return role === 'physician' || role === 'admin';
+  return role === 'physician';
 };
 
 export const isNurse = (user) => normalizeRole(user?.role) === 'nurse';
@@ -79,7 +79,7 @@ export const isWithinClinicHours = (date = new Date()) => {
   if (BYPASS_CLINIC_HOURS) return true;
 
   // User/patient portal has no time restriction.
-  if (IS_USER_SURFACE) return true;
+  if (IS_USER_SURFACE || DEPLOY_SURFACE === 'admin') return true;
 
   const { hour, minute } = getManilaClock(date);
   // Fail-open on frontend parsing issues; DB RLS/guards remain the authority.
