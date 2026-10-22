@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { adminAction, adminData, formatAdminDate } from './adminApi.js';
@@ -111,7 +111,9 @@ function ActionDialog({ action, onClose, onComplete }) {
 
 export function AdminAccounts({ kind }) {
   const navigate = useNavigate();
-  const query = new URLSearchParams(window.location.search);
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const accountSearchRef = useRef(null);
   const [tab, setTab] = useState(kind === 'staff' && query.get('tab') === 'invitations' ? 'invitations' : kind);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(query.get('status') || 'all');
@@ -121,17 +123,22 @@ export function AdminAccounts({ kind }) {
   const section = kind === 'users' ? 'users' : tab;
   const { data, loading, error, refresh } = useAdminData(section, search, status, page);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     setTab(kind === 'staff' && params.get('tab') === 'invitations' ? 'invitations' : kind);
     setSearch(''); setStatus(params.get('status') || 'all'); setPage(0);
     setAction(kind === 'staff' && params.get('invite') === '1' ? { type: 'invite_staff' } : null);
-  }, [kind]);
+  }, [kind, location.search]);
   const closeDialog = useCallback(() => setAction(null), []);
   const changeTab = value => { setTab(value); setSearch(''); setStatus('all'); setPage(0); navigate(`/admin/staff${value === 'invitations' ? '?tab=invitations' : ''}`, { replace: true }); };
   const open = (type, row) => setAction({ type, row });
   const rows = data?.rows || [];
   const total = data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / 20));
+  useEffect(() => {
+    if (!loading && !error && page >= totalPages) setPage(totalPages - 1);
+  }, [loading, error, page, totalPages]);
   const invitations = section === 'invitations';
+  const directoryTitle = invitations ? 'Staff invitations' : kind === 'staff' ? 'Staff directory' : 'User directory';
   const statuses = invitations ? ['pending', 'accepted', 'expired', 'revoked', 'failed', 'sending'] : ['active', 'suspended', 'locked', 'inactive', ...(kind === 'staff' ? ['invited'] : ['retired'])];
   return <main className="main"><div className="page">
     <Heading title={kind === 'staff' ? 'Staff Accounts' : 'User Accounts'} description={kind === 'staff' ? 'Invite clinic personnel and manage their sign-in access.' : 'Manage patient and enrollee account access and suspension status.'}>
@@ -139,15 +146,29 @@ export function AdminAccounts({ kind }) {
     </Heading>
     <Feedback message={message} />
     {kind === 'staff' && <div className="system-admin-tabs" role="tablist" aria-label="Staff account views"><button role="tab" aria-selected={tab === 'staff'} onClick={() => changeTab('staff')}>Staff directory</button><button role="tab" aria-selected={tab === 'invitations'} onClick={() => changeTab('invitations')}>Invitations</button></div>}
-    <section className="card system-admin-table-card" aria-label={invitations ? 'Staff invitations' : 'Account directory'} aria-busy={loading}>
-      <div className="system-admin-table-toolbar"><div className="system-admin-filter-search"><SearchIcon /><input aria-label="Search accounts" placeholder="Search name, email or ID…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} /></div><select aria-label="Filter by account status" value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}><option value="all">All statuses</option>{statuses.map(s => <option value={s} key={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}</select></div>
-      <LoadError error={error} retry={refresh} />
-      <div className="table-responsive"><table className="table system-admin-table"><thead><tr><th scope="col">{invitations ? 'Invited staff' : 'Account holder'}</th><th scope="col">Role / ID</th><th scope="col">Status</th><th scope="col">{invitations ? 'Sent / expires' : 'Last sign-in'}</th><th scope="col">Actions</th></tr></thead>
-        <tbody>{loading ? <tr><td colSpan={5} className="system-admin-table-empty" role="status">Loading {invitations ? 'invitations' : 'accounts'}…</td></tr> : !rows.length ? <tr><td colSpan={5} className="system-admin-table-empty"><strong>{search || status !== 'all' ? 'No matching accounts' : invitations ? 'No invitations yet' : 'No accounts found'}</strong><p>{invitations && !search ? 'Invite a staff member to get started.' : 'Try another search or status filter.'}</p></td></tr> : rows.map(row => <tr key={row.id || row.profile_id}>
+    <section className="card table-section-card system-admin-table-card" aria-label={directoryTitle} aria-busy={loading}>
+      <div className="table-section-header">
+        <div><h2>{directoryTitle}</h2><span className="card-subtitle">{invitations ? 'Track invitation delivery and account setup.' : kind === 'staff' ? 'Clinic staff accounts and sign-in access.' : 'Patient and enrollee accounts and sign-in access.'}</span></div>
+        <span className="badge badge-neutral" role="status">{loading ? 'Loading…' : `${total.toLocaleString()} ${invitations ? total === 1 ? 'invitation' : 'invitations' : total === 1 ? 'account' : 'accounts'}`}</span>
+      </div>
+      <div className="table-section-toolbar system-admin-table-toolbar">
+        <div className="system-admin-filter-search">
+          <SearchIcon size={16} />
+          <input ref={accountSearchRef} type="search" aria-label={invitations ? 'Search invitations' : 'Search accounts'} placeholder="Search name, email, or ID…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setPage(0); } }} />
+          {search && <button type="button" className="system-admin-clear-search" aria-label="Clear account search" onClick={() => { setSearch(''); setPage(0); accountSearchRef.current?.focus(); }}><CloseIcon size={14} /></button>}
+        </div>
+        <select aria-label="Filter by account status" value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}><option value="all">All statuses</option>{statuses.map(s => <option value={s} key={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}</select>
+      </div>
+      {error && <div className="table-section-feedback"><LoadError error={error} retry={refresh} /></div>}
+      <div className="table-responsive" tabIndex={0} role="region" aria-label={`${directoryTitle} records`}><table className="table system-admin-table">
+        <caption className="sr-only">{directoryTitle}</caption>
+        <colgroup><col className="system-admin-col-account" /><col className="system-admin-col-role" /><col className="system-admin-col-status" /><col className="system-admin-col-date" /><col className="system-admin-col-actions" /></colgroup>
+        <thead><tr><th scope="col">{invitations ? 'Invited staff' : 'Account holder'}</th><th scope="col">Role / ID</th><th scope="col">Status</th><th scope="col">{invitations ? 'Sent / expires' : 'Last sign-in'}</th><th scope="col" className="system-admin-actions-heading">Actions</th></tr></thead>
+        <tbody>{loading ? <tr><td colSpan={5} className="system-admin-table-empty" role="status">Loading {invitations ? 'invitations' : 'accounts'}…</td></tr> : error ? <tr className="table-empty-row"><td colSpan={5} className="system-admin-table-empty">{invitations ? 'Invitations could not be loaded.' : 'Accounts could not be loaded.'} Use Try again to reload.</td></tr> : !rows.length ? <tr className="table-empty-row"><td colSpan={5} className="system-admin-table-empty"><strong>{search || status !== 'all' ? invitations ? 'No matching invitations' : 'No matching accounts' : invitations ? 'No invitations yet' : 'No accounts found'}</strong><p>{invitations && !search && status === 'all' ? 'Invite a staff member to get started.' : 'Try another search or status filter.'}</p></td></tr> : rows.map(row => <tr key={row.id || row.profile_id}>
           <td><strong>{row.name}</strong><span className="system-admin-cell-sub">{row.email}</span>{row.department && <span className="system-admin-cell-sub">{row.department}</span>}</td>
           <td><span className="system-admin-capitalize">{row.role}</span>{row.identifier && <span className="system-admin-cell-sub">{row.identifier}</span>}</td>
           <td><Status value={invitations ? row.display_status : row.status} />{row.suspension_reason && row.status === 'suspended' && <span className="system-admin-cell-sub">{row.suspension_reason}</span>}{row.suspended_until && row.status === 'suspended' && <span className="system-admin-cell-sub">Until {formatAdminDate(row.suspended_until)}</span>}{row.last_error && <span className="system-admin-cell-error">{row.last_error}</span>}</td>
-          <td>{formatAdminDate(invitations ? row.last_sent_at : row.last_sign_in_at)}{invitations && <span className="system-admin-cell-sub">Expires {formatAdminDate(row.expires_at)}</span>}</td>
+          <td className="system-admin-date-cell">{formatAdminDate(invitations ? row.last_sent_at : row.last_sign_in_at)}{invitations && <span className="system-admin-cell-sub">Expires {formatAdminDate(row.expires_at)}</span>}</td>
           <td><div className="system-admin-row-actions">{invitations ? row.status !== 'accepted' && <><button className="btn secondary small" onClick={() => open('resend_invitation', row)}>Resend</button>{row.status !== 'revoked' && <button className="btn secondary small" onClick={() => open('revoke_invitation', row)}>Revoke</button>}</> : row.id && !['retired', 'invited'].includes(row.status) ? <>
             <button className="btn secondary small" onClick={() => open(row.status === 'suspended' || row.status === 'inactive' ? 'reactivate_account' : 'suspend_account', row)}>{row.status === 'suspended' || row.status === 'inactive' ? 'Reactivate' : 'Suspend'}</button>
             {row.status === 'locked' && <button className="btn secondary small" onClick={() => open('unlock_account', row)}>Unlock</button>}
@@ -156,7 +177,7 @@ export function AdminAccounts({ kind }) {
             <Link className="btn secondary small" to={`/admin/audit-trail?account=${row.id}&name=${encodeURIComponent(row.name)}`}>History</Link>
           </> : <span className="system-admin-muted">{row.status === 'retired' ? 'Elevated account' : row.status === 'invited' ? 'Setup pending' : 'No linked sign-in'}</span>}</div></td>
         </tr>)}</tbody></table></div>
-      <TablePagination page={page} totalPages={Math.max(1, Math.ceil(total / 20))} startIndex={total ? page * 20 + 1 : 0} endIndex={Math.min((page + 1) * 20, total)} total={total} onPageChange={setPage} disabled={loading} showWhenEmpty itemLabel={invitations ? 'invitations' : 'accounts'} />
+      {!loading && !error && <TablePagination page={page} totalPages={totalPages} startIndex={total ? page * 20 + 1 : 0} endIndex={Math.min((page + 1) * 20, total)} total={total} onPageChange={setPage} showWhenEmpty itemLabel={invitations ? 'invitations' : 'accounts'} />}
     </section>
     {kind === 'users' && <p className="system-admin-muted system-admin-directory-note">This directory shows account information. Clinical records remain in the Staff Portal.</p>}
     {action && <ActionDialog action={action} onClose={closeDialog} onComplete={text => { setAction(null); setMessage(text); if (action.type === 'invite_staff') changeTab('invitations'); refresh(); }} />}

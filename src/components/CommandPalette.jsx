@@ -12,21 +12,22 @@ import { useAuth } from '../AuthContext.jsx';
  * in a command-menu dependency for one list: the interaction is a filtered list
  * with arrow keys, Enter and Escape.
  *
- * The page list is the sidebar's own NAV_GROUPS, so the two can never disagree
- * about what exists or what it is called — including the `translate()` labels,
- * which the sidebar lowercases for i18n.
+ * Staff pages come from NAV_GROUPS, including its role gates and translated
+ * labels. Other portals can supply their own sidebar destinations.
  */
-const CommandPalette = ({ open, onOpenChange }) => {
+const CommandPalette = ({ open, onOpenChange, pages: customPages, label = 'Search pages' }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const dialogRef = useRef(null);
 
   const role = (user?.role || '').toLowerCase();
 
   const pages = useMemo(() => {
+    if (customPages) return customPages;
     const items = [];
     for (const group of NAV_GROUPS) {
       for (const item of group.items) {
@@ -42,13 +43,13 @@ const CommandPalette = ({ open, onOpenChange }) => {
       }
     }
     return items;
-  }, [role]);
+  }, [role, customPages]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return pages;
     return pages.filter(
-      (p) => p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q)
+      (p) => `${p.label} ${p.group} ${p.keywords || ''}`.toLowerCase().includes(q)
     );
   }, [pages, query]);
 
@@ -58,9 +59,15 @@ const CommandPalette = ({ open, onOpenChange }) => {
     if (open) {
       setQuery('');
       setActive(0);
+      const previousFocus = document.activeElement;
       // Focus after paint, or the input is not in the DOM yet.
       const id = requestAnimationFrame(() => inputRef.current?.focus());
-      return () => cancelAnimationFrame(id);
+      return () => {
+        cancelAnimationFrame(id);
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+          previousFocus.focus({ preventScroll: true });
+        }
+      };
     }
     return undefined;
   }, [open]);
@@ -84,16 +91,30 @@ const CommandPalette = ({ open, onOpenChange }) => {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
+      if (e.isComposing) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onOpenChange(false);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setActive((i) => Math.min(i + 1, matches.length - 1));
+        setActive((i) => Math.max(0, Math.min(i + 1, matches.length - 1)));
+        inputRef.current?.focus({ preventScroll: true });
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setActive((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter') {
+        inputRef.current?.focus({ preventScroll: true });
+      } else if (e.key === 'Tab') {
+        const controls = dialogRef.current?.querySelectorAll('input, button:not(:disabled)');
+        const first = controls?.[0];
+        const last = controls?.[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      } else if (e.key === 'Enter' && e.target === inputRef.current) {
         e.preventDefault();
         const choice = matches[active];
         if (choice) {
@@ -121,10 +142,11 @@ const CommandPalette = ({ open, onOpenChange }) => {
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Search pages"
+        aria-label={label}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="palette-input-row">
@@ -133,10 +155,13 @@ const CommandPalette = ({ open, onOpenChange }) => {
             ref={inputRef}
             type="text"
             className="palette-input"
-            placeholder="Search pages..."
+            placeholder={`${label}…`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search pages"
+            aria-label={label}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
             aria-controls="palette-results"
             aria-activedescendant={matches[active] ? `palette-item-${matches[active].page}` : undefined}
           />
@@ -159,6 +184,7 @@ const CommandPalette = ({ open, onOpenChange }) => {
                   data-active={index === active}
                   className="palette-item"
                   onMouseEnter={() => setActive(index)}
+                  onFocus={() => setActive(index)}
                   onClick={() => {
                     navigate(`/${p.page}`);
                     onOpenChange(false);

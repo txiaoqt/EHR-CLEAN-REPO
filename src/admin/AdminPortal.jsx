@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { useTheme } from '../ThemeContext.jsx';
@@ -11,20 +11,32 @@ import BackupRecovery from '../pages/BackupRecovery.jsx';
 import AuthCallback from '../pages/AuthCallback.jsx';
 import ResetPassword from '../pages/ResetPassword.jsx';
 import LegalPolicy from '../pages/LegalPolicy.jsx';
+import CommandPalette from '../components/CommandPalette.jsx';
 import logo from '../assets/images/tupehrlogo.jpg';
-import { DashboardIcon, UsersIcon, UserIcon, HistoryIcon, SettingsIcon, BackupIcon,
+import { DashboardIcon, UsersIcon, UserIcon, HistoryIcon, SettingsIcon, BackupIcon, MailIcon,
   ChevronLeftIcon, ChevronRightIcon, LogoutIcon, EyeIcon, EyeOffIcon, SearchIcon, CloseIcon } from '../components/icons/Icons.jsx';
 import './admin.css';
 
 const NAV = [
-  { path: '/admin/overview', label: 'Overview', Icon: DashboardIcon, group: 'MAIN' },
-  { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon },
-  { path: '/admin/users', label: 'User Accounts', Icon: UserIcon },
-  { path: '/admin/audit-trail', label: 'Audit Trail', Icon: HistoryIcon, group: 'SYSTEM' },
-  { path: '/admin/backup-recovery', label: 'Backup & Recovery', Icon: BackupIcon },
-  { path: '/admin/settings', label: 'System Settings', Icon: SettingsIcon },
-  { path: '/admin/account', label: 'My Account', Icon: UserIcon },
+  { path: '/admin/overview', label: 'Overview', Icon: DashboardIcon, group: 'MAIN', keywords: 'dashboard summary activity' },
+  { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon, keywords: 'directory clinic physician nurse clinician' },
+  { path: '/admin/users', label: 'User Accounts', Icon: UserIcon, keywords: 'patients students enrollees suspension access' },
+  { path: '/admin/audit-trail', label: 'Audit Trail', Icon: HistoryIcon, group: 'SYSTEM', keywords: 'logs history actions activity' },
+  { path: '/admin/backup-recovery', label: 'Backup & Recovery', Icon: BackupIcon, keywords: 'restore database history' },
+  { path: '/admin/settings', label: 'System Settings', Icon: SettingsIcon, keywords: 'clinic portals email redirects invitation expiry' },
+  { path: '/admin/account', label: 'My Account', Icon: UserIcon, keywords: 'profile name password security' },
 ];
+
+// The admin palette uses the same navigation list as the sidebar. Clinical
+// destinations from the staff palette are never included on this surface.
+const ADMIN_SEARCH_PAGES = NAV.reduce((pages, item) => {
+  const group = item.group || pages[pages.length - 1]?.group || 'MAIN';
+  pages.push({ page: item.path.slice(1), label: item.label, icon: item.Icon, group, keywords: item.keywords });
+  if (item.path === '/admin/staff') {
+    pages.push({ page: 'admin/staff?tab=invitations', label: 'Staff Invitations', icon: MailIcon, group, keywords: 'invite email pending setup' });
+  }
+  return pages;
+}, []);
 
 function AdminAuditTrail() {
   const location = useLocation();
@@ -58,24 +70,31 @@ function AdminLogin() {
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
   return <div className="system-admin-login">
-    <section className="system-admin-login-intro" aria-label="TUP Clinic system administration">
-      <div className="system-admin-login-brand"><img src={logo} alt="TUP Clinic" /><h1>TUP Manila Clinic</h1></div>
-      <h2>System Admin Portal</h2>
-      <p>Manage staff access, invitations, account security, and system activity for the clinic.</p>
-      <p className="system-admin-muted">For authorized system administrators.</p>
-    </section>
-    <section className="system-admin-login-card">
-      <h2>Administrator Log In</h2>
-      <form onSubmit={submit}>
-        <label>Username<input name="username" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={120} autoFocus /></label>
-        <label>Password<span className="system-admin-password"><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} />
-          <button type="button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? <EyeOffIcon /> : <EyeIcon />}</button></span></label>
-        {error && <div className="system-admin-login-error" role="alert">{error}</div>}
-        {location.state?.message && <p role="status">{location.state.message}</p>}
-        <button className="btn" disabled={busy || !username.trim() || !password}>{busy ? 'Signing in…' : 'Log In'}</button>
-      </form>
-      <p className="system-admin-login-footer">© Technological University of the Philippines</p>
-    </section>
+    <div className="system-admin-login-layout">
+      <section className="system-admin-login-intro" aria-label="TUP Clinic system administration">
+        <div className="system-admin-login-brand"><img src={logo} alt="TUP Clinic" /><h1>TUP Manila Clinic</h1></div>
+        <h2>System Admin Portal</h2>
+        <p>Manage staff access, invitations, account security, and system activity for the clinic.</p>
+        <p className="system-admin-muted">For authorized system administrators.</p>
+      </section>
+      <section className="system-admin-login-card" aria-labelledby="system-admin-login-title">
+        <div className="system-admin-login-mobile-brand">
+          <img src={logo} alt="TUP Clinic" />
+          <strong>TUP Manila Clinic</strong>
+          <span>System Admin Portal</span>
+        </div>
+        <h2 id="system-admin-login-title">Administrator Log In</h2>
+        <form onSubmit={submit}>
+          <label>Username<input name="username" type="text" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={120} autoFocus /></label>
+          <label>Password<span className="system-admin-password"><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} />
+            <button type="button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}</button></span></label>
+          {error && <div className="system-admin-login-error" role="alert">{error}</div>}
+          {location.state?.message && <p role="status">{location.state.message}</p>}
+          <button className="system-admin-login-submit" disabled={busy || !username.trim() || !password}>{busy ? 'Signing in…' : 'Log In'}</button>
+        </form>
+        <p className="system-admin-login-footer">© Technological University of the Philippines</p>
+      </section>
+    </div>
   </div>;
 }
 
@@ -85,8 +104,7 @@ export default function AdminPortal() {
   const { collapsed, toggle } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const searchRef = useRef(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobile, setMobile] = useState(() => window.innerWidth < 1024);
   const railCollapsed = collapsed && !mobile;
@@ -95,11 +113,10 @@ export default function AdminPortal() {
     window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
   }, []);
   useEffect(() => { document.title = 'TUP Clinic · System Admin'; document.documentElement.setAttribute('data-density', 'normal'); }, []);
-  useEffect(() => { setMobileOpen(false); setSearch(''); }, [location.pathname]);
+  useEffect(() => { setMobileOpen(false); setPaletteOpen(false); }, [location.pathname, location.search]);
   useEffect(() => {
     const key = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'k') { event.preventDefault(); searchRef.current?.focus(); }
-      if (event.key === 'Escape') { setSearch(''); setMobileOpen(false); }
+      if (event.key === 'Escape') setMobileOpen(false);
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, []);
@@ -132,9 +149,11 @@ export default function AdminPortal() {
     {mobileOpen && <button className="system-admin-backdrop" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     <header className="staff-topbar">
       <button className="btn secondary system-admin-mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation">{mobileOpen ? <CloseIcon /> : <ChevronRightIcon />}</button>
-      <div className="system-admin-search"><SearchIcon /><input ref={searchRef} placeholder="Search admin pages…" aria-label="Search administrator pages" value={search} onChange={e => setSearch(e.target.value)} /><kbd>Ctrl+K</kbd>
-        {search.trim() && <div className="system-admin-search-results">{NAV.filter(item => item.label.toLowerCase().includes(search.toLowerCase())).map(item => <Link key={item.path} to={item.path}>{item.label}</Link>)}{!NAV.some(item => item.label.toLowerCase().includes(search.toLowerCase())) && <p>No matching pages.</p>}</div>}
-      </div>
+      <button type="button" className="topbar-search" onClick={() => setPaletteOpen(true)} aria-label="Search admin pages" aria-haspopup="dialog" aria-expanded={paletteOpen}>
+        <SearchIcon size={16} />
+        <span className="topbar-search-label">Search admin pages…</span>
+        <span className="palette-kbd">Ctrl+K</span>
+      </button>
       <div className="system-admin-topbar-actions"><select aria-label="Appearance" value={theme} onChange={e => setTheme(e.target.value)}><option value="light">Light</option><option value="dark">Dark</option><option value="system">Auto</option></select><Link to="/admin/account"><span className="topbar-avatar" aria-hidden="true">{(user.name || 'A')[0]}</span><span>{user.name}</span></Link></div>
     </header>
     <div id="system-admin-content" className="system-admin-content" tabIndex={-1}>
@@ -149,5 +168,6 @@ export default function AdminPortal() {
         <Route path="*" element={<Navigate to="/admin/overview" replace />} />
       </Routes>
     </div>
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} pages={ADMIN_SEARCH_PAGES} label="Search admin pages" />
   </div>;
 }
