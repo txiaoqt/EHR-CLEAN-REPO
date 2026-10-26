@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
 import { useTheme } from '../../ThemeContext.jsx';
 import {
@@ -13,7 +13,8 @@ import {
 import CommandPalette from '../CommandPalette.jsx';
 
 /**
- * The staff portal's top bar: page search and the account menu.
+ * Shared clinic top bar: page search and the account menu. Administration
+ * supplies its own search destinations and account route; staff keeps defaults.
  *
  * Modelled on the reference admin. The menu is deliberately short — name, email,
  * appearance, sign out — because Settings and the Audit Trail already have their
@@ -23,17 +24,27 @@ import CommandPalette from '../CommandPalette.jsx';
  * toggle: "Auto" is a real mode that follows the OS and keeps following it, not
  * a one-off resolution of whatever the OS happened to be at click time.
  */
-const StaffTopBar = () => {
+const StaffTopBar = ({ pages, searchLabel = 'Search pages', accountActions = [], navigationControl, onSignOut, interactionBlocked = false }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
 
   const displayName = user?.name || 'Staff';
   const email = user?.email || '';
   const initial = (displayName.trim().split(/\s+/).pop() || '?').charAt(0).toUpperCase();
+
+  useEffect(() => {
+    setMenuOpen(false);
+    setPaletteOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => { if (paletteOpen) setMenuOpen(false); }, [paletteOpen]);
+  useEffect(() => { if (interactionBlocked) { setMenuOpen(false); setPaletteOpen(false); } }, [interactionBlocked]);
 
   useEffect(() => {
     const onOutside = (e) => {
@@ -51,11 +62,14 @@ const StaffTopBar = () => {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape' && menuOpen) {
+        setMenuOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [menuOpen]);
 
   const appearances = [
     { id: 'light', label: 'Light', Icon: SunIcon },
@@ -66,24 +80,30 @@ const StaffTopBar = () => {
   return (
     <>
       <header className="staff-topbar">
+        {navigationControl}
         <button
           type="button"
           className="topbar-search"
           onClick={() => setPaletteOpen(true)}
-          aria-label="Search pages"
+          aria-label={searchLabel}
+          aria-haspopup="dialog"
+          aria-expanded={paletteOpen}
+          disabled={interactionBlocked}
         >
           <SearchIcon size={16} />
-          <span className="topbar-search-label">Search pages...</span>
+          <span className="topbar-search-label">{searchLabel}...</span>
           <span className="palette-kbd">Ctrl+K</span>
         </button>
 
         <div className="topbar-account" ref={menuRef}>
           <button
+            ref={triggerRef}
             type="button"
             className="topbar-account-trigger"
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
+            disabled={interactionBlocked}
           >
             <span className="topbar-avatar" aria-hidden="true">{initial}</span>
             <span className="topbar-account-name">{displayName}</span>
@@ -98,6 +118,11 @@ const StaffTopBar = () => {
               </div>
 
               <div className="topbar-menu-divider" />
+
+              {accountActions.map(({ id, label, Icon, onSelect }) => <button key={id} type="button" role="menuitem" className="topbar-menu-item"
+                onClick={() => { setMenuOpen(false); triggerRef.current?.focus(); onSelect(); }}>
+                {Icon && <Icon size={15} />}<span>{label}</span>
+              </button>)}
 
               <div className="topbar-menu-section">
                 <span className="topbar-menu-heading">Appearance</span>
@@ -130,6 +155,7 @@ const StaffTopBar = () => {
                 className="topbar-menu-item is-danger"
                 onClick={() => {
                   setMenuOpen(false);
+                  if (onSignOut) { onSignOut(); return; }
                   logout();
                   navigate('/login');
                 }}
@@ -142,7 +168,7 @@ const StaffTopBar = () => {
         </div>
       </header>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      {!interactionBlocked && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} pages={pages} label={searchLabel} />}
     </>
   );
 };

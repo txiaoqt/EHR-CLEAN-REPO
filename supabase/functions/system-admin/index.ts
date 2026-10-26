@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.86.0';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../_shared/passwordPolicy.mjs';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,6 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 });
 const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-const passwordIsValid = (value: unknown) => typeof value === 'string' && value.length >= 12 && value.length <= 128 && /[A-Za-z]/.test(value) && /[0-9]/.test(value);
 const portalUrl = (value: unknown) => {
   let url: URL;
   try { url = new URL(String(value)); } catch { throw new RequestError('Enter a valid portal URL.'); }
@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
     const service = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, options);
     const operation = async (actor: string | null, name: string, data: Record<string, unknown> = {}) => {
       const { data: result, error } = await service.rpc('system_admin_action', { p_actor: actor, p_action: name, p_payload: data });
-      if (error) throw new RequestError(error.message, error.code === '42501' ? 403 : 400);
+      if (error) throw new RequestError(error.message.replace('Use My Account.', 'Use the account menu.'), error.code === '42501' ? 403 : error.code === '23505' ? 409 : 400);
       return result;
     };
 
@@ -81,17 +81,55 @@ Deno.serve(async (req: Request) => {
     if (identityError || !identity || !identity.active) throw new RequestError('Account access is unavailable. Sign in again or contact the administrator.', 403);
 
     if (action === 'complete_invitation') {
-      if (!identity.staff_setup_required || !['physician', 'nurse'].includes(identity.role)) throw new RequestError('No active staff invitation is available.', 403);
-      if (!passwordIsValid(payload.password)) throw new RequestError('Use 12–128 characters, including a letter and a number.');
-      const { error } = await service.auth.admin.updateUserById(user.id, { password: String(payload.password), app_metadata: { ...user.app_metadata, staff_role: identity.role } });
+      if (!identity.staff_setup_required || !['physician', 'nurse', 'admin'].includes(identity.role)) throw new RequestError('No active invitation is available.', 403);
+      if (!isPasswordValid(payload.password)) throw new RequestError(PASSWORD_POLICY_MESSAGE);
+      const administrator = identity.role === 'admin';
+      const username = String(payload.username || '').trim().toLowerCase();
+      if (administrator && !/^[a-z][a-z0-9_]{2,39}$/.test(username)) throw new RequestError('Use 3–40 lowercase letters, numbers or underscores, starting with a letter.');
+      const metadata = { ...user.app_metadata, app_role: identity.role, ...(!administrator ? { staff_role: identity.role } : {}) };
+      const { error } = await service.auth.admin.updateUserById(user.id, { password: String(payload.password), app_metadata: metadata });
       if (error) throw new RequestError('Could not set your password. Try again.');
-      const result = await operation(user.id, 'complete_invitation');
-      // The invitation session cannot be reused as a clinical session. Sign in
+      let result;
+      if (administrator) {
+        const { data, error: completeError } = await service.rpc('complete_administrator_invitation', { p_actor: user.id, p_username: username });
+        if (completeError) throw new RequestError(completeError.message);
+        result = data;
+      } else {
+        result = await operation(user.id, 'complete_invitation');
+      }
+      // The invitation session cannot be reused as a portal session. Sign in
       // with the newly chosen password after setup to create a fresh session.
       await service.auth.admin.signOut(bearer, 'global');
       return json(result);
     }
     if (identity.role !== 'admin' || identity.staff_setup_required) throw new RequestError('System administrator access required.', 403);
+    if (['delete_invitation','delete_administrator','delete_user_account'].includes(action)) {
+      if (!uuid(payload.id)) throw new RequestError('Choose an account or invitation to delete.');
+      const parameters = { p_actor: user.id, p_kind: action === 'delete_invitation' ? 'invitation' : action === 'delete_user_account' ? 'user' : 'administrator',
+        p_target: payload.id, p_confirmation_email: String(payload.confirmation_email || '').trim().toLowerCase() };
+      const deletion = async (stage: string) => {
+        const { data, error } = await service.rpc('admin_delete_account', { ...parameters, p_stage: stage });
+        if (error) throw new RequestError(error.message, error.code === '42501' ? 403 : 400);
+        return data;
+      };
+      const prepared = await deletion('prepare');
+      if (prepared.completed) return json({ deleted: true });
+      if (prepared.auth_user_id && !prepared.auth_deleted) {
+        // Sessions and portal access have already been disabled transactionally.
+        // Soft deletion preserves historical Auth foreign keys and frees the
+        // email for a new invitation. Never cascade-delete clinical records.
+        const { error } = await service.auth.admin.deleteUser(prepared.auth_user_id, true);
+        if (error && error.code !== 'user_not_found') {
+          throw new RequestError('Access has been disabled, but the sign-in could not be deleted. Retry delete to finish cleanup.', 503);
+        }
+      }
+      try { await deletion('complete'); }
+      catch (error) {
+        if (error instanceof RequestError && error.status === 403) throw error;
+        throw new RequestError('Access has been disabled, but cleanup is incomplete. Retry delete to finish.', 503);
+      }
+      return json({ deleted: true });
+    }
     const { data: settings } = await caller.rpc('admin_portal_data', { p_section: 'settings' });
     if (!settings) throw new RequestError('Could not load system settings.', 503);
     const staffOrigin = portalUrl(settings.staff_portal_url);
@@ -99,9 +137,9 @@ Deno.serve(async (req: Request) => {
     if (action === 'invite_staff' || action === 'resend_invitation') {
       let invitation;
       if (action === 'invite_staff') {
-        if (!['physician', 'nurse'].includes(String(payload.role))) throw new RequestError('Choose Physician or Nurse.');
+        if (!['physician', 'nurse', 'admin'].includes(String(payload.role))) throw new RequestError('Choose Admin, Physician or Nurse.');
         const name = String(payload.name || '').trim();
-        if (name.length < 2 || name.length > 120) throw new RequestError('Enter the staff member’s full name.');
+        if (name.length < 2 || name.length > 120) throw new RequestError('Enter the recipient’s full name.');
         invitation = await operation(user.id, 'invite_reserve', {
           name, email: String(payload.email || '').trim().toLowerCase(), role: payload.role,
           department: String(payload.department || 'University Clinic').trim(),
@@ -111,9 +149,13 @@ Deno.serve(async (req: Request) => {
         invitation = await operation(user.id, 'invite_resend', { id: payload.id });
       }
       try {
+        const administrator = invitation.role === 'admin';
+        const setupOrigin = administrator ? portalUrl(settings.admin_portal_url) : staffOrigin;
+        const setupUrl = `${setupOrigin}/${administrator ? 'admin' : 'staff'}/setup`;
         const inviteData = { role: 'staff_invited', name: invitation.name, invitation_id: invitation.id,
-          staff_role_label: invitation.role === 'physician' ? 'Physician' : 'Nurse',
-          staff_setup_url: `${staffOrigin}/staff/setup`,
+          staff_role_label: administrator ? 'Administrator' : invitation.role === 'physician' ? 'Physician' : 'Nurse',
+          portal_label: administrator ? 'System Admin Portal' : 'Staff Portal',
+          staff_setup_url: setupUrl,
           invitation_minutes: Math.max(1, Math.round((Date.parse(invitation.expires_at) - Date.now()) / 60000)) };
         const { data: recoverableId, error: recoveryError } = await service.rpc('admin_invitation_auth_user', {
           p_actor: user.id, p_invitation: invitation.id,
@@ -122,7 +164,7 @@ Deno.serve(async (req: Request) => {
         let invitedUserId = recoverableId;
         if (!invitedUserId) {
           const { data, error } = await service.auth.admin.inviteUserByEmail(invitation.email, {
-            data: inviteData, redirectTo: `${staffOrigin}/staff/setup`,
+            data: inviteData, redirectTo: setupUrl,
           });
           if (error || !data.user) throw new Error(error?.message || 'Invitation could not be sent.');
           invitedUserId = data.user.id;
@@ -136,9 +178,9 @@ Deno.serve(async (req: Request) => {
           });
           if (metadataError) throw new Error('Could not refresh the invitation details. Try again.');
           const { error } = existing?.user?.email_confirmed_at
-            ? await service.auth.resetPasswordForEmail(invitation.email, { redirectTo: `${staffOrigin}/staff/setup` })
+            ? await service.auth.resetPasswordForEmail(invitation.email, { redirectTo: setupUrl })
             : await service.auth.admin.inviteUserByEmail(invitation.email, {
-              data: inviteData, redirectTo: `${staffOrigin}/staff/setup`,
+              data: inviteData, redirectTo: setupUrl,
             });
           if (error) throw new Error(error.message);
         }
@@ -167,9 +209,10 @@ Deno.serve(async (req: Request) => {
       if (!uuid(payload.id)) throw new RequestError('Choose an account.');
       const { data: target, error: targetError } = await service.auth.admin.getUserById(String(payload.id));
       if (targetError || !target.user?.email) throw new RequestError('Account not found.');
-      if (target.user.id === user.id) throw new RequestError('Change your password in My Account.');
+      if (target.user.id === user.id) throw new RequestError('Use Change password in the account menu.');
       const { data: staff } = await service.from('admins').select('role').eq('auth_user_id', target.user.id).maybeSingle();
       if (staff?.role === 'admin') throw new RequestError('System administrator accounts are protected.');
+      if (!staff || !['physician','nurse'].includes(staff.role)) throw new RequestError('User accounts reset their password through Forgot password on the patient portal.', 403);
       const origin = staff ? staffOrigin : portalUrl(settings.user_portal_url);
       const { error } = await service.auth.resetPasswordForEmail(target.user.email, { redirectTo: `${origin}/auth/callback?type=recovery` });
       if (error) throw new RequestError('The password reset email could not be sent. Try again later.');
@@ -186,9 +229,14 @@ Deno.serve(async (req: Request) => {
         user_portal_url: portalUrl(payload.user_portal_url), invitation_expiry_minutes: minutes });
       return json({ settings: result });
     }
-    if (action === 'save_profile') return json(await operation(user.id, 'save_profile', { name: payload.name }));
+    if (action === 'save_profile') {
+      if (typeof payload.name !== 'string') throw new RequestError('Enter your full name.');
+      const { data, error } = await service.rpc('update_administrator_name', { p_actor: user.id, p_name: payload.name });
+      if (error) throw new RequestError(error.message, error.code === '42501' ? 403 : error.code === '23505' ? 409 : 400);
+      return json(data);
+    }
     if (action === 'change_password') {
-      if (!passwordIsValid(payload.password)) throw new RequestError('Use 12–128 characters, including a letter and a number.');
+      if (!isPasswordValid(payload.password)) throw new RequestError(PASSWORD_POLICY_MESSAGE);
       const passwordClient = createClient(url, anon, options);
       const { data, error } = await passwordClient.auth.signInWithPassword({ email: user.email!, password: String(payload.current_password || '') });
       if (error || !data.user) throw new RequestError('Your current password is incorrect.', 401);

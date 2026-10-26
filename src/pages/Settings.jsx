@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient.js';
 import { loadSettings, saveSettings as saveSettingsUtil } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { useTheme } from '../ThemeContext.jsx';
+import PasswordRequirements from '../components/PasswordRequirements.jsx';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy.js';
 import { SunIcon, MoonIcon, DesktopIcon } from '../components/icons/Icons.jsx';
 
 /**
@@ -81,8 +83,8 @@ const Settings = () => {
       flash('The two passwords do not match.', 'error');
       return;
     }
-    if (newPassword.length < 8) {
-      flash('Use at least 8 characters.', 'error');
+    if (!isPasswordValid(newPassword)) {
+      flash(PASSWORD_POLICY_MESSAGE, 'error');
       return;
     }
     setSavingPassword(true);
@@ -180,7 +182,7 @@ const Settings = () => {
             <div className="settings-subhead">
               <div className="settings-subhead-title">Change password</div>
               <div className="settings-subhead-note">
-                Minimum 8 characters. Your email and role are managed by clinic administration.
+                Your email and role are managed by clinic administration.
               </div>
             </div>
 
@@ -189,6 +191,9 @@ const Settings = () => {
                 <label htmlFor="new-password">New password</label>
                 <input
                   id="new-password"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
+                  aria-describedby="staff-password-requirements"
                   type="password"
                   className="input"
                   value={newPassword}
@@ -209,12 +214,13 @@ const Settings = () => {
               </div>
             </div>
 
+            <PasswordRequirements id="staff-password-requirements" password={newPassword} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button
                 type="button"
                 className="btn"
                 onClick={changePassword}
-                disabled={savingPassword || !newPassword || !confirmPassword}
+                disabled={savingPassword || !isPasswordValid(newPassword) || newPassword !== confirmPassword}
               >
                 {savingPassword ? 'Updating…' : 'Update password'}
               </button>

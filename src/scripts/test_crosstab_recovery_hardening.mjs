@@ -38,7 +38,10 @@ assert(
   'Success modal Close button uses explicit high-contrast styling (#0f172a on #f1f5f9)'
 );
 assert(
-  resetCode.includes("fontWeight: 600"),
+  resetCode.includes("fontWeight: 600") || (
+    resetCode.includes("fontWeight: 'var(--font-weight-semibold)'") &&
+    Number(fs.readFileSync(path.join(projectRoot, 'src/styles/variables.css'), 'utf8').match(/--font-weight-semibold:\s*(\d+)/)?.[1]) >= 600
+  ),
   'Success modal Close button has prominent font weight'
 );
 
@@ -87,8 +90,10 @@ assert(
   appCode.includes('return <Navigate to="/reset-password" replace />;'),
   'ProtectedRoute redirects to /reset-password whenever isPasswordRecoverySession is active'
 );
+const shellExpression = appCode.match(/const canAccessAuthenticatedHome\s*=\s*([^;]+);/)?.[1];
+const canAccessShell = shellExpression && new Function('isAuthenticated', 'isRoleAllowedOnSurface', 'isPasswordRecoverySession', 'registrationInProgress', 'isWithinClinicHours', `return Boolean(${shellExpression});`);
 assert(
-  appCode.includes('canAccessAuthenticatedHome = isAuthenticated && !isPasswordRecoverySession'),
+  canAccessShell && !canAccessShell(true, true, true, false, () => true) && canAccessShell(true, true, false, false, () => true),
   'canAccessAuthenticatedHome strictly blocks authenticated portal shell when recovery is active'
 );
 

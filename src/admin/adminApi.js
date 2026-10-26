@@ -11,12 +11,22 @@ export async function adminAction(action, payload = {}) {
   return data;
 }
 
-export async function adminData(section, { search = '', status = 'all', page = 0 } = {}) {
+export async function adminData(section, { search = '', status = 'all', page = 0, signal } = {}) {
   const { data, error } = await supabase.rpc('admin_portal_data', {
     p_section: section, p_search: search.trim(), p_status: status, p_page: page + 1,
-  });
+  }).abortSignal(signal);
   if (error) throw new Error(error.code === '42501'
     ? 'Administrator access is unavailable. Sign in again.' : 'Could not load this information. Try again.');
+  return data;
+}
+
+export async function adminAccountHistory({ accountId = null, search = '', action = 'all', dateFrom = '', dateTo = '', page = 0, exportAll = false, signal } = {}) {
+  const { data, error } = await supabase.rpc('admin_account_history', {
+    p_account: accountId, p_search: search.trim(), p_action: action,
+    p_date_from: dateFrom || null, p_date_to: dateTo || null, p_page: page + 1, p_export: exportAll,
+  }).abortSignal(signal);
+  if (error) throw new Error(error.code === '42501'
+    ? 'Administrator access is unavailable. Sign in again.' : 'Could not load account history. Try again.');
   return data;
 }
 

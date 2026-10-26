@@ -69,10 +69,14 @@ Deploy the same repo in three Vercel projects with different environment values:
 An existing staff deployment that previously used `admin` must change its
 environment value to `staff` before redeploying this version.
 
-After deployment, configure the actual origins in **Admin → System Settings**.
-The invitation destination is **the staff origin + `/staff/setup`**. In Supabase
-Authentication → URL Configuration, add that setup URL and the staff/user
-`/auth/callback` URLs. Update the origins before resending a local test invitation.
+Portal origins are stored in the private server configuration. For a new database,
+review and apply `supabase/scripts/configure_production_portal_origins.sql` as a
+database administrator to replace the initial localhost URLs with this project's
+production domains. The script preserves origins that have already been customized.
+The invitation destination is **the staff origin + `/staff/setup`**, or
+**the admin origin + `/admin/setup`** for the Admin role. In Supabase
+Authentication → URL Configuration, add both setup URLs and the staff/user
+`/auth/callback` URLs. Configure the origins before resending a local test invitation.
 
 See [System administration](docs/system-administration.md) for email templates,
 initial admin setup, access controls, and verification commands.

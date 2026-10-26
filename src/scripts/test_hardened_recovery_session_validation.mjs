@@ -35,7 +35,7 @@ assert(fs.existsSync(resetPath), 'ResetPassword.jsx exists');
 const resetCode = fs.readFileSync(resetPath, 'utf8');
 
 assert(!resetCode.includes('if (session || isRecoveryUrl)'), 'Removed permissive "if (session || isRecoveryUrl)" shortcut');
-assert(resetCode.includes("useState('checking')"), 'Initializes explicit recovery state machine in checking state');
+assert(resetCode.includes("isPasswordRecoverySession ? 'valid' : 'checking'"), 'Starts in checking state unless AuthContext has already verified recovery');
 assert(resetCode.includes("setRecoveryState('valid')"), 'Transitions to explicit valid recovery state');
 assert(resetCode.includes("setRecoveryState('invalid')") || resetCode.includes("setRecoveryState((prev) => (prev === 'valid' ? 'valid' : 'invalid'))"), 'Transitions to explicit invalid recovery state');
 assert(resetCode.includes("setRecoveryState('success')"), 'Transitions to explicit success state');

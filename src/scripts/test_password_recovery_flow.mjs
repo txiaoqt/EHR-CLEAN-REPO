@@ -71,7 +71,7 @@ assert(resetCode.includes('TUP Manila Clinic') && resetCode.includes('tupehrlogo
 assert(resetCode.includes('EyeIcon') && resetCode.includes('EyeOffIcon'), 'Includes Show/Hide password toggle icons');
 assert(resetCode.includes('showNewPass') && resetCode.includes('showConfirmNewPass'), 'Supports individual visibility toggle for new and confirm password fields');
 assert(resetCode.includes('Passwords do not match.'), 'Validates matching password fields with user-facing warning');
-assert(resetCode.includes('.length >= 6') || resetCode.includes('.length < 6'), 'Enforces 6-character minimum password length');
+assert(resetCode.includes('isPasswordValid(newPass)'), 'Enforces the shared 8-character password policy');
 assert(resetCode.includes('Update Password'), 'Features "Update Password" action button');
 assert(resetCode.includes('Updating password...') || resetCode.includes('Updating Password'), 'Displays loading text during submission');
 assert(resetCode.includes('Back to Login'), 'Provides navigation back to Login page');
@@ -94,7 +94,7 @@ assert(resetCode.includes('supabase.auth.signOut()'), 'Performs clean session cl
 assert(resetCode.includes('Password updated successfully.'), 'Provides clear success confirmation');
 assert(resetCode.includes('Continue to Login'), 'Offers "Continue to Login" action upon successful reset');
 assert(
-  resetCode.includes('This password reset link is invalid or has expired'),
+  resetCode.includes('This password reset link has expired or is no longer valid.'),
   'Gracefully handles invalid or expired recovery tokens'
 );
 

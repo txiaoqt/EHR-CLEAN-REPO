@@ -1,5 +1,5 @@
 // src/pages/AuditTrail.jsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { SearchIcon, ChevronDownIcon, CloseIcon } from '../components/icons/Icons.jsx';
@@ -7,6 +7,8 @@ import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { auditLogsExportConfig } from '../utils/export/configs.js';
+import { adminAccountHistory } from '../admin/adminApi.js';
+import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 
 const PAGE_SIZE = 25;
 // Ceiling for a full export. A clinic log is small; this just stops a runaway
@@ -62,6 +64,10 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
     { value: 'all', label: 'All actions' },
     { value: 'ADMIN_SUSPEND', label: 'Account suspensions' },
     { value: 'ADMIN_REACTIVATE', label: 'Account reactivations' },
+    { value: 'ADMIN_NAME_CHANGED', label: 'Administrator name changes' },
+    { value: 'ADMIN_USER_ACCOUNT_DELETED', label: 'User account deletions' },
+    { value: 'ADMIN_ACCOUNT_DELETED', label: 'Administrator deletions' },
+    { value: 'STAFF_INVITATION_DELETED', label: 'Invitation deletions' },
     { value: 'ADMIN_CHANGE_ROLE', label: 'Staff role changes' },
     { value: 'ADMIN_UNLOCK', label: 'Account unlocks' },
     { value: 'STAFF_INVITATION_SENT', label: 'Invitations sent' },
@@ -77,6 +83,8 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const requestRef = useRef(null);
+  const loadedKey = useRef('');
   const [page, setPage] = useState(0);
 
   const [search, setSearch] = useState('');
@@ -112,33 +120,46 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
   );
 
   const fetchPage = useCallback(async () => {
-    setLoading(true);
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const key = JSON.stringify([administration, accountId, actionFilter, dateFrom, dateTo, search, page]);
+    setLoading(loadedKey.current !== key);
     setLoadError('');
     try {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      const { data, error, count } = await applyFilters(
-        supabase.from('audit_logs').select('*', { count: 'exact' })
-      )
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-      setLogs(data || []);
-      setTotal(count || 0);
+      let rows, totalRows;
+      if (administration) {
+        const result = await adminAccountHistory({ accountId, search, action: actionFilter, dateFrom, dateTo, page, signal: controller.signal });
+        rows = result.rows; totalRows = result.total;
+      } else {
+        const from = page * PAGE_SIZE;
+        const { data, error, count } = await applyFilters(supabase.from('audit_logs').select('*', { count: 'exact' }))
+          .order('created_at', { ascending: false }).order('id', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1).abortSignal(controller.signal);
+        if (error) throw error;
+        rows = data; totalRows = count;
+      }
+      if (controller.signal.aborted) return;
+      loadedKey.current = key;
+      setLogs(rows || []);
+      setTotal(totalRows || 0);
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error('Failed to load audit trail:', err);
       setLoadError(err?.message || 'Failed to load the audit trail.');
       setLogs([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) { setLoading(false); requestRef.current = null; }
     }
-  }, [applyFilters, page]);
+  }, [applyFilters, administration, accountId, search, actionFilter, dateFrom, dateTo, page]);
 
   useEffect(() => {
     fetchPage();
+    return () => requestRef.current?.abort();
   }, [fetchPage]);
+
+  useVisibleRefresh(() => { if (!requestRef.current) fetchPage(); }, administration);
 
   // Live-append when new entries are written anywhere in the portal.
   useEffect(() => {
@@ -165,6 +186,10 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
   }, [actionFilter, dateFrom, dateTo, search, accountId, accountLabel]);
 
   const fetchAllForExport = useCallback(async () => {
+    if (administration) {
+      const result = await adminAccountHistory({ accountId, search, action: actionFilter, dateFrom, dateTo, exportAll: true });
+      return result.rows || [];
+    }
     const { data, error } = await applyFilters(
       supabase.from('audit_logs').select('*')
     )
@@ -172,7 +197,7 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
       .limit(EXPORT_ROW_LIMIT);
     if (error) throw error;
     return data || [];
-  }, [applyFilters]);
+  }, [applyFilters, administration, accountId, search, actionFilter, dateFrom, dateTo]);
 
   const exporter = useTableExport({
     config: auditLogsExportConfig,
@@ -184,6 +209,7 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
   });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  useEffect(() => { if (!loading && !loadError && page >= totalPages) setPage(totalPages - 1); }, [loading, loadError, page, totalPages]);
   const startIndex = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const endIndex = Math.min((page + 1) * PAGE_SIZE, total);
   const hasFilters = activeFilterLines.length > 0;
@@ -216,7 +242,11 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
           </div>
         </div>
 
-        <div className="card table-section-card audit-trail-table-card">
+        {administration && accountId && <div className="system-admin-history-filter" role="region" aria-label="Selected account history">
+          <div><strong>Account history: {accountLabel || 'Selected account'}</strong><p>Actions performed by or affecting this account. Older entries that were not linked to an account may not appear.</p></div>
+          <button type="button" className="btn secondary small" onClick={clearFilters}>View all activity</button>
+        </div>}
+        <div className="card table-section-card audit-trail-table-card" aria-busy={loading}>
           <div className="card-header table-section-header">
             <div>
               <h3 className="card-title" style={{ fontSize: 'var(--font-size-md)' }}>Activity Log</h3>
@@ -306,7 +336,7 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
                       Loading audit entries…
                     </td>
                   </tr>
-                ) : logs.length === 0 ? (
+                ) : logs.length === 0 ? !administration && (
                   <tr className="table-empty-row">
                     <td colSpan={4}>{hasFilters ? 'No matching audit entries' : 'No audit entries yet'}</td>
                   </tr>
@@ -335,6 +365,11 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
               </tbody>
             </table>
           </div>
+
+          {administration && !loading && !loadError && !logs.length && <div className="system-admin-table-state" role="status">
+            <p className="system-admin-table-state-title">{accountId ? 'No recorded activity for this account' : hasFilters ? 'No matching audit entries' : 'No audit entries yet'}</p>
+            <p className="system-admin-table-state-description">{accountId ? 'New linked activity will appear here automatically.' : hasFilters ? 'Try adjusting your search or filters.' : 'Account and system activity will appear here.'}</p>
+          </div>}
 
           <TablePagination
             page={page}

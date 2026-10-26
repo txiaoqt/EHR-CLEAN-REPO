@@ -38,9 +38,9 @@ export class BackupControlError extends Error {
   }
 }
 
-const invoke = async (action) => {
+const invoke = async (action, { signal } = {}) => {
   try {
-    const { data, error } = await supabase.functions.invoke('backup-control', { body: { action } });
+    const { data, error } = await supabase.functions.invoke('backup-control', { body: { action }, signal });
     if (error) {
       // The function returns { code, error }; prefer its code so the message
       // matches the real cause rather than a generic one.
@@ -121,8 +121,8 @@ export const formatDuration = (run) => {
   return seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
 };
 
-export async function fetchBackupRuns() {
-  const result = await invoke('list_runs');
+export async function fetchBackupRuns(options = {}) {
+  const result = await invoke('list_runs', options);
   if (!Array.isArray(result.runs)) throw new BackupControlError('control_unavailable');
   return {
     runs: result.runs.map(displayRun),

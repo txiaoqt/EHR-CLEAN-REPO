@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
+import PasswordRequirements from '../components/PasswordRequirements.jsx';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy.js';
 import { EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import bg1Image from '../assets/images/bg1.jpg';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
@@ -131,13 +133,13 @@ const ResetPassword = () => {
 
   // Validation rules
   const passwordsMatch = newPass && confirmNewPass && newPass === confirmNewPass;
-  const isLengthValid = newPass.length >= 6;
+  const isNewPasswordValid = isPasswordValid(newPass);
   const isSubmitDisabled =
     loading ||
     !newPass.trim() ||
     !confirmNewPass.trim() ||
     !passwordsMatch ||
-    !isLengthValid;
+    !isNewPasswordValid;
 
   const handleUpdatePassword = async (e) => {
     if (e) e.preventDefault();
@@ -151,8 +153,8 @@ const ResetPassword = () => {
       setMsg('Passwords do not match.');
       return;
     }
-    if (newPass.length < 6) {
-      setMsg('Password must be at least 6 characters.');
+    if (!isPasswordValid(newPass)) {
+      setMsg(PASSWORD_POLICY_MESSAGE);
       return;
     }
 
@@ -391,7 +393,10 @@ const ResetPassword = () => {
                   className="input"
                   style={{ ...authInputStyle, paddingRight: 40 }}
                   type={showNewPass ? 'text' : 'password'}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
+                  aria-describedby="reset-password-requirements"
                   autoComplete="new-password"
                   value={newPass}
                   onChange={(e) => setNewPass(e.target.value)}
@@ -420,6 +425,8 @@ const ResetPassword = () => {
                 </button>
               </div>
             </div>
+
+            <PasswordRequirements id="reset-password-requirements" password={newPass} inverse />
 
             {/* Confirm New Password Field */}
             <div style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>

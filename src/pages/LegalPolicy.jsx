@@ -20,6 +20,7 @@ export default function LegalPolicy({ type }) {
   const id = useId();
   const page = useRef(null);
   const title = useRef(null);
+  const toolbar = useRef(null);
   const readingArea = useRef(null);
   const tabButtons = useRef({});
   const previousType = useRef(null);
@@ -30,6 +31,17 @@ export default function LegalPolicy({ type }) {
   const returningToForm = location.state?.policyBackgroundLocation?.pathname === '/login';
 
   useEffect(() => { title.current?.focus({ preventScroll: true }); }, []);
+
+  useEffect(() => {
+    const element = toolbar.current;
+    if (!element) return undefined;
+    const measure = () => page.current?.style.setProperty('--policy-toolbar-height', `${Math.ceil(element.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
 
   useEffect(() => {
     const previous = document.title;
@@ -57,9 +69,10 @@ export default function LegalPolicy({ type }) {
     const update = () => {
       frame = 0;
       let current = policySectionId(type, 0);
+      const readingTop = (toolbar.current?.getBoundingClientRect().bottom || 64) + 24;
       sections.forEach((_, index) => {
         const sectionId = policySectionId(type, index);
-        if (document.getElementById(sectionId)?.getBoundingClientRect().top <= 128) current = sectionId;
+        if (document.getElementById(sectionId)?.getBoundingClientRect().top <= readingTop) current = sectionId;
       });
       const bounds = page.current?.getBoundingClientRect();
       if (bounds && bounds.bottom <= window.innerHeight + 2) current = policySectionId(type, sections.length - 1);
@@ -123,29 +136,33 @@ export default function LegalPolicy({ type }) {
 
       <section className="policy-page-intro" aria-labelledby={id + '-title'}>
         <div className="policy-page-container">
-          <h1 ref={title} tabIndex={-1} id={id + '-title'}>Legal policies</h1>
+          <h1 ref={title} tabIndex={-1} id={id + '-title'}>Legal Policies</h1>
           <p>Understand how the TUP Manila Clinic portal handles your information and the terms for using its services.</p>
         </div>
       </section>
 
-      <div className="policy-page-container policy-page-content">
-        <div className="policy-page-tabs" role="tablist" aria-label="Legal policies">
-          {POLICY_TABS.map(([value, label]) => (
-            <button key={value} ref={(element) => { tabButtons.current[value] = element; }}
-              type="button" role="tab" id={id + '-' + value + '-tab'}
-              aria-selected={type === value} aria-controls={id + '-panel'}
-              tabIndex={type === value ? 0 : -1} onClick={() => switchTab(value)}
-              onKeyDown={(event) => {
-                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-                event.preventDefault();
-                const next = event.key === 'Home' ? 'privacy' : event.key === 'End' ? 'terms'
-                  : type === 'privacy' ? 'terms' : 'privacy';
-                switchTab(next);
-                tabButtons.current[next]?.focus();
-              }}>{label}</button>
-          ))}
+      <div ref={toolbar} className="policy-page-toolbar">
+        <div className="policy-page-container">
+          <div className="policy-page-tabs" role="tablist" aria-label="Legal policies">
+            {POLICY_TABS.map(([value, label]) => (
+              <button key={value} ref={(element) => { tabButtons.current[value] = element; }}
+                type="button" role="tab" id={id + '-' + value + '-tab'}
+                aria-selected={type === value} aria-controls={id + '-panel'}
+                tabIndex={type === value ? 0 : -1} onClick={() => switchTab(value)}
+                onKeyDown={(event) => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === 'Home' ? 'privacy' : event.key === 'End' ? 'terms'
+                    : type === 'privacy' ? 'terms' : 'privacy';
+                  switchTab(next);
+                  tabButtons.current[next]?.focus();
+                }}>{label}</button>
+            ))}
+          </div>
         </div>
+      </div>
 
+      <div className="policy-page-container policy-page-content">
         <div ref={readingArea} className="policy-page-reading-layout" id={id + '-panel'}
           role="tabpanel" aria-labelledby={id + '-' + type + '-tab'} aria-busy={checking} tabIndex={0}>
           {checking ? (

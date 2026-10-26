@@ -1,7 +1,8 @@
 import { runtime } from './supabase-runtime.mjs';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../../supabase/functions/_shared/passwordPolicy.mjs';
 const { service } = runtime();
 const password = process.env.EHR_ADMIN_INITIAL_PASSWORD;
-if (!password || password.length < 12) throw new Error('Supply EHR_ADMIN_INITIAL_PASSWORD with at least 12 characters.');
+if (!isPasswordValid(password)) throw new Error(`Supply EHR_ADMIN_INITIAL_PASSWORD. ${PASSWORD_POLICY_MESSAGE}`);
 const email = 'ehradmin@admin.tup-clinic.invalid';
 const { data: existing, error: lookupError } = await service.from('admins').select('auth_user_id,role').eq('email', email).maybeSingle();
 if (lookupError) throw new Error(`Could not check the initial administrator (${lookupError.code}).`);

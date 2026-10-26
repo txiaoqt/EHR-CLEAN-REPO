@@ -1,30 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
-import { useTheme } from '../ThemeContext.jsx';
 import { supabase } from '../supabaseClient.js';
 import { useSidebar } from '../useSidebar.js';
 import { adminAction } from './adminApi.js';
-import { AdminOverview, AdminAccounts, AdminSettings, AdminMyAccount } from './AdminScreens.jsx';
+import { AdminOverview, AdminAccounts } from './AdminScreens.jsx';
+import AdminAccountDialog from './AdminAccountDialog.jsx';
 import AuditTrail from '../pages/AuditTrail.jsx';
 import BackupRecovery from '../pages/BackupRecovery.jsx';
 import AuthCallback from '../pages/AuthCallback.jsx';
 import ResetPassword from '../pages/ResetPassword.jsx';
 import LegalPolicy from '../pages/LegalPolicy.jsx';
-import CommandPalette from '../components/CommandPalette.jsx';
+import StaffSetup from './StaffSetup.jsx';
+import StaffTopBar from '../components/header/StaffTopBar.jsx';
 import logo from '../assets/images/tupehrlogo.jpg';
-import { DashboardIcon, UsersIcon, UserIcon, HistoryIcon, SettingsIcon, BackupIcon, MailIcon,
-  ChevronLeftIcon, ChevronRightIcon, LogoutIcon, EyeIcon, EyeOffIcon, SearchIcon, CloseIcon } from '../components/icons/Icons.jsx';
+import { DashboardIcon, UsersIcon, UserIcon, HistoryIcon, BackupIcon, MailIcon,
+  ChevronLeftIcon, ChevronRightIcon, LogoutIcon, EyeIcon, EyeOffIcon, CloseIcon, LockIcon } from '../components/icons/Icons.jsx';
 import './admin.css';
 
 const NAV = [
   { path: '/admin/overview', label: 'Overview', Icon: DashboardIcon, group: 'MAIN', keywords: 'dashboard summary activity' },
+  { path: '/admin/administrators', label: 'Administrators', Icon: UsersIcon, keywords: 'admins administration directory access' },
   { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon, keywords: 'directory clinic physician nurse clinician' },
   { path: '/admin/users', label: 'User Accounts', Icon: UserIcon, keywords: 'patients students enrollees suspension access' },
   { path: '/admin/audit-trail', label: 'Audit Trail', Icon: HistoryIcon, group: 'SYSTEM', keywords: 'logs history actions activity' },
   { path: '/admin/backup-recovery', label: 'Backup & Recovery', Icon: BackupIcon, keywords: 'restore database history' },
-  { path: '/admin/settings', label: 'System Settings', Icon: SettingsIcon, keywords: 'clinic portals email redirects invitation expiry' },
-  { path: '/admin/account', label: 'My Account', Icon: UserIcon, keywords: 'profile name password security' },
 ];
 
 // The admin palette uses the same navigation list as the sidebar. Clinical
@@ -32,8 +32,8 @@ const NAV = [
 const ADMIN_SEARCH_PAGES = NAV.reduce((pages, item) => {
   const group = item.group || pages[pages.length - 1]?.group || 'MAIN';
   pages.push({ page: item.path.slice(1), label: item.label, icon: item.Icon, group, keywords: item.keywords });
-  if (item.path === '/admin/staff') {
-    pages.push({ page: 'admin/staff?tab=invitations', label: 'Staff Invitations', icon: MailIcon, group, keywords: 'invite email pending setup' });
+  if (item.path === '/admin/staff' || item.path === '/admin/administrators') {
+    pages.push({ page: `${item.path.slice(1)}?tab=invitations`, label: item.path === '/admin/administrators' ? 'Administrator Invitations' : 'Staff Invitations', icon: MailIcon, group, keywords: 'invite email pending setup' });
   }
   return pages;
 }, []);
@@ -66,7 +66,7 @@ function AdminLogin() {
       });
       if (sessionError) throw new Error('Could not establish your session. Sign in again.');
       login(result.profile);
-      navigate(result.profile.must_change_password ? '/admin/account' : '/admin/overview', { replace: true });
+      navigate('/admin/overview', { replace: true });
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
   return <div className="system-admin-login">
@@ -100,12 +100,12 @@ function AdminLogin() {
 
 export default function AdminPortal() {
   const { user, loading, initializing, isAuthenticated, isPasswordRecoverySession, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
   const { collapsed, toggle } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountDialog, setAccountDialog] = useState(null);
+  const [accountMessage, setAccountMessage] = useState('');
   const [mobile, setMobile] = useState(() => window.innerWidth < 1024);
   const railCollapsed = collapsed && !mobile;
   useEffect(() => {
@@ -113,20 +113,28 @@ export default function AdminPortal() {
     window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
   }, []);
   useEffect(() => { document.title = 'TUP Clinic · System Admin'; document.documentElement.setAttribute('data-density', 'normal'); }, []);
-  useEffect(() => { setMobileOpen(false); setPaletteOpen(false); }, [location.pathname, location.search]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
+  useEffect(() => { setAccountMessage(''); }, [location.pathname]);
+  useEffect(() => {
+    if (!accountMessage) return undefined;
+    const timer = setTimeout(() => setAccountMessage(''), 5000);
+    return () => clearTimeout(timer);
+  }, [accountMessage]);
+  useEffect(() => { if (!isAuthenticated) { setAccountDialog(null); setAccountMessage(''); } }, [isAuthenticated]);
   useEffect(() => {
     const key = (event) => {
       if (event.key === 'Escape') setMobileOpen(false);
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, []);
+  if (location.pathname === '/admin/setup') return <StaffSetup administration />;
   if (location.pathname === '/auth/callback') return <AuthCallback />;
   if (location.pathname === '/reset-password') return <ResetPassword />;
   if (location.pathname === '/privacy' || location.pathname === '/terms') return <LegalPolicy type={location.pathname === '/privacy' ? 'privacy' : 'terms'} />;
   if (loading || initializing) return <div className="system-admin-loading" role="status">Loading your administrator session…</div>;
   if (isPasswordRecoverySession) return <Navigate to="/reset-password" replace />;
   if (!isAuthenticated || user?.role !== 'admin' || user.active === false) return <AdminLogin />;
-  if (user.must_change_password && location.pathname !== '/admin/account') return <Navigate to="/admin/account" replace />;
+  if (user.staff_setup_required) return <Navigate to="/admin/setup" replace />;
   const signOut = async () => { await logout(); navigate('/login', { replace: true }); };
   return <div id="app-root" className={`system-admin has-staff-topbar ${railCollapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'system-admin-mobile-open' : ''}`}>
     <a className="system-admin-skip" href="#system-admin-content">Skip to content</a>
@@ -136,7 +144,7 @@ export default function AdminPortal() {
           <Link className="brand" to="/admin/overview"><img className="logo-img" src={logo} alt="TUP Clinic" /><div className="brand-text"><h1 className="brand-title">TUP CLINIC</h1><div className="brand-sub">System Admin Portal</div></div></Link>
           <button type="button" className="sidebar-collapse-btn" onClick={toggle} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}>{collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}</button>
         </div>
-        <Link className="sidebar-user-widget" to="/admin/account" title="My Account"><span className="system-admin-avatar">{(user.name || 'A')[0]}</span><div className="sidebar-user-info"><div className="sidebar-user-name">{user.name}</div><div className="sidebar-user-role">System Administrator</div></div></Link>
+        <div className="sidebar-user-widget"><span className="system-admin-avatar">{(user.name || 'A')[0]}</span><div className="sidebar-user-info"><div className="sidebar-user-name">{user.name}</div><div className="sidebar-user-role">System Administrator</div></div></div>
         <nav className="menu">
           {NAV.map(({ path, label, Icon, group }) => <React.Fragment key={path}>
             {group && <div className="nav-group-label">{group}</div>}
@@ -147,27 +155,26 @@ export default function AdminPortal() {
       </aside>
     </div>
     {mobileOpen && <button className="system-admin-backdrop" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
-    <header className="staff-topbar">
-      <button className="btn secondary system-admin-mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation">{mobileOpen ? <CloseIcon /> : <ChevronRightIcon />}</button>
-      <button type="button" className="topbar-search" onClick={() => setPaletteOpen(true)} aria-label="Search admin pages" aria-haspopup="dialog" aria-expanded={paletteOpen}>
-        <SearchIcon size={16} />
-        <span className="topbar-search-label">Search admin pages…</span>
-        <span className="palette-kbd">Ctrl+K</span>
-      </button>
-      <div className="system-admin-topbar-actions"><select aria-label="Appearance" value={theme} onChange={e => setTheme(e.target.value)}><option value="light">Light</option><option value="dark">Dark</option><option value="system">Auto</option></select><Link to="/admin/account"><span className="topbar-avatar" aria-hidden="true">{(user.name || 'A')[0]}</span><span>{user.name}</span></Link></div>
-    </header>
+    <StaffTopBar pages={ADMIN_SEARCH_PAGES} searchLabel="Search admin pages" onSignOut={signOut}
+      interactionBlocked={Boolean(user.must_change_password || accountDialog)}
+      accountActions={[{ id: 'change-name', label: 'Change Name', Icon: UserIcon, onSelect: () => setAccountDialog('name') },
+        { id: 'change-password', label: 'Change Password', Icon: LockIcon, onSelect: () => setAccountDialog('password') }]}
+      navigationControl={<button type="button" className="btn secondary system-admin-mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileOpen} aria-controls="sidebar-container">{mobileOpen ? <CloseIcon /> : <ChevronRightIcon />}</button>} />
     <div id="system-admin-content" className="system-admin-content" tabIndex={-1}>
-      <Routes>
+      {!user.must_change_password && <Routes>
         <Route path="/admin/overview" element={<AdminOverview />} />
+        <Route path="/admin/administrators" element={<AdminAccounts kind="administrators" />} />
         <Route path="/admin/staff" element={<AdminAccounts kind="staff" />} />
         <Route path="/admin/users" element={<AdminAccounts kind="users" />} />
         <Route path="/admin/audit-trail" element={<AdminAuditTrail />} />
         <Route path="/admin/backup-recovery" element={<BackupRecovery />} />
-        <Route path="/admin/settings" element={<AdminSettings />} />
-        <Route path="/admin/account" element={<AdminMyAccount />} />
+        <Route path="/admin/account" element={<Navigate to="/admin/overview" replace />} />
         <Route path="*" element={<Navigate to="/admin/overview" replace />} />
-      </Routes>
+      </Routes>}
     </div>
-    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} pages={ADMIN_SEARCH_PAGES} label="Search admin pages" />
+    {(user.must_change_password || accountDialog) && <AdminAccountDialog key={user.must_change_password ? 'required-password' : accountDialog}
+      type={user.must_change_password ? 'password' : accountDialog} required={Boolean(user.must_change_password)} onClose={() => setAccountDialog(null)}
+      onSaved={message => { setAccountDialog(null); setAccountMessage(message); }} onSignOut={signOut} />}
+    {accountMessage && <div className="system-admin-notice system-admin-account-notice" role="status"><span>{accountMessage}</span><button type="button" className="system-admin-icon-btn" aria-label="Dismiss message" onClick={() => setAccountMessage('')}><CloseIcon size={16} /></button></div>}
   </div>;
 }

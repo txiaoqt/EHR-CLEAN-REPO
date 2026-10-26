@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { useTheme, getSystemTheme } from '../../ThemeContext.jsx';
+import PasswordRequirements from '../../components/PasswordRequirements.jsx';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../../utils/passwordPolicy.js';
 import {
   SunIcon,
   MoonIcon,
@@ -278,8 +280,8 @@ const PatientSettings = () => {
     e.preventDefault();
     setPasswordMsg({ text: '', type: '' });
 
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordMsg({ text: 'Password must be at least 6 characters long.', type: 'danger' });
+    if (!isPasswordValid(newPassword)) {
+      setPasswordMsg({ text: PASSWORD_POLICY_MESSAGE, type: 'danger' });
       return;
     }
 
@@ -734,7 +736,7 @@ const PatientSettings = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', display: 'block', marginBottom: 4, color: 'var(--text)' }}>
-                      New Password (Minimum 6 characters) *
+                      New Password *
                     </label>
                     <div style={{ position: 'relative' }}>
                       <input
@@ -745,7 +747,9 @@ const PatientSettings = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        minLength={6}
+                        minLength={PASSWORD_MIN_LENGTH}
+                        maxLength={PASSWORD_MAX_LENGTH}
+                        aria-describedby="patient-password-requirements"
                       />
                       <button
                         type="button"
@@ -780,11 +784,13 @@ const PatientSettings = () => {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
                       required
-                      minLength={6}
+                      minLength={PASSWORD_MIN_LENGTH}
+                      maxLength={PASSWORD_MAX_LENGTH}
                     />
                   </div>
                 </div>
 
+                <PasswordRequirements id="patient-password-requirements" password={newPassword} />
                 <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                   <button
                     type="button"
@@ -797,7 +803,7 @@ const PatientSettings = () => {
                   <button
                     type="submit"
                     className="btn primary"
-                    disabled={passwordUpdating}
+                    disabled={passwordUpdating || !isPasswordValid(newPassword) || newPassword !== confirmPassword}
                   >
                     {passwordUpdating ? 'Updating...' : 'Update Password'}
                   </button>

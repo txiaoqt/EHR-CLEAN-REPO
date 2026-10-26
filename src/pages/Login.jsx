@@ -13,6 +13,8 @@ import {
 import { useAuth } from '../AuthContext.jsx';
 import { logAudit } from '../utils.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
+import PasswordRequirements from '../components/PasswordRequirements.jsx';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, createTemporaryPassword } from '../utils/passwordPolicy.js';
 import {
   getClinicHoursMessage,
   getLockoutMessage,
@@ -467,7 +469,7 @@ const Login = () => {
       // 1. Sign up with Supabase Auth to trigger OTP verification email (State 1: New Account)
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email: targetEmail,
-        password: signupData.password || 'TupPatientTempPass@2026',
+        password: createTemporaryPassword(),
         options: {
           data: {
             name: composeFullName({
@@ -606,7 +608,7 @@ const Login = () => {
       // so the account cannot be signed into until the applicant replaces it
       // with their own after verifying (see handleEnrolleeSignup). If they never
       // finish, the account stays unreachable rather than half-open.
-      const placeholderPassword = `${crypto.randomUUID()}Aa1`;
+      const placeholderPassword = createTemporaryPassword();
 
       const { error: authErr } = await supabase.auth.signUp({
         email: targetEmail,
@@ -691,8 +693,8 @@ const Login = () => {
 
     // The password is chosen here, after the code was sent, so it is validated
     // here rather than before the address was ever contacted.
-    if (!enrolleeData.password || enrolleeData.password.length < 6) {
-      setMsg('Please choose a password of at least 6 characters.');
+    if (!isPasswordValid(enrolleeData.password)) {
+      setMsg(PASSWORD_POLICY_MESSAGE);
       return;
     }
     if (enrolleeData.password !== enrolleeData.confirmPassword) {
@@ -837,8 +839,8 @@ const Login = () => {
       setMsg('Passwords do not match.');
       return;
     }
-    if (payload.password.length < 6) {
-      setMsg('Password must be at least 6 characters.');
+    if (!isPasswordValid(payload.password)) {
+      setMsg(PASSWORD_POLICY_MESSAGE);
       return;
     }
     if (!payload.otp) {
@@ -877,6 +879,14 @@ const Login = () => {
 
       if (!authUserId) {
         authUserId = (await supabase.auth.getUser())?.data?.user?.id;
+      }
+
+      // Replace the random OTP-only password with the password chosen here.
+      const { error: passwordError } = await supabase.auth.updateUser({ password: payload.password });
+      if (passwordError) {
+        setMsg(passwordError.message || 'Could not save your password. Please try again.');
+        setLoading(false);
+        return;
       }
 
       // 2. Execute atomic patient registration RPC (CREATE ONLY, NO OVERWRITE)
@@ -991,7 +1001,7 @@ const Login = () => {
     !signupData.course ||
     !isSignupEmailValid ||
     !signupData.password ||
-    signupData.password.length < 6 ||
+    !isPasswordValid(signupData.password) ||
     !passwordsMatch ||
     !otpSent ||
     !otpCode.trim();
@@ -1004,7 +1014,7 @@ const Login = () => {
     !otpSent ||
     !otpCode.trim() ||
     !enrolleeData.password ||
-    enrolleeData.password.length < 6 ||
+    !isPasswordValid(enrolleeData.password) ||
     enrolleeData.password !== enrolleeData.confirmPassword;
 
   const submitDisabled = !signupPolicyAgreed || (signupKind === 'enrollee' ? isEnrolleeSignupDisabled : isSignupDisabled);
@@ -1504,7 +1514,10 @@ const Login = () => {
                               className="input"
                               style={authInputStyle}
                               type="password"
-                              placeholder="At least 6 characters"
+                              placeholder="At least 8 characters"
+                              minLength={PASSWORD_MIN_LENGTH}
+                              maxLength={PASSWORD_MAX_LENGTH}
+                              aria-describedby="enrollee-password-requirements"
                               value={enrolleeData.password}
                               onChange={(e) => setEnrolleeData((p) => ({ ...p, password: e.target.value }))}
                               autoComplete="new-password"
@@ -1523,6 +1536,7 @@ const Login = () => {
                               autoComplete="new-password"
                             />
                           </div>
+                          <PasswordRequirements id="enrollee-password-requirements" password={enrolleeData.password} inverse />
                         </div>
                       )}
                     </>
@@ -1756,7 +1770,11 @@ const Login = () => {
                         className="input"
                         style={{ ...authInputStyle, paddingRight: 40 }}
                         type={showSignupPass ? 'text' : 'password'}
-                        placeholder="At least 6 characters"
+                        placeholder="At least 8 characters"
+                        minLength={PASSWORD_MIN_LENGTH}
+                        maxLength={PASSWORD_MAX_LENGTH}
+                        autoComplete="new-password"
+                        aria-describedby="student-password-requirements"
                         value={signupData.password}
                         onChange={(e) => setSignupData((p) => ({ ...p, password: e.target.value }))}
                       />
@@ -1783,6 +1801,8 @@ const Login = () => {
                       </button>
                     </div>
                   </div>
+
+                  <PasswordRequirements id="student-password-requirements" password={signupData.password} inverse />
 
                   {/* 7. Confirm Password with Eye Toggle */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -2113,7 +2133,7 @@ const Login = () => {
                           fontSize: 'var(--font-size-sm)',
                         }}
                       >
-                        Create one
+                        Create Account
                       </button>
                     </div>
                   )}

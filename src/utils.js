@@ -188,6 +188,14 @@ export const emailEnabled = (kind = 'notifications') => {
  */
 export const logAudit = async (action, description, userName, extra = {}) => {
   try {
+    if (action === 'LOGIN_SUCCESS') {
+      // Identity, event text and session are derived on the server. Patients do
+      // not need permission to insert arbitrary rows into the audit table.
+      const { error } = await supabase.rpc('record_my_sign_in');
+      if (error) console.error('Sign-in audit error:', error);
+      else window.dispatchEvent(new CustomEvent('auditLogAdded'));
+      return;
+    }
     // Try to get current user if not provided
     let finalUserName = userName;
     if (!finalUserName) {

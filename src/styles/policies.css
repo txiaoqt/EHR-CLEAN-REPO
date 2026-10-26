@@ -193,11 +193,11 @@
   transition: none;
   will-change: auto;
 }
-.policy-public-page { color: var(--text); background: var(--bg); font-size: 16px; }
+.policy-public-page { --policy-toolbar-height: 64px; --policy-reading-offset: calc(var(--policy-toolbar-height) + 24px); color: var(--text); background: var(--bg); font-size: 16px; }
 .policy-public-page ::selection { background: var(--color-primary-tint); color: var(--text); }
 .policy-page-container { width: 100%; max-width: 1280px; margin-inline: auto; padding-inline: var(--space-xl); box-sizing: border-box; }
 .policy-public-header { background: var(--panel); border-bottom: 1px solid var(--border); }
-.policy-public-header-inner { min-height: 80px; display: flex; justify-content: space-between; align-items: center; gap: var(--space-lg); }
+.policy-public-header-inner { min-height: 64px; display: flex; justify-content: space-between; align-items: center; gap: var(--space-lg); }
 .policy-public-brand { display: flex; align-items: center; gap: var(--space-sm); }
 .policy-public-brand img { flex: 0 0 40px; object-fit: contain; }
 .policy-public-brand strong { display: block; font-size: 15px; line-height: 1.4; }
@@ -218,25 +218,30 @@
   text-decoration: none;
 }
 .policy-portal-link:hover { background: var(--bg); }
-.policy-page-intro { background: var(--color-primary-active); color: var(--text-on-primary); padding-block: 56px 60px; }
-.policy-public-page .policy-page-intro h1 { color: inherit; font-size: clamp(28px, 2.6vw, 38px); font-weight: 750; line-height: 1.2; letter-spacing: -0.02em; margin: 0; }
-.policy-page-intro p { max-width: 64ch; margin: 16px 0 0; font-size: 18px; line-height: 1.65; color: inherit; }
-.policy-page-content { padding-block: var(--space-xl) 80px; }
-.policy-page-tabs {
+.policy-page-intro { background: var(--color-primary-active); color: var(--text-on-primary); padding-block: 24px 28px; }
+.policy-public-page .policy-page-intro h1 { color: inherit; font-size: clamp(26px, 2.2vw, 32px); font-weight: 750; line-height: 1.2; letter-spacing: -0.02em; margin: 0; }
+.policy-page-intro p { max-width: 80ch; margin: 8px 0 0; font-size: 16px; line-height: 1.6; color: inherit; }
+.policy-page-content { padding-block: 24px 80px; }
+.policy-page-toolbar {
   position: sticky;
-  top: 16px;
+  top: 0;
   z-index: 20;
+  padding-block: 4px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.policy-page-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-xs);
-  padding: var(--space-xs);
+  gap: 4px;
+  padding: 4px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
 }
 .policy-page-tabs button {
-  min-height: 48px;
-  padding: 12px 16px;
+  min-height: 44px;
+  padding: 8px 16px;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -247,9 +252,9 @@
 }
 .policy-page-tabs button:hover { background: var(--bg); }
 .policy-page-tabs button[aria-selected="true"] { background: var(--color-primary-active); color: var(--text-on-primary); }
-.policy-page-reading-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: start; gap: 64px; margin-top: 40px; scroll-margin-top: 104px; }
-.policy-page-sidebar { position: sticky; top: 112px; min-width: 0; }
-.policy-section-navigation { max-height: calc(100dvh - 144px); overflow-y: auto; padding-right: 8px; scrollbar-gutter: stable; }
+.policy-page-reading-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: start; gap: 64px; scroll-margin-top: var(--policy-reading-offset); }
+.policy-page-sidebar { position: sticky; top: var(--policy-reading-offset); min-width: 0; }
+.policy-section-navigation { max-height: calc(100dvh - var(--policy-reading-offset) - 24px); overflow-y: auto; padding-right: 8px; scrollbar-gutter: stable; }
 .policy-section-navigation h2 { font-size: 15px; font-weight: 700; line-height: 1.4; margin: 0 0 16px; }
 .policy-mobile-section-picker { display: none; }
 .policy-section-list { list-style: none; margin: 0; padding: 0; }
@@ -272,7 +277,7 @@
 .policy-page-document-header h2 { font-size: 28px; font-weight: 750; line-height: 1.3; letter-spacing: -0.015em; margin: 0 0 10px; }
 .policy-page-document-header .policy-version { margin: 0; font-size: 14px; line-height: 1.6; }
 .policy-page-article .policy-document { font-size: inherit; line-height: 1.8; }
-.policy-page-article .policy-document section { scroll-margin-top: 112px; }
+.policy-page-article .policy-document section { scroll-margin-top: var(--policy-reading-offset); }
 .policy-page-article .policy-document section + section { margin-top: 40px; }
 .policy-page-article .policy-document h3 { font-size: 20px; line-height: 1.4; font-weight: 700; margin: 0 0 14px; text-wrap: pretty; }
 .policy-page-article .policy-document h3:focus { outline: none; }
@@ -315,9 +320,9 @@
 
 @media (max-width: 900px) {
   .policy-page-container { padding-inline: 24px; }
-  .policy-page-intro { padding-block: 40px; }
+  .policy-page-intro { padding-block: 24px; }
   .policy-page-intro p { font-size: 16px; }
-  .policy-page-reading-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 28px; }
+  .policy-page-reading-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .policy-page-sidebar { position: static; }
   .policy-section-navigation { max-height: none; overflow: visible; padding: 0 0 24px; border-bottom: 1px solid var(--border); }
   .policy-section-navigation h2 { margin-bottom: 12px; }
@@ -343,15 +348,14 @@
   .policy-actions { flex-wrap: wrap; }
   .policy-actions .btn { flex: 1 1 auto; min-height: 44px; font-size: var(--font-size-sm); }
   .policy-page-container { padding-inline: 20px; }
-  .policy-public-header-inner { min-height: 72px; gap: 12px; }
+  .policy-public-header-inner { min-height: 64px; gap: 12px; }
   .policy-public-brand { gap: 8px; }
   .policy-public-brand img { width: 32px; height: 32px; flex-basis: 32px; }
   .policy-public-brand strong { font-size: 13px; }
   .policy-public-brand span { font-size: 11px; }
   .policy-portal-link { font-size: 12px; padding-inline: 10px; gap: 4px; }
   .policy-page-content { padding-top: 24px; padding-bottom: 88px; }
-  .policy-page-tabs { top: 8px; gap: 4px; padding: 4px; }
-  .policy-page-tabs button { padding: 10px 8px; font-size: 14px; }
+  .policy-page-tabs button { padding: 8px; font-size: 14px; }
   .policy-page-document-header { padding-bottom: 20px; margin-bottom: 28px; }
   .policy-page-article .policy-document section + section { margin-top: 32px; }
   .policy-page-article .policy-document h3 { font-size: 18px; }

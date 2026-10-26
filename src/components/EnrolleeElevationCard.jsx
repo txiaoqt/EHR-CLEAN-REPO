@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { isValidStudentId, isValidTupEmail } from '../utils/authValidation.js';
 import { AlertIcon, CheckIcon } from './icons/Icons.jsx';
+import PasswordRequirements from './PasswordRequirements.jsx';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, createTemporaryPassword } from '../utils/passwordPolicy.js';
 
 /**
  * Elevates an enrollee account into an enrolled student/patient account after
@@ -133,7 +135,7 @@ const EnrolleeElevationCard = ({ locked = false }) => {
       }
 
       // Step 2: Send the 6-digit verification code to the @tup.edu.ph address.
-      const placeholderPassword = `${crypto.randomUUID()}Aa1`;
+      const placeholderPassword = createTemporaryPassword();
       const { error: authErr } = await supabase.auth.signUp({
         email: cleanEmail,
         password: placeholderPassword,
@@ -205,9 +207,9 @@ const EnrolleeElevationCard = ({ locked = false }) => {
       setMessage('Enter the 6-digit verification code sent to your TUP email.');
       return;
     }
-    if (!password || password.length < 6) {
+    if (!isPasswordValid(password)) {
       setTone('error');
-      setMessage('Choose a password of at least 6 characters for your student account.');
+      setMessage(PASSWORD_POLICY_MESSAGE);
       return;
     }
     if (password !== confirmPassword) {
@@ -428,7 +430,10 @@ const EnrolleeElevationCard = ({ locked = false }) => {
                 className="input"
                 type="password"
                 autoComplete="new-password"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
+                aria-describedby="elevation-password-requirements"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -447,6 +452,7 @@ const EnrolleeElevationCard = ({ locked = false }) => {
               />
             </div>
 
+            <PasswordRequirements id="elevation-password-requirements" password={password} />
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
               <button
                 type="button"
@@ -458,7 +464,7 @@ const EnrolleeElevationCard = ({ locked = false }) => {
                   !hasApprovedCertificate ||
                   otpCode.trim().length !== 6 ||
                   !password ||
-                  password.length < 6 ||
+                  !isPasswordValid(password) ||
                   password !== confirmPassword
                 }
                 onClick={handleElevate}

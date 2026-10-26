@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="x-apple-disable-message-reformatting">
-  <title>Set Up Your Staff Account</title>
+  <title>Set Up Your Clinic Account</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f4f6f8;">
@@ -22,7 +22,7 @@
                 TUP MANILA CLINIC
               </div>
               <div style="font-size:13px;line-height:18px;color:#65748a;margin-top:4px;letter-spacing:.35px;">
-                STAFF PORTAL
+                {{ .Data.portal_label }}
               </div>
             </td>
           </tr>
@@ -31,18 +31,18 @@
           <tr>
             <td style="padding:34px 36px 30px;">
               <div style="font-size:24px;line-height:30px;font-weight:700;color:#172033;text-align:center;">
-                Set Up Your Staff Account
+                Set Up Your Account
               </div>
 
               <div style="font-size:15px;line-height:24px;color:#52627a;text-align:center;margin-top:12px;">
-                Hello {{ .Data.name }}, you have been invited to the TUP Manila Clinic Staff Portal.
-                Set your own password to activate your {{ .Data.staff_role_label }} account.
+                Hello {{ .Data.name }}, you have been invited to the TUP Manila Clinic {{ .Data.portal_label }}.
+                Choose your own sign-in credentials to activate your {{ .Data.staff_role_label }} account.
               </div>
 
               <!-- Invitation confirmation happens only after the recipient opens setup. -->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:26px auto 18px;">
                 <tr><td align="center" style="background:#a7191f;border-radius:6px;">
-                  <a href="{{ .Data.staff_setup_url }}?token_hash={{ .TokenHash }}&amp;type=invite" style="display:inline-block;padding:15px 26px;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;text-decoration:none;">Set up staff account</a>
+                  <a href="{{ .Data.staff_setup_url }}?token_hash={{ .TokenHash }}&amp;type=invite" style="display:inline-block;padding:15px 26px;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;text-decoration:none;">Set up account</a>
                 </td></tr>
               </table>
               <!-- Expiration notice -->
@@ -52,7 +52,7 @@
                   <td align="center" style="padding:11px 14px;">
                     <div style="font-size:13px;line-height:20px;color:#6f4a4d;">
                       <strong style="color:#a51c22;">This invitation expires in {{ .Data.invitation_minutes }} minutes.</strong>
-                      Open the link and finish setting your password before it expires.
+                      Open the link and finish setting up your account before it expires.
                     </div>
                   </td>
                 </tr>
@@ -73,8 +73,8 @@
               </table>
 
               <div style="font-size:13px;line-height:21px;color:#7a879a;text-align:center;margin-top:20px;">
-                If you were not expecting this staff invitation, you can safely ignore this email.
-                No staff access is activated until account setup is completed.
+                If you were not expecting this invitation, you can safely ignore this email.
+                No portal access is activated until account setup is completed.
               </div>
             </td>
           </tr>

@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
-import { surfaceHomeForRole } from '../deploySurface.js';
+import { IS_ADMIN_SURFACE, surfaceHomeForRole } from '../deploySurface.js';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
 
 
@@ -41,7 +41,7 @@ const AuthCallback = () => {
 
       if (type === 'invite' || user?.staff_setup_required) {
         setIsPasswordRecoverySession(false);
-        if (mounted) navigate(`/staff/setup${window.location.search}${window.location.hash}`, { replace: true });
+        if (mounted) navigate(`${IS_ADMIN_SURFACE ? '/admin/setup' : '/staff/setup'}${window.location.search}${window.location.hash}`, { replace: true });
         return;
       }
 
