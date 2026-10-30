@@ -397,14 +397,11 @@ console.log('  ✓ PASS: dashboard — upcoming is filtered, the count is honest
 // -----------------------------------------------------------------------------
 console.log('\n[TEST GROUP 11] Palette-only destinations stay reachable');
 
-// Backup & Recovery is deliberately not in the sidebar — the list otherwise grows
-// past the viewport — but it must stay reachable from Search pages. The palette
-// builds from the sidebar's own NAV_GROUPS, so the flag has to be honoured on
-// exactly one side.
+// Backup & Recovery is a System Admin Portal page; the staff sidebar must not offer it.
 const sidebarSrc = readCode('src/components/sidebar/Sidebar.jsx');
 assert(
-  /page: 'backup-recovery'[\s\S]{0,140}paletteOnly: true/.test(sidebarSrc),
-  'Backup & Recovery is flagged as palette-only'
+  !sidebarSrc.includes("page: 'backup-recovery'"),
+  'Backup & Recovery is not a staff page'
 );
 assert(
   /!item\.paletteOnly/.test(sidebarSrc),

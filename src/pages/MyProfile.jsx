@@ -1,5 +1,5 @@
 // src/pages/MyProfile.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,8 @@ const MyProfile = () => {
   const [user, setUser] = useState({ name: '', role: '', email: '', avatar: '' });
   const [editableUser, setEditableUser] = useState({ name: '', avatar: '' });
   const [loading, setLoading] = useState(true);
+  // Set once the profile loads; View All Activity filters with the same rule.
+  const matchesClinicianRef = useRef(() => false);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
@@ -30,8 +32,8 @@ const MyProfile = () => {
 
   // Modal for viewing all activity
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [modalTab, setModalTab] = useState('audit'); // 'audit' | 'encounters' | 'appointments'
-  const [modalData, setModalData] = useState({ audit: [], encounters: [], appointments: [] });
+  const [modalTab, setModalTab] = useState('encounters'); // 'encounters' | 'appointments'
+  const [modalData, setModalData] = useState({ encounters: [], appointments: [] });
   const [modalLoading, setModalLoading] = useState(false);
 
   useEffect(() => {
@@ -85,6 +87,8 @@ const MyProfile = () => {
 
         const matchesClinician = (clinicianField) => {
           const c = normalize(clinicianField || '');
+          // An empty field would match every name below via includes('').
+          if (!c) return false;
           const namesToCheck = [
             normalize(displayName),
             normalize(authUser.name),
@@ -105,29 +109,10 @@ const MyProfile = () => {
           }
           return false;
         };
+        matchesClinicianRef.current = matchesClinician;
 
-        // 1) recent audit logs
-        const { data: logs, error: logsErr } = await supabase
-          .from('audit_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(40);
-
-        const auditEntries = (!logsErr && Array.isArray(logs)) ? logs : [];
-
-        const filteredAudit = auditEntries.filter(l => {
-          const performedBy = (l.performed_by || '').toString();
-          return matchesClinician(performedBy);
-        }).map(l => ({
-          id: l.id,
-          source: 'audit',
-          action: l.action || l.type || 'Activity',
-          detail: l.detail || l.message || l.description || JSON.stringify(l.meta || {}),
-          created_at: l.created_at,
-          raw: l
-        }));
-
-        // 2) recent encounters (last 50)
+        // Audit logs are read in the System Admin Portal only.
+        // 1) recent encounters (last 50)
         let encounterEntries = [];
         try {
           const { data: encs, error: encErr } = await supabase
@@ -152,7 +137,7 @@ const MyProfile = () => {
           console.warn('Error fetching encounters for recent activity', e);
         }
 
-        // 3) recent appointments (last 50)
+        // 2) recent appointments (last 50)
         let appointmentEntries = [];
         try {
           const { data: appts, error: apptErr } = await supabase
@@ -179,7 +164,6 @@ const MyProfile = () => {
 
         // Merge and sort
         const merged = [
-          ...filteredAudit,
           ...encounterEntries,
           ...appointmentEntries
         ].filter(x => x && x.created_at)
@@ -229,16 +213,16 @@ const MyProfile = () => {
     setShowActivityModal(true);
     setModalLoading(true);
     try {
-      const [aRes, eRes, pRes] = await Promise.all([
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
+      const [eRes, pRes] = await Promise.all([
         supabase.from('encounters').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('appointments').select('*').order('created_at', { ascending: false }).limit(200)
       ]);
 
+      const mine = matchesClinicianRef.current;
+      const byClinician = (r) => mine(r.clinician_name) || mine(r.clinician_id) || mine(r.clinician);
       setModalData({
-        audit: aRes.data || [],
-        encounters: eRes.data || [],
-        appointments: pRes.data || []
+        encounters: (eRes.data || []).filter(byClinician),
+        appointments: (pRes.data || []).filter(byClinician)
       });
     } catch (err) {
       console.error('Error loading modal activity data', err);
@@ -249,7 +233,7 @@ const MyProfile = () => {
 
   const closeActivityModal = () => {
     setShowActivityModal(false);
-    setModalTab('audit');
+    setModalTab('encounters');
   };
 
   // Navigate helpers for clickable rows
@@ -259,16 +243,6 @@ const MyProfile = () => {
       navigate(`/encounter?id=${act.id}`);
     } else if (act.source === 'appointment') {
       navigate(`/appointments?id=${act.id}`);
-    } else if (act.source === 'audit') {
-      const raw = act.raw || {};
-      const possibleId = raw?.reference_id || raw?.item_id || raw?.encounter_id || raw?.appointment_id;
-      if (possibleId) {
-        navigate(`/encounter?id=${possibleId}`);
-      } else {
-        setMessage('This audit entry has no direct link.');
-        setMessageType('info');
-        setTimeout(() => setMessage(''), 2000);
-      }
     }
   };
 
@@ -372,11 +346,7 @@ const MyProfile = () => {
   };
 
   const modalRows = modalData[modalTab] || [];
-  const modalItemLabel = modalTab === 'audit'
-    ? 'audit entries'
-    : modalTab === 'encounters'
-      ? 'encounters'
-      : 'appointments';
+  const modalItemLabel = modalTab === 'encounters' ? 'encounters' : 'appointments';
 
   if (loading) return <main className="main"><div className="card">Loading staff profile...</div></main>;
 
@@ -635,10 +605,9 @@ const MyProfile = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>Activity History Log</h3>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Historical audit and clinical records for your staff account</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Encounters and appointments recorded under your staff account</div>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button className={`btn small ${modalTab === 'audit' ? '' : 'secondary'}`} onClick={() => setModalTab('audit')}>Audit Logs</button>
                 <button className={`btn small ${modalTab === 'encounters' ? '' : 'secondary'}`} onClick={() => setModalTab('encounters')}>Encounters</button>
                 <button className={`btn small ${modalTab === 'appointments' ? '' : 'secondary'}`} onClick={() => setModalTab('appointments')}>Appointments</button>
                 <button type="button" className="modal-close-btn" onClick={closeActivityModal} aria-label="Close modal">
@@ -652,36 +621,6 @@ const MyProfile = () => {
             ) : (
               <>
               <div className="table-responsive table-edge-bleed table-edge-bleed--fixed-24">
-                {modalTab === 'audit' && (
-                  <table className="table">
-                    <thead>
-                      <tr><th>Time</th><th>Action</th><th>Performed By</th><th>Details</th></tr>
-                    </thead>
-                    <tbody>
-                      {(modalData.audit || []).length === 0 ? (
-                        <tr className="table-empty-row"><td colSpan={4}>No activity yet</td></tr>
-                      ) : (modalData.audit || []).map(row => (
-                        <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => {
-                          const possibleId = row.reference_id || row.item_id || row.encounter_id || row.appointment_id;
-                          if (possibleId) {
-                            navigate(`/encounter?id=${possibleId}`);
-                            closeActivityModal();
-                          } else {
-                            setMessage('No direct link for this audit log.');
-                            setMessageType('info');
-                            setTimeout(() => setMessage(''), 2000);
-                          }
-                        }}>
-                          <td style={{ color: 'var(--text-muted)' }}>{row.created_at ? new Date(row.created_at).toLocaleString() : ''}</td>
-                          <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{row.action || row.type}</td>
-                          <td>{row.performed_by}</td>
-                          <td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.detail || row.message || JSON.stringify(row.meta || {})}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-
                 {modalTab === 'encounters' && (
                   <table className="table">
                     <thead>

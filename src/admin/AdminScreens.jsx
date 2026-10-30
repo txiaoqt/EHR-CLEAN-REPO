@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../AuthContext.jsx';
-import { adminAction, adminData, formatAdminDate } from './adminApi.js';
+import { adminAction, adminData, adminPageAccess, saveAdminPageAccess, formatAdminDate } from './adminApi.js';
+import { STAFF_PAGE_OPTIONS } from '../staffPageAccess.mjs';
 import TablePagination from '../components/table/TablePagination.jsx';
 import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 import { fetchBackupRuns, isBackupActive } from '../utils/backupControl.js';
@@ -99,6 +100,82 @@ export function AdminOverview() {
   </div></main>;
 }
 
+const PAGE_ACCESS_ROLES = [['physician', 'Physician'], ['nurse', 'Nurse']];
+const pageOptionsFor = role => STAFF_PAGE_OPTIONS.filter(option => !option.roles || option.roles.includes(role));
+const pageLabels = pages => pageOptionsFor('physician').filter(option => pages.includes(option.page)).map(option => option.label);
+
+export function AdminPageAccess() {
+  const [state, setState] = useState({ saved: null, loading: true, error: '' });
+  const [drafts, setDrafts] = useState({});
+  const [saving, setSaving] = useState('');
+  const [saveError, setSaveError] = useState({});
+  const [feedback, setFeedback] = useState('');
+  const load = useCallback(async () => {
+    setState(previous => ({ ...previous, loading: true, error: '' }));
+    try {
+      const data = await adminPageAccess();
+      const saved = Object.fromEntries(PAGE_ACCESS_ROLES.map(([role]) => [role, data?.[role]?.pages || []]));
+      setState({ saved, loading: false, error: '' }); setDrafts(saved);
+    } catch (err) { setState({ saved: null, loading: false, error: err.message }); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const toggle = (role, page) => setDrafts(previous => ({ ...previous, [role]: previous[role].includes(page) ? previous[role].filter(p => p !== page) : [...previous[role], page] }));
+  const save = async (role, label) => {
+    setSaving(role); setSaveError(previous => ({ ...previous, [role]: '' })); setFeedback('');
+    try {
+      const result = await saveAdminPageAccess(role, drafts[role]);
+      setState(previous => ({ ...previous, saved: { ...previous.saved, [role]: result.pages } }));
+      setDrafts(previous => ({ ...previous, [role]: result.pages }));
+      setFeedback(`${label} page access saved. It applies to every ${label.toLowerCase()} account, including new invitations, the next time their portal refreshes.`);
+    } catch (err) { setSaveError(previous => ({ ...previous, [role]: err.message })); } finally { setSaving(''); }
+  };
+  return <main className="main"><div className="page">
+    <Heading title="Staff Page Access" description="Choose which Staff Portal pages physicians and nurses can open. Set this before inviting; every account with the role follows it.">
+      <button className="btn secondary" onClick={load} disabled={state.loading || Boolean(saving)}>Refresh</button>
+    </Heading>
+    <Feedback message={feedback} onDismiss={() => setFeedback('')} />
+    <LoadError error={state.error} retry={load} />
+    {state.loading && <p role="status">Loading page access…</p>}
+    {state.saved && <div className="system-admin-page-access">
+      {PAGE_ACCESS_ROLES.map(([role, label]) => {
+        const draft = drafts[role] || [];
+        const dirty = [...draft].sort().join() !== [...state.saved[role]].sort().join();
+        const options = pageOptionsFor(role);
+        return <section className="card" key={role} aria-labelledby={`page-access-${role}`}>
+          <div className="system-admin-section-head"><div><h2 id={`page-access-${role}`}>{label}</h2><p className="system-admin-muted">{draft.length} of {options.length} pages enabled</p></div></div>
+          {[...new Set(options.map(option => option.group))].map(group => <fieldset key={group} className="system-admin-page-group" disabled={Boolean(saving)}>
+            <legend>{group}</legend>
+            {options.filter(option => option.group === group).map(option => <label key={option.page} className="system-admin-check">
+              <input type="checkbox" checked={draft.includes(option.page)} onChange={() => toggle(role, option.page)} />
+              <span>{option.label}{option.note && <small className="system-admin-muted">{option.note}</small>}</span>
+            </label>)}
+          </fieldset>)}
+          <LoadError error={saveError[role]} />
+          <footer className="system-admin-page-access-actions">
+            <button type="button" className="btn secondary" disabled={!dirty || Boolean(saving)} onClick={() => setDrafts(previous => ({ ...previous, [role]: state.saved[role] }))}>Discard Changes</button>
+            <button type="button" className="btn" disabled={!dirty || Boolean(saving)} onClick={() => save(role, label)}>{saving === role ? 'Saving…' : `Save ${label} Access`}</button>
+          </footer>
+        </section>;
+      })}
+    </div>}
+    <p className="system-admin-muted system-admin-directory-note">Dashboard, Help, Settings and My Profile are always available.</p>
+  </div></main>;
+}
+
+function InvitePageAccess({ role }) {
+  const [access, setAccess] = useState(null);
+  useEffect(() => {
+    let current = true;
+    adminPageAccess().then(data => { if (current) setAccess(data); }).catch(() => { if (current) setAccess({}); });
+    return () => { current = false; };
+  }, []);
+  const pages = access?.[role]?.pages;
+  return <p className="system-admin-muted">
+    {!access ? 'Loading page access…' : !pages ? 'Page access could not be loaded.' : pages.length ? `Pages this role can open: ${pageLabels(pages).join(', ')}, plus Dashboard, Help, Settings and My Profile.` : 'This role can open only Dashboard, Help, Settings and My Profile.'}
+    {' '}<Link to="/admin/page-access">Change Page Access</Link>
+  </p>;
+}
+
 function ActionDialog({ action, onClose, onComplete, onFailed }) {
   const dialog = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -145,6 +222,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
         <PersonNameFields value={invite} onChange={setInvite} disabled={busy} />
         <label>Email Address<input type="email" required maxLength={254} value={invite.email} disabled={busy} onChange={e => setInvite({ ...invite, email: e.target.value })} autoComplete="email" /></label>
         <div className="system-admin-form-row"><label>Assigned Role<select value={invite.role} disabled={busy} onChange={e => setInvite({ ...invite, role: e.target.value })}><option value="nurse">Nurse</option><option value="physician">Physician</option><option value="admin">Admin</option></select></label><label>Department<input required maxLength={120} value={invite.department} disabled={busy} onChange={e => setInvite({ ...invite, department: e.target.value })} /></label></div>
+        {invite.role !== 'admin' && <InvitePageAccess role={invite.role} />}
         {invite.role === 'admin' && <p className="system-admin-muted">Administrators can invite accounts, manage portal access, and view system activity. They choose a username and password for the System Admin Portal.</p>}
       </>}
       {action.type === 'suspend_account' && <p>Existing sessions will be revoked. This account cannot access the portal while suspended. Clinical records are retained.</p>}

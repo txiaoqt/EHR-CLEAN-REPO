@@ -17,14 +17,12 @@ import StaffPatientMessages from './pages/StaffPatientMessages.jsx';
 import Events from './pages/Events.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/Settings.jsx';
-import BackupRecovery from './pages/BackupRecovery.jsx';
 import EnrolleeHome from './pages/enrollee/EnrolleeHome.jsx';
 import EnrolleeMessages from './pages/enrollee/EnrolleeMessages.jsx';
 import EnrolleeProfile from './pages/enrollee/EnrolleeProfile.jsx';
 import Enrollees from './pages/Enrollees.jsx';
 import ArchiveFiles from './pages/ArchiveFiles.jsx';
 import EnrolleeReview from './pages/EnrolleeReview.jsx';
-import AuditTrail from './pages/AuditTrail.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import PatientDashboard from './pages/patient/PatientDashboard.jsx';
 import PatientEvents from './pages/patient/PatientEvents.jsx';
@@ -38,6 +36,7 @@ import KioskBooking from './pages/patient/KioskBooking.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import AdminPortal from './admin/AdminPortal.jsx';
+import { canOpenStaffPage } from './staffPageAccess.mjs';
 import StaffSetup from './admin/StaffSetup.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import PolicyAgreement from './components/PolicyAgreement.jsx';
@@ -116,6 +115,10 @@ const ProtectedRoute = ({
       return <Navigate to="/login" replace state={{ sessionMessage: 'You do not have permission to access this page.' }} />;
     }
     return <Navigate to={fallbackHome} replace />;
+  }
+  // The administrator's per-role page settings; Dashboard is always allowed.
+  if (IS_STAFF_SURFACE && !canOpenStaffPage(user, location.pathname.split('/')[1])) {
+    return <Navigate to="/dashboard" replace />;
   }
   if (isStaffProtected && !isStaffDeviceSupported) {
     return <PCAccessRequired viewport={viewport} onLogout={logout} />;
@@ -358,8 +361,6 @@ function AppShell() {
             <Route path="/messages" element={guard(<StaffPatientMessages />, ['admin', 'physician', 'nurse'])} />
             <Route path="/help" element={guard(<Help />, ['admin', 'physician', 'nurse'])} />
             <Route path="/settings" element={guard(<Settings />, ['admin', 'physician', 'nurse'])} />
-            <Route path="/backup-recovery" element={guard(<BackupRecovery />, ['admin', 'physician'])} />
-            <Route path="/audit-trail" element={guard(<AuditTrail />, ['admin', 'physician'])} />
             <Route path="/my-profile" element={guard(<MyProfile />, ['admin', 'physician', 'nurse'])} />
             <Route path="/patient-profile" element={guard(<PatientProfile />, ['admin', 'physician', 'nurse'])} />
           </>

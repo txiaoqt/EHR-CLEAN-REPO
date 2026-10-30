@@ -140,8 +140,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const role = String(profile.role ?? "").toLowerCase();
-    if (!["admin", "physician"].includes(role)) {
-      return fail("forbidden", `Backups are limited to administrators and physicians. Your role is "${role || "unset"}".`, 403);
+    if (role !== "admin") {
+      return fail("forbidden", "Backups are managed in the System Admin Portal.", 403);
     }
 
     let body: Record<string, unknown> = {};

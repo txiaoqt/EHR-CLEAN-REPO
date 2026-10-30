@@ -148,6 +148,7 @@ Deno.serve(async (req: Request) => {
         if (!uuid(payload.id)) throw new RequestError('Choose an invitation.');
         invitation = await operation(user.id, 'invite_resend', { id: payload.id });
       }
+      let invitedUserId: string | null = null;
       try {
         const administrator = invitation.role === 'admin';
         const setupOrigin = administrator ? portalUrl(settings.admin_portal_url) : staffOrigin;
@@ -161,7 +162,7 @@ Deno.serve(async (req: Request) => {
           p_actor: user.id, p_invitation: invitation.id,
         });
         if (recoveryError) throw new Error(recoveryError.message);
-        let invitedUserId = recoverableId;
+        invitedUserId = recoverableId;
         if (!invitedUserId) {
           const { data, error } = await service.auth.admin.inviteUserByEmail(invitation.email, {
             data: inviteData, redirectTo: setupUrl,
@@ -184,12 +185,20 @@ Deno.serve(async (req: Request) => {
             });
           if (error) throw new Error(error.message);
         }
-        const result = await operation(user.id, 'invite_sent', { id: invitation.id, auth_user_id: invitedUserId });
-        return json({ invitation: result, message: 'Invitation email sent.' });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Invitation email could not be sent.';
-        await operation(user.id, 'invite_failed', { id: invitation.id, message });
+        // Recording the failure must not replace the reason the admin needs to see.
+        try { await operation(user.id, 'invite_failed', { id: invitation.id, message }); } catch (_) { /* Row stays 'sending'; Resend recovers it. */ }
         throw new RequestError(message);
+      }
+      // The email is out, so a failure here is not a failed send: marking it
+      // failed would block the link the recipient already has. The row stays
+      // 'sending', and Resend reuses the same Auth identity to finish it.
+      try {
+        const result = await operation(user.id, 'invite_sent', { id: invitation.id, auth_user_id: invitedUserId });
+        return json({ invitation: result, message: 'Invitation email sent.' });
+      } catch (_) {
+        throw new RequestError('The invitation email was sent but could not be recorded. Wait one minute, then use Resend.', 503);
       }
     }
     if (action === 'revoke_invitation') {

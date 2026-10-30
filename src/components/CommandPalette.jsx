@@ -4,6 +4,7 @@ import { SearchIcon, CloseIcon } from './icons/Icons.jsx';
 import { NAV_GROUPS } from './sidebar/Sidebar.jsx';
 import { translate } from '../utils';
 import { useAuth } from '../AuthContext.jsx';
+import { canOpenStaffPage } from '../staffPageAccess.mjs';
 
 /**
  * Search pages, opened with Ctrl+K or Cmd+K.
@@ -34,6 +35,7 @@ const CommandPalette = ({ open, onOpenChange, pages: customPages, label = 'Searc
         // Respect the same role gate the sidebar uses, or the palette would
         // offer a page the sidebar hides.
         if (item.roles && !item.roles.includes(role)) continue;
+        if (!canOpenStaffPage(user, item.page)) continue;
         items.push({
           page: item.page,
           icon: item.icon,
@@ -43,7 +45,7 @@ const CommandPalette = ({ open, onOpenChange, pages: customPages, label = 'Searc
       }
     }
     return items;
-  }, [role, customPages]);
+  }, [role, user?.page_access, customPages]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();

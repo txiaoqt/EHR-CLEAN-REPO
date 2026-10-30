@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
 import { useSidebar } from '../useSidebar.js';
 import { adminAction } from './adminApi.js';
-import { AdminOverview, AdminAccounts } from './AdminScreens.jsx';
+import { AdminOverview, AdminAccounts, AdminPageAccess } from './AdminScreens.jsx';
 import AdminAccountDialog from './AdminAccountDialog.jsx';
 import AuditTrail from '../pages/AuditTrail.jsx';
 import BackupRecovery from '../pages/BackupRecovery.jsx';
@@ -23,6 +23,7 @@ const NAV = [
   { path: '/admin/administrators', label: 'Administrators', Icon: UsersIcon, keywords: 'admins administration directory access' },
   { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon, keywords: 'directory clinic physician nurse clinician' },
   { path: '/admin/users', label: 'User Accounts', Icon: UserIcon, keywords: 'patients students enrollees suspension access' },
+  { path: '/admin/page-access', label: 'Staff Page Access', Icon: LockIcon, keywords: 'permissions roles pages physician nurse sidebar configuration' },
   { path: '/admin/audit-trail', label: 'Audit Trail', Icon: HistoryIcon, group: 'SYSTEM', keywords: 'logs history actions activity' },
   { path: '/admin/backup-recovery', label: 'Backup & Recovery', Icon: BackupIcon, keywords: 'restore database history' },
 ];
@@ -166,6 +167,7 @@ export default function AdminPortal() {
         <Route path="/admin/administrators" element={<AdminAccounts kind="administrators" />} />
         <Route path="/admin/staff" element={<AdminAccounts kind="staff" />} />
         <Route path="/admin/users" element={<AdminAccounts kind="users" />} />
+        <Route path="/admin/page-access" element={<AdminPageAccess />} />
         <Route path="/admin/audit-trail" element={<AdminAuditTrail />} />
         <Route path="/admin/backup-recovery" element={<BackupRecovery />} />
         <Route path="/admin/account" element={<Navigate to="/admin/overview" replace />} />

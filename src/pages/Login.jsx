@@ -1,5 +1,5 @@
 // src/pages/Login.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import {
@@ -121,19 +121,6 @@ const SIGNUP_COURSES = [
   },
 ];
 
-const USER_TEST_ACCOUNT = {
-  email: 'patient.test@tup.edu.ph',
-  password: 'UserTest@123',
-  profile: {
-    id: 'hardcoded-patient-user',
-    name: 'Test Patient',
-    email: 'patient.test@tup.edu.ph',
-    avatar: null,
-    role: 'patient',
-    patient_id: 'TUPM-XX-XXXX',
-  },
-};
-
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -149,11 +136,22 @@ const Login = () => {
     signupAgreement?.accepted_terms && signupAgreement?.accepted_privacy
   );
 
+  // Email whose code was verified but whose registration has not finished. The
+  // verified session is kept so a rejected submission can be corrected and sent
+  // again without a new code; leaving sign-up must not leave it signed in.
+  const verifiedSignupRef = useRef(null);
+
   useEffect(() => {
     setRegistrationInProgress(IS_USER_SURFACE && authMode === 'signup');
     if (authMode !== 'signup') setSignupAgreement(null);
-    return () => setRegistrationInProgress(false);
-  }, [authMode, setRegistrationInProgress]);
+    return () => {
+      setRegistrationInProgress(false);
+      if (verifiedSignupRef.current) {
+        verifiedSignupRef.current = null;
+        logout({ scope: 'local' });
+      }
+    };
+  }, [authMode, setRegistrationInProgress, logout]);
 
   // Login State
   const [email, setEmail] = useState('');
@@ -237,6 +235,29 @@ const Login = () => {
     }
   };
 
+  // Returns the verified Auth user for `email`, or null when the code is wrong.
+  // A session this form already verified is reused, because a code works once.
+  const verifySignupCode = async (email) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (verifiedSignupRef.current === email && session?.user?.email?.toLowerCase() === email) {
+      return session.user;
+    }
+    const token = otpCode.trim();
+    let { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+    if (error) ({ data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' }));
+    if (error) {
+      console.warn('OTP verification error:', error.message);
+      return null;
+    }
+    verifiedSignupRef.current = email;
+    return data?.user || (await supabase.auth.getUser())?.data?.user || null;
+  };
+
+  const endVerifiedSignup = async () => {
+    verifiedSignupRef.current = null;
+    await logout({ scope: 'local' });
+  };
+
   // Handle Password Recovery Session (following Y-TRACE SignIn architecture)
   useEffect(() => {
     if (isPasswordRecoverySession) {
@@ -300,17 +321,6 @@ const Login = () => {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
-
-      // Hardcoded user-surface account for quick QA/testing without signup.
-      if (
-        IS_USER_SURFACE &&
-        normalizedEmail === USER_TEST_ACCOUNT.email &&
-        pass === USER_TEST_ACCOUNT.password
-      ) {
-        login(USER_TEST_ACCOUNT.profile);
-        navigate('/patient/dashboard');
-        return;
-      }
 
       // Check lockout status before attempting sign in if RPC is available
       try {
@@ -454,7 +464,9 @@ const Login = () => {
       setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
       return;
     }
-    if (studentId && !isValidStudentId(studentId)) {
+    // Required here: the account is provisioned under this ID when the code is
+    // sent, so a blank or different ID would not match the one registered.
+    if (!isValidStudentId(studentId)) {
       setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).');
       return;
     }
@@ -479,7 +491,7 @@ const Login = () => {
             }) || 'Patient',
             role: 'patient',
             policy_agreement: signupAgreement,
-            patient_id: studentId || targetEmail.split('@')[0],
+            patient_id: studentId,
           },
         },
       });
@@ -705,30 +717,17 @@ const Login = () => {
     setLoading(true);
     setMsg('');
     try {
-      const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
-        email,
-        token: otpCode.trim(),
-        type: 'signup',
-      });
-      let verifiedUser = verifyData?.user || null;
-
-      if (verifyErr) {
-        const { data: retryData, error: retryErr } = await supabase.auth.verifyOtp({
-          email,
-          token: otpCode.trim(),
-          type: 'email',
-        });
-        if (retryErr) {
-          console.warn('Enrollee OTP verification error:', verifyErr.message);
-          setMsg('The verification code is incorrect or has expired. Please try again.');
-          setLoading(false);
-          return;
-        }
-        verifiedUser = retryData?.user || verifiedUser;
+      const verifiedUser = await verifySignupCode(email);
+      if (!verifiedUser) {
+        setMsg('The verification code is incorrect or has expired. Please try again.');
+        setLoading(false);
+        return;
       }
 
       const verifiedRole = (verifiedUser?.user_metadata?.role || '').toLowerCase();
       if (verifiedRole && verifiedRole !== 'enrollee') {
+        // The code signed in an existing account; it must not stay signed in.
+        await endVerifiedSignup();
         setMsg('This email is already linked to another account. Please sign in with that account.');
         setLoading(false);
         return;
@@ -779,7 +778,7 @@ const Login = () => {
       }
 
       // Verification is a temporary signup session, not the first portal login.
-      await logout({ scope: 'local' });
+      await endVerifiedSignup();
       setEmail(email);
       setPass('');
       setMsg('Registration complete. Sign in to review and accept the portal policies.');
@@ -852,33 +851,28 @@ const Login = () => {
     setMsg('');
     try {
       // 1. Verify OTP with Supabase Auth
-      let authUserId = null;
-      const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
-        email: payload.email,
-        token: payload.otp,
-        type: 'signup',
-      });
-
-      if (verifyErr) {
-        // Fallback retry with type: 'email'
-        const { data: retryData, error: retryErr } = await supabase.auth.verifyOtp({
-          email: payload.email,
-          token: payload.otp,
-          type: 'email',
-        });
-        if (retryErr) {
-          console.warn('OTP Verification error:', verifyErr.message);
-          setMsg('The verification code is incorrect or has expired. Please try again.');
-          setLoading(false);
-          return;
-        }
-        authUserId = retryData?.user?.id;
-      } else {
-        authUserId = verifyData?.user?.id;
+      if (!await verifySignupCode(payload.email)) {
+        setMsg('The verification code is incorrect or has expired. Please try again.');
+        setLoading(false);
+        return;
       }
 
-      if (!authUserId) {
-        authUserId = (await supabase.auth.getUser())?.data?.user?.id;
+      // 2. Execute atomic patient registration RPC (CREATE ONLY, NO OVERWRITE).
+      // Runs before the password is set: until registration succeeds the
+      // account keeps its unknown placeholder password, so a rejected
+      // registration never leaves a working sign-in behind.
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_patient_registration', {
+        p_student_id: payload.studentId,
+        p_name: payload.fullName,
+        p_year: payload.year,
+        p_date_of_birth: payload.dateOfBirth,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        if (rpcErr) console.warn('Patient registration error:', rpcErr.code, rpcErr.message);
+        setMsg(rpcData?.error || 'Unable to complete registration. Please check your information or contact clinic support.');
+        setLoading(false);
+        return;
       }
 
       // Replace the random OTP-only password with the password chosen here.
@@ -889,34 +883,17 @@ const Login = () => {
         return;
       }
 
-      // 2. Execute atomic patient registration RPC (CREATE ONLY, NO OVERWRITE)
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_patient_registration', {
-        p_student_id: payload.studentId,
-        p_name: payload.fullName,
-        p_year: payload.year,
-        p_date_of_birth: payload.dateOfBirth,
-      });
-
-      if (rpcErr || !rpcData?.success) {
-        setMsg('Unable to complete registration. Please check your information or contact clinic support.');
-        setLoading(false);
-        return;
-      }
-
       // Store the Medical Log demographics (SEX and DEPT./COURSE) on the profile
       // the RPC just created. Kept out of complete_patient_registration — a
       // 184-line SECURITY DEFINER function — so extending it cannot disturb the
       // anti-overwrite logic. The patient owns this row, so RLS permits it.
-      try {
-        await supabase
-          .from('patient_profiles')
-          .update({ sex: payload.sex || null, course: payload.course || null })
-          .eq('patient_id', String(payload.studentId || '').trim().toUpperCase());
-      } catch (profileErr) {
-        console.warn('Could not store sex/course on the patient profile:', profileErr);
-      }
+      const { error: profileErr } = await supabase
+        .from('patient_profiles')
+        .update({ sex: payload.sex || null, course: payload.course || null })
+        .eq('patient_id', payload.studentId);
+      if (profileErr) console.warn('Could not store sex/course on the patient profile:', profileErr.message);
 
-      await logout({ scope: 'local' });
+      await endVerifiedSignup();
       setMsg('Account created and verified. Sign in to review and accept the portal policies.');
       setAuthMode('login');
       setEmail(payload.email);
@@ -928,6 +905,8 @@ const Login = () => {
         firstName: '',
         middleName: '',
         lastName: '',
+        suffix: '',
+        dateOfBirth: '',
         year: '1',
         sex: '',
         course: '',
@@ -984,7 +963,23 @@ const Login = () => {
   const isSignupEmailValid = isValidTupEmail(signupData.email);
   const showSignupEmailError = signupData.email.length > 0 && !isSignupEmailValid;
 
-  const isSendDisabled = otpSending || otpCooldown > 0 || !isSignupEmailValid || !signupPolicyAgreed;
+  // What Send still needs, in form order. The same list disables the button and
+  // is shown beneath it, so a disabled Send always says why.
+  const sendMissing = (signupKind === 'student'
+    ? [!isStudentIdValid && 'a valid Student ID', !isSignupEmailValid && 'your TUP email']
+    : [
+        !enrolleeData.applicantId.trim() && 'your Applicant ID',
+        (!enrolleeData.firstName.trim() || !enrolleeData.lastName.trim()) && 'your first and last name',
+        !enrolleeData.dateOfBirth && 'your date of birth',
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enrolleeData.email) && 'a valid email',
+      ]
+  ).concat(!signupPolicyAgreed && 'agreement to both policies').filter(Boolean);
+  const isSendDisabled = otpSending || otpCooldown > 0 || sendMissing.length > 0;
+  const sendMissingHint = !otpSent && sendMissing.length > 0 && (
+    <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
+      To send the code, add {sendMissing.length > 1 ? `${sendMissing.slice(0, -1).join(', ')} and ${sendMissing.at(-1)}` : sendMissing[0]}.
+    </div>
+  );
 
   const passwordsMatch =
     signupData.password &&
@@ -1367,19 +1362,37 @@ const Login = () => {
 
                   {signupKind === 'enrollee' && (
                     <>
+                      {/* Same order as the student form: the ID first, then the
+                          name, suffix and date of birth. The Applicant ID is
+                          required: it ties this account to an admissions record. */}
+                      <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        <label htmlFor="enrollee-applicant-id" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
+                          Applicant ID
+                        </label>
+                        <input
+                          id="enrollee-applicant-id"
+                          className="input"
+                          style={authInputStyle}
+                          placeholder="e.g. 2526A34660"
+                          value={enrolleeData.applicantId}
+                          onChange={(e) => setEnrolleeData((p) => ({ ...p, applicantId: e.target.value.toUpperCase() }))}
+                        />
+                      </div>
+
+                      <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        <label htmlFor="enrollee-first-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>First Name</label>
+                        <input
+                          id="enrollee-first-name"
+                          className="input"
+                          style={authInputStyle}
+                          placeholder="e.g. Juan"
+                          value={enrolleeData.firstName}
+                          onChange={(e) => setEnrolleeData((p) => ({ ...p, firstName: e.target.value }))}
+                          onBlur={() => setEnrolleeData((p) => ({ ...p, firstName: toProperName(p.firstName) }))}
+                        />
+                      </div>
+
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
-                        <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <label htmlFor="enrollee-first-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>First Name</label>
-                          <input
-                            id="enrollee-first-name"
-                            className="input"
-                            style={authInputStyle}
-                            placeholder="e.g. Juan"
-                            value={enrolleeData.firstName}
-                            onChange={(e) => setEnrolleeData((p) => ({ ...p, firstName: e.target.value }))}
-                            onBlur={() => setEnrolleeData((p) => ({ ...p, firstName: toProperName(p.firstName) }))}
-                          />
-                        </div>
                         <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label htmlFor="enrollee-middle-name" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
                             Middle Name <span style={{ fontWeight: 'var(--font-weight-normal)', opacity: 0.75 }}>(optional)</span>
@@ -1394,11 +1407,8 @@ const Login = () => {
                             onBlur={() => setEnrolleeData((p) => ({ ...p, middleName: toProperName(p.middleName) }))}
                           />
                         </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
                         <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <label htmlFor="enrollee-surname" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Surname</label>
+                          <label htmlFor="enrollee-surname" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Last Name</label>
                           <input
                             id="enrollee-surname"
                             className="input"
@@ -1409,6 +1419,9 @@ const Login = () => {
                             onBlur={() => setEnrolleeData((p) => ({ ...p, lastName: toProperName(p.lastName) }))}
                           />
                         </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
                         <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label htmlFor="enrollee-suffix" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
                             Suffix <span style={{ fontWeight: 'var(--font-weight-normal)', opacity: 0.75 }}>(optional)</span>
@@ -1422,9 +1435,6 @@ const Login = () => {
                             onChange={(e) => setEnrolleeData((p) => ({ ...p, suffix: e.target.value }))}
                           />
                         </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
                         <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label htmlFor="enrollee-dob" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Date of Birth</label>
                           <input
@@ -1436,24 +1446,45 @@ const Login = () => {
                             onChange={(e) => setEnrolleeData((p) => ({ ...p, dateOfBirth: e.target.value }))}
                           />
                         </div>
-                        <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          {/* Required, not optional: it is the only thing tying
-                              this account to an admissions record. */}
-                          <label htmlFor="enrollee-applicant-id" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>
-                            Applicant ID
-                          </label>
-                          <input
-                            id="enrollee-applicant-id"
-                            className="input"
-                            style={authInputStyle}
-                            placeholder="e.g. 2526A34660"
-                            value={enrolleeData.applicantId}
-                            onChange={(e) => setEnrolleeData((p) => ({ ...p, applicantId: e.target.value.toUpperCase() }))}
-                          />
-                        </div>
                       </div>
 
-                      {/* Personal address, and the Send button that mails the code. */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
+                        <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <label htmlFor="enrollee-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Password</label>
+                          <input
+                            id="enrollee-password"
+                            className="input"
+                            style={authInputStyle}
+                            type="password"
+                            placeholder="At least 8 characters"
+                            minLength={PASSWORD_MIN_LENGTH}
+                            maxLength={PASSWORD_MAX_LENGTH}
+                            aria-describedby="enrollee-password-requirements"
+                            value={enrolleeData.password}
+                            onChange={(e) => setEnrolleeData((p) => ({ ...p, password: e.target.value }))}
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <label htmlFor="enrollee-confirm" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Confirm Password</label>
+                          <input
+                            id="enrollee-confirm"
+                            className="input"
+                            style={authInputStyle}
+                            type="password"
+                            placeholder="Re-type password"
+                            value={enrolleeData.confirmPassword}
+                            onChange={(e) => setEnrolleeData((p) => ({ ...p, confirmPassword: e.target.value }))}
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <PasswordRequirements id="enrollee-password-requirements" password={enrolleeData.password} inverse />
+                      </div>
+
+                      {signupConsent}
+
+                      {/* Send comes last, after everything it requires, so a
+                          disabled button never waits on a field further down. */}
                       <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
                         <label htmlFor="enrollee-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Personal Email</label>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
@@ -1470,7 +1501,7 @@ const Login = () => {
                             type="button"
                             className="btn secondary"
                             onClick={handleEnrolleeSendOtp}
-                            disabled={otpSending || otpCooldown > 0 || !enrolleeData.email.trim() || !signupPolicyAgreed}
+                            disabled={isSendDisabled}
                             style={{
                               padding: '0 14px',
                               whiteSpace: 'nowrap',
@@ -1484,6 +1515,7 @@ const Login = () => {
                         <div style={{ fontSize: 'var(--font-size-2xs)', color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
                           Any personal address works. Your TUP email comes later, once you are enrolled.
                         </div>
+                        {sendMissingHint}
                         {otpSent && (
                           <div style={{ color: '#c6f6d5', fontSize: 'var(--font-size-xs)', marginTop: 2, fontWeight: 'var(--font-weight-semibold)' }}>
                             If the provided information is eligible for registration, you will receive a verification code by email.
@@ -1491,10 +1523,6 @@ const Login = () => {
                         )}
                       </div>
 
-                      {/* The code first, then the password. The applicant proves
-                          the address is theirs before choosing a credential, so
-                          nothing is asked for that depends on the address being
-                          real until it has been confirmed. */}
                       {otpSent && (
                         <VerificationCodeField
                           id="enrollee-otp"
@@ -1505,40 +1533,6 @@ const Login = () => {
                         />
                       )}
 
-                      {otpSent && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '8px 0' }}>
-                          <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            <label htmlFor="enrollee-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Password</label>
-                            <input
-                              id="enrollee-password"
-                              className="input"
-                              style={authInputStyle}
-                              type="password"
-                              placeholder="At least 8 characters"
-                              minLength={PASSWORD_MIN_LENGTH}
-                              maxLength={PASSWORD_MAX_LENGTH}
-                              aria-describedby="enrollee-password-requirements"
-                              value={enrolleeData.password}
-                              onChange={(e) => setEnrolleeData((p) => ({ ...p, password: e.target.value }))}
-                              autoComplete="new-password"
-                            />
-                          </div>
-                          <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            <label htmlFor="enrollee-confirm" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Confirm Password</label>
-                            <input
-                              id="enrollee-confirm"
-                              className="input"
-                              style={authInputStyle}
-                              type="password"
-                              placeholder="Re-type password"
-                              value={enrolleeData.confirmPassword}
-                              onChange={(e) => setEnrolleeData((p) => ({ ...p, confirmPassword: e.target.value }))}
-                              autoComplete="new-password"
-                            />
-                          </div>
-                          <PasswordRequirements id="enrollee-password-requirements" password={enrolleeData.password} inverse />
-                        </div>
-                      )}
                     </>
                   )}
 
@@ -1554,6 +1548,7 @@ const Login = () => {
                       placeholder="e.g. TUPM-XX-XXXX"
                       value={signupData.studentId}
                       onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
+                      disabled={otpSent}
                     />
                     {showStudentIdError && (
                       <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
@@ -1696,71 +1691,6 @@ const Login = () => {
                     </div>
                   </div>
 
-                  {/* 4. Email with Send/Resend Button */}
-                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Email</label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        id="signup-email"
-                        className="input"
-                        style={{ ...authInputStyle, flex: 1 }}
-                        type="email"
-                        placeholder="student@tup.edu.ph"
-                        value={signupData.email}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSignupData((p) => ({ ...p, email: val }));
-                          if (otpSent && otpEmail && val.trim().toLowerCase() !== otpEmail) {
-                            setOtpSent(false);
-                            setOtpCode('');
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        disabled={isSendDisabled}
-                        onClick={handleSendOtp}
-                        style={{
-                          background: isSendDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
-                          color: isSendDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
-                          fontWeight: 'var(--font-weight-bold)',
-                          padding: '10px 14px',
-                          borderRadius: 10,
-                          border: 'none',
-                          cursor: isSendDisabled ? 'not-allowed' : 'pointer',
-                          fontSize: 'var(--font-size-sm)',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          boxShadow: isSendDisabled ? 'none' : '0 2px 6px rgba(0,0,0,0.1)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {otpSending ? 'Sending…' : otpCooldown > 0 ? `Resend (${otpCooldown}s)` : otpSent ? 'Resend' : 'Send'}
-                      </button>
-                    </div>
-                    {showSignupEmailError && (
-                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
-                        Please use your official TUP email address ending in @tup.edu.ph.
-                      </div>
-                    )}
-                    {otpSent && (
-                      <div style={{ color: '#c6f6d5', fontSize: 'var(--font-size-xs)', marginTop: 2, fontWeight: 'var(--font-weight-semibold)' }}>
-                        If the provided information is eligible for registration, you will receive a verification code by email.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. Verification Code (OTP) Field — DIRECTLY BENEATH EMAIL */}
-                  {otpSent && (
-                    <VerificationCodeField
-                      id="signup-otp"
-                      value={otpCode}
-                      onChange={setOtpCode}
-                      sentTo={otpEmail || signupData.email}
-                      inputStyle={authInputStyle}
-                    />
-                  )}
-
                   {/* 6. Password with Eye Toggle */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <label htmlFor="signup-password" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Password</label>
@@ -1845,10 +1775,76 @@ const Login = () => {
                       </div>
                     )}
                   </div>
+                  {signupConsent}
+
+                  {/* 8. Email with Send/Resend Button — last, after everything Send requires */}
+                  <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label htmlFor="signup-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Email</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        id="signup-email"
+                        className="input"
+                        style={{ ...authInputStyle, flex: 1 }}
+                        type="email"
+                        placeholder="student@tup.edu.ph"
+                        value={signupData.email}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSignupData((p) => ({ ...p, email: val }));
+                          if (otpSent && otpEmail && val.trim().toLowerCase() !== otpEmail) {
+                            setOtpSent(false);
+                            setOtpCode('');
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={isSendDisabled}
+                        onClick={handleSendOtp}
+                        style={{
+                          background: isSendDisabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                          color: isSendDisabled ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                          fontWeight: 'var(--font-weight-bold)',
+                          padding: '10px 14px',
+                          borderRadius: 10,
+                          border: 'none',
+                          cursor: isSendDisabled ? 'not-allowed' : 'pointer',
+                          fontSize: 'var(--font-size-sm)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          boxShadow: isSendDisabled ? 'none' : '0 2px 6px rgba(0,0,0,0.1)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {otpSending ? 'Sending…' : otpCooldown > 0 ? `Resend (${otpCooldown}s)` : otpSent ? 'Resend' : 'Send'}
+                      </button>
+                    </div>
+                    {showSignupEmailError && (
+                      <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
+                        Please use your official TUP email address ending in @tup.edu.ph.
+                      </div>
+                    )}
+                    {sendMissingHint}
+                    {otpSent && (
+                      <div style={{ color: '#c6f6d5', fontSize: 'var(--font-size-xs)', marginTop: 2, fontWeight: 'var(--font-weight-semibold)' }}>
+                        If the provided information is eligible for registration, you will receive a verification code by email.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 9. Verification Code (OTP) Field — DIRECTLY BENEATH EMAIL */}
+                  {otpSent && (
+                    <VerificationCodeField
+                      id="signup-otp"
+                      value={otpCode}
+                      onChange={setOtpCode}
+                      sentTo={otpEmail || signupData.email}
+                      inputStyle={authInputStyle}
+                    />
+                  )}
+
                 </>
               )}
-
-              {signupConsent}
 
               {/* Shared by both paths. These used to sit inside the student
                   branch, so the enrollee form had no submit button at all —

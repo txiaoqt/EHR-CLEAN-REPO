@@ -171,13 +171,13 @@ assert(auditPage.includes('<TablePagination'), 'reuses the shared pagination foo
 assert(auditPage.includes('auditLogsExportConfig'), 'can export itself');
 
 const appSrc = read('src/App.jsx');
-assert(appSrc.includes("path=\"/audit-trail\""), 'route registered');
-assert(appSrc.includes("guard(<AuditTrail />, ['admin', 'physician'])"), 'route is role-gated');
+assert(!appSrc.includes('path="/audit-trail"'), 'no staff route: audit is admin-only');
+assert(read('src/admin/AdminPortal.jsx').includes('path="/admin/audit-trail"'), 'admin route registered');
 
 const sidebarSrc = read('src/components/sidebar/Sidebar.jsx');
-assert(sidebarSrc.includes("page: 'audit-trail'"), 'sidebar entry present');
+assert(!sidebarSrc.includes("page: 'audit-trail'"), 'not in the staff sidebar');
 assert(sidebarSrc.includes('roles:'), 'sidebar supports role-gated items');
-console.log('  ✓ PASS: Audit Trail page registered, role-gated and linked from the sidebar');
+console.log('  ✓ PASS: Audit Trail page registered in the System Admin Portal only');
 
 assert(read('src/utils.js').includes('performed_by: finalUserName'), 'logAudit mirrors the actor into performed_by');
 console.log('  ✓ PASS: logAudit populates performed_by (the profile feed previously matched nothing)');

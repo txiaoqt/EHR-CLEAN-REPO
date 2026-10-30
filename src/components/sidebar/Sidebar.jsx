@@ -6,8 +6,7 @@ import { translate } from '../../utils';
 import { useAuth } from '../../AuthContext.jsx';
 import { useStaffPresence } from '../../StaffPresenceContext.jsx';
 import StaffAvailability from '../StaffAvailability.jsx';
-import { supabase } from '../../supabaseClient.js';
-import { isPhysician } from '../../accessControl.js';
+import { canOpenStaffPage } from '../../staffPageAccess.mjs';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 
@@ -23,9 +22,7 @@ import {
   SettingsIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  HistoryIcon,
   MedicalLogIcon,
-  BackupIcon,
   ArchiveIcon,
   LogoutIcon
 } from '../icons/Icons.jsx';
@@ -67,8 +64,6 @@ export const NAV_GROUPS = [
   {
     label: 'ADMINISTRATION',
     items: [
-      { page: 'audit-trail', label: 'Audit Trail', icon: HistoryIcon, roles: ['admin', 'physician'] },
-      { page: 'backup-recovery', label: 'Backup & Recovery', icon: BackupIcon, roles: ['admin', 'physician'], paletteOnly: true },
       { page: 'settings', label: 'Settings', icon: SettingsIcon },
     ]
   }
@@ -83,9 +78,6 @@ const Sidebar = ({ collapsed = false, toggle }) => {
 
   // Confirmation popup state
   const [showConfirm, setShowConfirm] = useState(false);
-
-  // show last backup timestamp
-  const [lastBackup, setLastBackup] = useState(() => localStorage.getItem('last_backup') || '--');
 
   useEffect(() => {
     // re-render trigger for settings changes
@@ -106,49 +98,6 @@ const Sidebar = ({ collapsed = false, toggle }) => {
   }
   const formattedRole = (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Staff');
 
-  // Fetch last_backup from Supabase on mount (fallback to localStorage), and listen to backupCompleted events
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchLastBackup = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('settings')
-          .select('value')
-          .eq('key', 'last_backup')
-          .maybeSingle();
-
-        if (!error && data && data.value) {
-          if (mounted) {
-            setLastBackup(data.value);
-            localStorage.setItem('last_backup', data.value);
-          }
-        } else {
-          const local = localStorage.getItem('last_backup');
-          if (mounted && local) setLastBackup(local);
-        }
-      } catch (err) {
-        const local = localStorage.getItem('last_backup');
-        if (mounted && local) setLastBackup(local);
-      }
-    };
-
-    fetchLastBackup();
-
-    const onBackupCompleted = (ev) => {
-      const ts = ev?.detail || localStorage.getItem('last_backup') || '--';
-      setLastBackup(ts);
-      if (ts && ts !== '--') localStorage.setItem('last_backup', ts);
-    };
-
-    window.addEventListener('backupCompleted', onBackupCompleted);
-
-    return () => {
-      mounted = false;
-      window.removeEventListener('backupCompleted', onBackupCompleted);
-    };
-  }, []);
-
   const handleNavigation = (page) => {
     navigate('/' + page);
   };
@@ -166,8 +115,6 @@ const Sidebar = ({ collapsed = false, toggle }) => {
   const handleSignOutClick = () => {
     setShowConfirm(true);
   };
-
-  const openBackupSettings = () => navigate('/backup-recovery');
 
   return (
     <>
@@ -229,6 +176,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
               <div className="nav-group-label">{group.label}</div>
               {group.items.filter((item) =>
                 (!item.roles || item.roles.includes((user?.role || '').toString().trim().toLowerCase())) &&
+                canOpenStaffPage(user, item.page) &&
                 // Some destinations are reachable from Search pages but kept out
                 // of the sidebar, which otherwise grows past the viewport.
                 !item.paletteOnly
@@ -278,15 +226,6 @@ const Sidebar = ({ collapsed = false, toggle }) => {
               {formattedRole}
             </div>
 
-            {isPhysician(user) && (
-              <div
-                style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', marginTop: 6, cursor: 'pointer', borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}
-                onClick={(e) => { e.stopPropagation(); openBackupSettings(); }}
-                title="Open backup settings"
-              >
-                Last backup: <strong>{lastBackup}</strong>
-              </div>
-            )}
           </div>
 
           {/* Collapsed Compact Profile Avatar Button */}

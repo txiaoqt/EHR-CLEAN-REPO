@@ -203,7 +203,7 @@ const PatientProfilePortal = () => {
     setUploadingPhoto(true);
     setMsg('');
 
-    let uploadedBucket = 'profile-images';
+    const uploadedBucket = 'profile-images';
     let uploadedPath = '';
 
     try {
@@ -218,29 +218,14 @@ const PatientProfilePortal = () => {
       const filePath = `${authUid}/${fileName}`;
       uploadedPath = filePath;
 
-      // 1. Upload directly to Supabase Storage bucket 'profile-images' (with avatars fallback)
-      let { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
+      // 1. Upload directly to Supabase Storage bucket 'profile-images'. The old
+      // 'avatars' fallback bucket does not exist, so a retry there always failed.
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(uploadedBucket)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true,
         });
-
-      if (uploadError) {
-        // Fallback check for avatars bucket
-        const fallbackRes = await supabase.storage
-          .from('avatars')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: true,
-          });
-
-        if (!fallbackRes.error && fallbackRes.data) {
-          uploadedBucket = 'avatars';
-          uploadData = fallbackRes.data;
-          uploadError = null;
-        }
-      }
 
       if (uploadError || !uploadData) {
         console.error('Storage upload failed:', uploadError);

@@ -30,6 +30,20 @@ export async function adminAccountHistory({ accountId = null, search = '', actio
   return data;
 }
 
+export async function adminPageAccess() {
+  const { data, error } = await supabase.rpc('admin_role_page_access');
+  if (error) throw new Error(error.code === '42501'
+    ? 'Administrator access is unavailable. Sign in again.' : 'Could not load page access. Try again.');
+  return data;
+}
+
+export async function saveAdminPageAccess(role, pages) {
+  const { data, error } = await supabase.rpc('admin_set_role_page_access', { p_role: role, p_pages: pages });
+  if (error) throw new Error(error.code === '42501' ? 'Administrator access is unavailable. Sign in again.'
+    : error.code === '22023' ? error.message : 'Could not save page access. Try again.');
+  return data;
+}
+
 export const formatAdminDate = (value) => value ? new Intl.DateTimeFormat('en-PH', {
   timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short',
 }).format(new Date(value)) : '—';

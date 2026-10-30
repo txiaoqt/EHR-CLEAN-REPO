@@ -55,7 +55,7 @@ const profileCode = fs.readFileSync(path.join(projectRoot, 'src/pages/patient/Pa
 assert(profileCode.includes('Change Photo'), 'PatientProfilePortal provides "Change Photo" button');
 assert(profileCode.includes('ALLOWED_MIME_TYPES') && profileCode.includes('image/webp'), 'Validates image format (JPEG, PNG, WEBP)');
 assert(profileCode.includes('MAX_FILE_SIZE_BYTES') || profileCode.includes('5 * 1024 * 1024'), 'Enforces maximum file size limit (5MB)');
-assert(profileCode.includes("from('avatars')"), 'Uploads avatar to Supabase Storage avatars bucket');
+assert(profileCode.includes("'profile-images'") && !profileCode.includes("from('avatars')"), 'Uploads avatar to the profile-images bucket (no dead avatars fallback)');
 assert(profileCode.includes('handleRemovePhoto'), 'Provides option to remove custom photo and revert to default');
 assert(profileCode.includes('avatarPlaceholder'), 'Provides default avatar placeholder');
 assert(profileCode.includes('updateUser?.({ avatar:'), 'Propagates avatar change live through AuthContext');

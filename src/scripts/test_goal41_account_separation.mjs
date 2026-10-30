@@ -157,7 +157,7 @@ assert(authContextCode.includes("if (['admin', 'physician', 'nurse'].includes(ro
 const loginPath = path.join(projectRoot, 'src/pages/Login.jsx');
 const loginCode = fs.readFileSync(loginPath, 'utf8');
 
-assert(loginCode.includes("patient_id: 'TUPM-XX-XXXX'"), 'USER_TEST_ACCOUNT in Login.jsx uses generic sample Student ID TUPM-XX-XXXX');
+assert(!loginCode.includes('USER_TEST_ACCOUNT'), 'Login.jsx ships no hardcoded test account that bypasses Supabase Auth');
 assert(loginCode.includes('placeholder="e.g. TUPM-XX-XXXX"'), 'Login.jsx signup form uses placeholder e.g. TUPM-XX-XXXX');
 assert(loginCode.includes('isValidStudentId'), 'Login.jsx validates studentId with isValidStudentId');
 // The rule moved into deploySurface.js so it is stated once. Assert the call

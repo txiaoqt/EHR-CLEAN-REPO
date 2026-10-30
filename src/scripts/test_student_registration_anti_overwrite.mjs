@@ -77,6 +77,23 @@ assert(
   'TEST 12: Trigger trg_check_unique_student_account provides storage-level atomic concurrency protection against duplicate student IDs'
 );
 
+// The checks above cover the migration that introduced the rules; a later
+// rewrite of the function replaces it, so the newest definition must keep them.
+const migrationsDir = path.join(projectRoot, 'supabase/migrations');
+const latestRegistration = fs.readdirSync(migrationsDir)
+  .filter((f) => /^\d{14}_.*\.sql$/.test(f))
+  .sort()
+  .map((f) => fs.readFileSync(path.join(migrationsDir, f), 'utf8'))
+  .filter((sql) => /create or replace function public\.complete_patient_registration/i.test(sql))
+  .pop()
+  .toLowerCase();
+assert(
+  /insert into public\.students[\s\S]*?on conflict \(id\) do nothing/.test(latestRegistration) &&
+  latestRegistration.includes('auth_user_id <> v_auth_uid') &&
+  latestRegistration.includes('user_id <> v_auth_uid'),
+  'Newest complete_patient_registration keeps DO NOTHING and the reassignment checks'
+);
+
 // -----------------------------------------------------------------------------
 // 3. User Enumeration & Error Message Sanitization
 // -----------------------------------------------------------------------------
