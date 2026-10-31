@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { CheckIcon, AlertIcon } from './icons/Icons.jsx';
-import { COURSE_GROUPS, digitsOnly, isValidPhMobile, limitPhone } from '../utils/courses.js';
+import CourseSearch from './CourseSearch.jsx';
+import { digitsOnly, isValidPhMobile, limitPhone } from '../utils/courses.js';
 
 /**
  * The clinic's paper record, as input fields.
@@ -344,22 +345,15 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
                           style={isMissing || fieldError ? { borderColor: 'var(--color-rose-text)' } : undefined}
                         />
                       ) : field.type === 'course-select' ? (
-                        <select
-                          {...common}
-                          className="input"
+                        <CourseSearch
+                          id={common.id}
+                          disabled={common.disabled}
+                          invalid={common['aria-invalid']}
+                          describedBy={common['aria-describedby']}
                           value={answers[field.key] || ''}
-                          onChange={(e) => set(field.key, e.target.value)}
-                          style={isMissing || fieldError ? { borderColor: 'var(--color-rose-text)' } : undefined}
-                        >
-                          <option value="">Select your degree program</option>
-                          {COURSE_GROUPS.map((group) => (
-                            <optgroup key={group.college} label={group.college}>
-                              {group.programs.map((program) => (
-                                <option key={program} value={program}>{program}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
+                          onChange={(course) => set(field.key, course)}
+                          inputStyle={isMissing || fieldError ? { borderColor: 'var(--color-rose-text)' } : undefined}
+                        />
                       ) : field.type === 'select' ? (
                         <select
                           {...common}

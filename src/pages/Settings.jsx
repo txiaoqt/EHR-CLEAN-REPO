@@ -6,6 +6,7 @@ import { useTheme } from '../ThemeContext.jsx';
 import PasswordRequirements from '../components/PasswordRequirements.jsx';
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy.js';
 import { SunIcon, MoonIcon, DesktopIcon } from '../components/icons/Icons.jsx';
+import { IS_DENTAL_SURFACE } from '../deploySurface.js';
 
 /**
  * Staff settings.
@@ -22,12 +23,7 @@ import { SunIcon, MoonIcon, DesktopIcon } from '../components/icons/Icons.jsx';
  *    task rather than a preference.
  */
 
-const CLINIC_FIELDS = [
-  ['clinic_name', 'Clinic name'],
-  ['clinic_email', 'Official email'],
-  ['clinic_phone', 'Contact number'],
-  ['clinic_address', 'Address'],
-];
+const ROLE_LABELS = { physician: 'Physician', nurse: 'Nurse', dentist: 'Dentist', admin: 'Administrator' };
 
 const Settings = () => {
   const { user: authUser } = useAuth();
@@ -40,16 +36,6 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
-
-  const [clinic, setClinic] = useState(() => {
-    const s = loadSettings();
-    return {
-      clinic_name: s.clinic_name || 'TUP Clinic',
-      clinic_email: s.clinic_email || 'clinic@tup.edu.ph',
-      clinic_phone: s.clinic_phone || '(02) 301-3001 loc. 605',
-      clinic_address: s.clinic_address || 'Ayala Blvd., Ermita, Manila, 1000, Philippines',
-    };
-  });
 
   useEffect(() => {
     setSettings((prev) => (prev.theme !== globalTheme ? { ...prev, theme: globalTheme } : prev));
@@ -132,9 +118,9 @@ const Settings = () => {
       <div className="page">
         <div className="page-header">
           <div className="page-header-title-block">
-            <h1 className="page-header-title">System &amp; Staff Settings</h1>
+            <h1 className="page-header-title">Settings</h1>
             <div className="page-header-subtitle">
-              Account credentials, notification preferences, appearance, audit records and backup.
+              Your password, the notices you get, and how the portal looks.
             </div>
           </div>
         </div>
@@ -156,21 +142,22 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Row 1 — account and notifications */}
+        {/* Account on the left; the two short cards stack on the right so neither
+            column ends in blank space. */}
         <div className="settings-main-grid">
           <div className="card settings-card">
             <header className="settings-card-head">
               <h2>Account &amp; Security</h2>
-              <p>Authenticated staff identity and credential management.</p>
+              <p>Your sign-in details and password.</p>
             </header>
 
             <div className="settings-identity">
-              <div className="settings-identity-label">Active account user</div>
+              <div className="settings-identity-label">Signed in as</div>
               <div className="settings-identity-body">
                 <div>
                   <div className="settings-identity-name">{authUser?.name || 'Staff'}</div>
                   <div className="settings-identity-meta">
-                    {authUser?.role || 'physician'} · {authUser?.email}
+                    {ROLE_LABELS[authUser?.role] || 'Staff'} · {authUser?.email}
                   </div>
                 </div>
                 <span className="settings-identity-status">
@@ -227,35 +214,32 @@ const Settings = () => {
             </div>
           </div>
 
+          <div className="settings-stack">
           <div className="card settings-card">
             <header className="settings-card-head">
               <h2>Notifications</h2>
-              <p>What the system tells you, and by which route.</p>
+              <p>Alerts in the portal and emails to patients.</p>
             </header>
 
             {switchRow('notifications_stock', 'Low stock warning banners',
               'Show the reorder alert at the top of the dashboard when stock falls below its threshold.')}
             {switchRow('notifications_email', 'Email notifications',
-              'Appointment confirmations, reschedule notices and clinic announcements.')}
-            {switchRow('notifications_email_blast', 'Allow email blasts',
+              'Appointment confirmations, reschedule notices and clinic announcements.', IS_DENTAL_SURFACE)}
+            {/* Announcements to every patient are sent from the medical Staff Portal only. */}
+            {!IS_DENTAL_SURFACE && switchRow('notifications_email_blast', 'Allow email blasts',
               'Permits sending an announcement to every registered patient at once.', true)}
 
             <div className="settings-callout">
-              Email delivery depends on the deployed <code>send-patient-notification</code> and{' '}
-              <code>send-event-announcement</code> functions and on the mail provider being configured.
-              If sending fails, the portal still records the action.
+              Emails go out only when the clinic&rsquo;s mail service is set up. If an email fails,
+              the change is still saved.
             </div>
           </div>
-        </div>
 
-        {/* Row 2 — appearance and clinic identity */}
-        <div className="settings-main-grid">
           <div className="card settings-card">
             <header className="settings-card-head">
               <h2>Interface Appearance</h2>
               <p>
-                Saved to this browser. System default follows your operating system and keeps following
-                it when the system changes.
+                Saved to this browser. System default follows your computer&rsquo;s light or dark setting.
               </p>
             </header>
 
@@ -280,23 +264,6 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="card settings-card">
-            <header className="settings-card-head">
-              <h2>System Information</h2>
-              <p>Shown on exported reports and the letters the clinic issues.</p>
-            </header>
-            {CLINIC_FIELDS.map(([key, label]) => (
-              <div className="settings-field" key={key}>
-                <label htmlFor={key}>{label}</label>
-                <input
-                  id={key}
-                  className="input"
-                  value={clinic[key]}
-                  onChange={(e) => setClinic((prev) => ({ ...prev, [key]: e.target.value }))}
-                  onBlur={(e) => persist({ ...settings, [key]: e.target.value })}
-                />
-              </div>
-            ))}
           </div>
         </div>
 

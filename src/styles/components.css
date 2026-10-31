@@ -7412,3 +7412,25 @@ select {
   outline: 2px solid var(--focus-ring, var(--primary));
   outline-offset: -2px;
 }
+
+/* Right column of Settings: Notifications and Appearance stacked. */
+.settings-stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Searchable degree-program picker (CourseSearch). */
+.course-search { position: relative; min-width: 0; }
+.course-search > input { width: 100%; box-sizing: border-box; }
+.course-search-list {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 280px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); color: var(--text); text-align: left;
+}
+.course-search-list li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.course-search-list li.is-active { background: var(--color-primary-tint); }
+.course-search-program { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.course-search-college { font-size: var(--font-size-xs); color: var(--text-muted); }
+.course-search-empty { padding: 10px 12px; font-size: var(--font-size-sm); color: var(--text-muted); }

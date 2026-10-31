@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { SearchIcon } from '../../components/icons/Icons.jsx';
+import CourseSearch from '../../components/CourseSearch.jsx';
 import { CLASSIFICATIONS, DENTAL_TIMES, EMPTY_RECORD, ageFrom, formatTimeLabel, addDaysIso, todayIso } from './dentalShared.js';
 
 /** Finds a patient in the student directory, or registers one by ID and name. */
@@ -124,7 +125,11 @@ export const RecordFields = ({ record, onChange, disabled }) => {
         {text('middle_name', 'Middle Name', { max: 80 })}
       </div>
       <div className="dental-fields" style={{ marginTop: 14 }}>
-        {text('college_course_unit', 'College / Course / Unit / Department')}
+        <Field label="College / Course / Unit / Department" wide={false}>
+          {/* Free text allowed: faculty and staff write their unit or department. */}
+          <CourseSearch allowCustom value={record.college_course_unit || ''} disabled={disabled}
+            placeholder="Type a program (e.g. BSIT) or a unit" onChange={(v) => onChange({ ...record, college_course_unit: v.slice(0, 160) })} />
+        </Field>
         <div className="dental-field">
           <fieldset disabled={disabled}>
             <legend>Classification</legend>

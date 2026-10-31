@@ -19,8 +19,16 @@ const server = await createServer({
 });
 
 try {
-  const { COURSE_GROUPS, ALL_PROGRAMS, limitPhone, isValidPhMobile } =
+  const { COURSE_GROUPS, ALL_PROGRAMS, limitPhone, isValidPhMobile, matchPrograms } =
     await server.ssrLoadModule('/src/utils/courses.js');
+
+  const found = (q) => matchPrograms(q).map((o) => o.program);
+  assert.deepEqual(found('BSIT'), ['BS Information Technology'], 'acronym search finds the program');
+  assert.ok(found('bscs').includes('BS Computer Science'), 'acronym search ignores case');
+  assert.ok(found('mechatronics').some((p) => p.includes('Mechatronics')), 'word search matches inside names');
+  assert.ok(found('college of science').includes('BS Environmental Science'), 'search matches the college');
+  assert.equal(found('').length, ALL_PROGRAMS.length, 'empty search lists every program');
+  assert.equal(found('zzz').length, 0, 'unknown text matches nothing');
 
   assert.equal(COURSE_GROUPS.length, 6, 'all six TUP Manila colleges are grouped');
   assert.ok(ALL_PROGRAMS.includes('BS Information Technology'), 'TUP course appears in the shared list');

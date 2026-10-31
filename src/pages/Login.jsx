@@ -1,5 +1,6 @@
 // src/pages/Login.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import CourseSearch from '../components/CourseSearch.jsx';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import {
@@ -39,88 +40,6 @@ import {
 
 export { ALLOWED_USER_EMAIL_DOMAIN, STUDENT_ID_REGEX, isValidTupEmail, isValidStudentId };
 
-
-// Degree programmes offered by TUP Manila, grouped by the six colleges the
-// University names on its own Academics page.
-//
-// The list is taken from TUP's admission requirements page
-// (ers.tup.edu.ph/aims/applicants/admissionrequirements.php), which sets out the
-// programmes college by college, cross-checked against the University's
-// estimated-tuition table and its Academics page. The previous list held eight
-// programmes from the College of Science alone, so a student from Engineering or
-// Industrial Technology could not state their own course.
-//
-// Grouped with <optgroup> because there are around forty entries — a flat list
-// is unusable in a dropdown. The stored value stays the programme name alone, so
-// it reads correctly on the Medical Log's DEPT./COURSE column and matches the
-// rows already recorded.
-const SIGNUP_COURSES = [
-  {
-    college: 'College of Engineering',
-    programs: [
-      'BS Civil Engineering',
-      'BS Electrical Engineering',
-      'BS Electronics Engineering',
-      'BS Mechanical Engineering',
-    ],
-  },
-  {
-    college: 'College of Science',
-    programs: [
-      'BS Computer Science',
-      'BS Information Technology',
-      'BS Information Systems',
-      'BS Environmental Science',
-      'BS Applied Science major in Laboratory Technology',
-    ],
-  },
-  {
-    college: 'College of Industrial Technology',
-    programs: [
-      'Bachelor of Engineering Technology major in Computer Engineering Technology',
-      'Bachelor of Engineering Technology major in Civil Technology',
-      'Bachelor of Engineering Technology major in Electrical Technology',
-      'Bachelor of Engineering Technology major in Electronics Technology',
-      'Bachelor of Engineering Technology major in Electronics and Communications Technology',
-      'Bachelor of Engineering Technology major in Instrumentation and Control Technology',
-      'Bachelor of Engineering Technology major in Mechanical Technology',
-      'Bachelor of Engineering Technology major in Mechatronics Technology',
-      'Bachelor of Engineering Technology major in Railway Technology',
-      'Bachelor of Engineering Technology major in Mechanical Engineering Technology option in Automotive Technology',
-      'Bachelor of Engineering Technology major in Mechanical Engineering Technology option in Foundry Technology',
-      'BS Food Technology',
-    ],
-  },
-  {
-    college: 'College of Industrial Education',
-    programs: [
-      'Bachelor of Technical Teacher Education',
-      'Bachelor of Technical Vocational Teacher Education',
-      'BS Industrial Education major in Art Education',
-      'BS Industrial Education major in Computer Education',
-      'BS Industrial Education major in Electrical Technology',
-      'BS Industrial Education major in Electronics Technology',
-      'BS Industrial Education major in Home Economics',
-      'BS Industrial Education major in Industrial Arts',
-    ],
-  },
-  {
-    college: 'College of Architecture and Fine Arts',
-    programs: [
-      'BS Architecture',
-      'BS Graphics Technology',
-      'BS Product Design and Development Technology',
-      'Bachelor of Fine Arts',
-    ],
-  },
-  {
-    college: 'College of Liberal Arts',
-    programs: [
-      'BS Entrepreneurial Management',
-      'Bachelor of Arts in Management major in Industrial Management',
-    ],
-  },
-];
 
 const Login = () => {
   const navigate = useNavigate();
@@ -1674,21 +1593,13 @@ const Login = () => {
 
                     <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                       <label htmlFor="signup-course" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Degree Program</label>
-                      <select
+                      <CourseSearch
                         id="signup-course"
-                        className="input"
-                        style={{ ...authInputStyle, cursor: 'pointer' }}
+                        inputStyle={authInputStyle}
                         value={signupData.course}
-                        onChange={(e) => setSignupData((p) => ({ ...p, course: e.target.value }))}
+                        onChange={(course) => setSignupData((p) => ({ ...p, course }))}
                         required
-                      >
-                        <option value="">Select…</option>
-                        {SIGNUP_COURSES.map(({ college, programs }) => (
-                          <optgroup key={college} label={college}>
-                            {programs.map((c) => <option key={c} value={c}>{c}</option>)}
-                          </optgroup>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 

@@ -82,6 +82,28 @@ export const COURSE_GROUPS = [
 /** Every programme as one flat list, for validation and lookups. */
 export const ALL_PROGRAMS = COURSE_GROUPS.flatMap((g) => g.programs);
 
+const CONNECTORS = new Set(['of', 'in', 'and', 'major', 'option']);
+
+/** 'BS Information Technology' -> 'bsit'; 'Bachelor of Engineering Technology ...' -> 'bet...'. */
+export const programAcronym = (program) => program.split(/\s+/)
+  .filter((word) => !CONNECTORS.has(word.toLowerCase()))
+  .map((word) => (word === 'BS' ? 'bs' : word[0].toLowerCase()))
+  .join('');
+
+export const COURSE_PROGRAM_OPTIONS = COURSE_GROUPS.flatMap(({ college, programs }) => programs.map((program) => ({
+  program, college, acronym: programAcronym(program), haystack: `${program} ${college}`.toLowerCase(),
+})));
+
+/** Acronym prefix ("bsit", "bet") or every typed word somewhere in the program or college. */
+export const matchPrograms = (query) => {
+  const q = query.trim().toLowerCase();
+  if (!q) return COURSE_PROGRAM_OPTIONS;
+  const letters = q.replace(/[^a-z]/g, '');
+  const words = q.split(/\s+/);
+  return COURSE_PROGRAM_OPTIONS.filter((o) => (letters.length >= 2 && o.acronym.startsWith(letters))
+    || words.every((w) => o.haystack.includes(w)));
+};
+
 /**
  * A Philippine mobile number: eleven digits, beginning 09.
  *

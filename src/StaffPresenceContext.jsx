@@ -6,6 +6,8 @@ import { registerStaffPresenceStop } from './utils/staffPresenceLifecycle.js';
 const StaffPresenceContext = createContext(null);
 const EMPTY = [];
 const STAFF_ROLES = ['physician', 'nurse'];
+// A dentist tracks their own status; the medical roster stays medical-only.
+const DENTAL_ROLES = ['dentist'];
 const TOPIC_PREFIX = 'clinic-staff-presence:';
 
 export const useStaffPresence = () => {
@@ -22,7 +24,9 @@ export const StaffPresenceProvider = ({ children }) => {
     !isPasswordRecoverySession && user?.active !== false && !user?.staff_setup_required &&
     (!user?.auth_user_id || user.auth_user_id === authId)
   );
-  const isStaff = enabled && STAFF_ROLES.includes((user?.role || '').toLowerCase());
+  const role = (user?.role || '').toLowerCase();
+  const rosterRoles = role === 'dentist' ? DENTAL_ROLES : STAFF_ROLES;
+  const isStaff = enabled && (STAFF_ROLES.includes(role) || role === 'dentist');
   const [networkOnline, setNetworkOnline] = useState(() => navigator.onLine !== false);
   const [directory, setDirectory] = useState(null);
   const [presence, setPresence] = useState(null);
@@ -56,7 +60,7 @@ export const StaffPresenceProvider = ({ children }) => {
       try {
         const { data, error } = await supabase.from('staff_directory')
           .select('id, auth_user_id, name, role, avatar, department, active')
-          .in('role', STAFF_ROLES).order('name').abortSignal(controller.signal);
+          .in('role', rosterRoles).order('name').abortSignal(controller.signal);
         if (error) throw error;
         if (active) setDirectory({ owner: authId,
           staff: (data || []).filter((staff) => staff.active !== false && staff.auth_user_id),
@@ -91,7 +95,7 @@ export const StaffPresenceProvider = ({ children }) => {
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
     };
-  }, [enabled, authId]);
+  }, [enabled, authId, rosterRoles]);
 
   useEffect(() => {
     let active = true;
