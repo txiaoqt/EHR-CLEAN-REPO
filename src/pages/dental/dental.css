@@ -104,3 +104,4 @@ button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px so
 .dental-id-input { position: relative; display: block; }
 .dental-id-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); pointer-events: none; }
 .dental-id-input .input { padding-left: 62px; font-variant-numeric: tabular-nums; }
+.dental-alert--warn { margin: 0; background: var(--color-amber-bg); color: var(--color-amber-text); }

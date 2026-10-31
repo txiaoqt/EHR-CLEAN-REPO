@@ -51,6 +51,8 @@ const Login = () => {
   const [authMode, setAuthMode] = useState('login');
   const signupPolicy = useAppPolicy({ enabled: IS_USER_SURFACE && authMode === 'signup' });
   const [signupAgreement, setSignupAgreement] = useState(null);
+  // Student ID the student confirmed after a same-name warning; Create Account again proceeds.
+  const [nameWarningConfirmedFor, setNameWarningConfirmedFor] = useState('');
   const signupPolicyAgreed = Boolean(
     signupPolicy.ready && signupAgreement?.version === signupPolicy.policy?.version &&
     signupAgreement?.accepted_terms && signupAgreement?.accepted_privacy
@@ -780,6 +782,20 @@ const Login = () => {
         setMsg('The verification code is incorrect or has expired. Please try again.');
         setLoading(false);
         return;
+      }
+
+      // Same first name and surname under another Student ID is usually the same
+      // student with a mistyped ID. Warn once; a second Create Account confirms.
+      if (nameWarningConfirmedFor !== payload.studentId) {
+        const { data: elsewhere } = await supabase.rpc('signup_name_registered_elsewhere', {
+          p_first_name: signupData.firstName, p_surname: signupData.lastName, p_student_id: payload.studentId,
+        });
+        if (elsewhere === true) {
+          setNameWarningConfirmedFor(payload.studentId);
+          setMsg(`A student named ${toProperName(signupData.firstName)} ${toProperName(signupData.lastName)} is already registered under a different Student ID. Check that ${payload.studentId} is your own ID. If it is, press Create Account again.`);
+          setLoading(false);
+          return;
+        }
       }
 
       // 2. Execute atomic patient registration RPC (CREATE ONLY, NO OVERWRITE).

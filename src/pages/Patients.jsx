@@ -12,6 +12,7 @@ import { useTablePagination } from '../hooks/useTablePagination.js';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { patientsExportConfig } from '../utils/export/configs.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
+import { findSameNamePatients } from '../utils/duplicatePatients.js';
 
 const EMPTY_MANUAL = { first: '', middle: '', last: '', suffix: '', id: '', year: 1 };
 const manualName = (m) => composeFullName({ firstName: m.first, middleName: m.middle, lastName: m.last, suffix: m.suffix });
@@ -39,6 +40,7 @@ const Patients = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   // manual mode
   const [manualStudent, setManualStudent] = useState(EMPTY_MANUAL);
+  const [sameName, setSameName] = useState(null); // existing patients with the typed first name + surname
 
   const [showNewStudentForm, setShowNewStudentForm] = useState(false);
 
@@ -212,7 +214,7 @@ const Patients = () => {
   });
 
   // create student (manual tab) - insert into students table and select it automatically
-  const submitCreateStudent = async () => {
+  const submitCreateStudent = async (differentPerson = false) => {
     // VALIDATION: ensure name and id meet rules
     const name = manualName(manualStudent);
     const id = (manualStudent.id || '').trim();
@@ -231,6 +233,12 @@ const Patients = () => {
       showToast(`Invalid ID. Use letters, numbers, -, _, or . only. Max ${ID_MAX} chars.`, 'error');
       return;
     }
+
+    if (!differentPerson) {
+      const matches = await findSameNamePatients({ firstName: manualStudent.first, surname: manualStudent.last, excludeId: id });
+      if (matches.length) { setSameName(matches); return; }
+    }
+    setSameName(null);
 
     try {
       const payload = {
@@ -265,6 +273,17 @@ const Patients = () => {
       console.error(err);
       showToast('Failed to create student', 'error');
     }
+  };
+
+  // The typed name is already registered: pick that patient instead of adding a second ID.
+  const pickExistingPatient = (match) => {
+    setSelectedStudent({ id: match.id, name: match.name, year: match.year });
+    setSameName(null);
+    showToast(`Using ${match.name} (${match.id})`, 'success');
+    setShowNewStudentForm(false);
+    setStudentSearch('');
+    setStudentSuggestions([]);
+    setRegisterTab('search');
   };
 
   // register patient (from modal) — uses selectedStudent (from search or manual)
@@ -460,7 +479,7 @@ const Patients = () => {
                               id={`manual-${key}`}
                               value={manualStudent[key]}
                               maxLength={80}
-                              onChange={(e) => setManualStudent(prev => ({ ...prev, [key]: e.target.value }))}
+                              onChange={(e) => { setSameName(null); setManualStudent(prev => ({ ...prev, [key]: e.target.value })); }}
                               onBlur={(e) => setManualStudent(prev => ({ ...prev, [key]: key === 'suffix' ? e.target.value.trim() : toProperName(e.target.value) }))}
                               placeholder={placeholder}
                               className="input"
@@ -487,8 +506,21 @@ const Patients = () => {
                         </div>
                       </div>
 
+                      {sameName && (
+                        <div role="alert" style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--color-amber-bg)', color: 'var(--color-amber-text)', fontSize: 'var(--font-size-sm)', display: 'grid', gap: 10 }}>
+                          <div>
+                            <strong>{sameName[0].name}</strong> is already registered as <strong>{sameName.map((m) => m.id).join(', ')}</strong>. Is this the same person?
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {sameName.map((m) => (
+                              <button key={m.id} type="button" className="btn small" onClick={() => pickExistingPatient(m)}>Use {m.id}</button>
+                            ))}
+                            <button type="button" className="btn secondary small" onClick={() => submitCreateStudent(true)}>Register as a different person</button>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-                        <button className="btn secondary small" onClick={() => { setManualStudent(EMPTY_MANUAL); }}>Reset</button>
+                        <button className="btn secondary small" onClick={() => { setManualStudent(EMPTY_MANUAL); setSameName(null); }}>Reset</button>
                         <button className="btn small" onClick={async () => { await submitCreateStudent(); }}>
                           Create & Select
                         </button>

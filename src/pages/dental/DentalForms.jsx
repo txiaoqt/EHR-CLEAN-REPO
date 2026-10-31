@@ -4,6 +4,7 @@ import { SearchIcon } from '../../components/icons/Icons.jsx';
 import CourseSearch from '../../components/CourseSearch.jsx';
 import { isValidStudentId } from '../../utils/authValidation.js';
 import { composeFullName, toProperName } from '../../utils/nameFormat.js';
+import { findSameNamePatients } from '../../utils/duplicatePatients.js';
 import { CLASSIFICATIONS, DENTAL_TIMES, EMPTY_RECORD, ageFrom, formatTimeLabel, addDaysIso, todayIso } from './dentalShared.js';
 
 /** Finds a patient in the student directory, or registers one by ID and name. */
@@ -22,6 +23,8 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
   const [results, setResults] = useState([]);
   const [manual, setManual] = useState(false);
   const [draft, setDraft] = useState({ id: '', first: '', middle: '', last: '', suffix: '', year: '1' });
+  const [sameName, setSameName] = useState(null); // existing patients with the typed first name + surname
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     const q = query.trim();
@@ -54,9 +57,20 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
     const nameInput = (key, label, placeholder, optional) => (
       <label className="dental-field"><span>{label}{optional && ' (optional)'}</span>
         <input className="input" value={draft[key]} maxLength={80} placeholder={placeholder}
-          onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+          onChange={(e) => { setSameName(null); setDraft({ ...draft, [key]: e.target.value }); }}
           onBlur={(e) => setDraft({ ...draft, [key]: key === 'suffix' ? e.target.value.trim() : toProperName(e.target.value) })} /></label>
     );
+    const registerNew = () => {
+      const parts = { first_name: toProperName(draft.first), middle_name: toProperName(draft.middle), surname: toProperName(draft.last), suffix: draft.suffix.trim() };
+      onChange({ id: studentId, name: composeFullName({ firstName: parts.first_name, middleName: parts.middle_name, lastName: parts.surname, suffix: parts.suffix }),
+        ...parts, year: Number(draft.year), isNew: true });
+    };
+    const checkThenRegister = async () => {
+      setChecking(true);
+      const matches = await findSameNamePatients({ firstName: draft.first, surname: draft.last, excludeId: studentId });
+      setChecking(false);
+      if (matches.length) setSameName(matches); else registerNew();
+    };
     return (
       <div className="dental-stack" style={{ gap: 12 }}>
         <div className="dental-fields">
@@ -77,13 +91,18 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
           {nameInput('middle', 'Middle Name', 'Full middle name, e.g. Santos', true)}
           {nameInput('suffix', 'Suffix', 'e.g. Jr., III', true)}
         </div>
+        {sameName && (
+          <div className="dental-alert dental-alert--warn" role="alert">
+            <p style={{ margin: '0 0 10px' }}><strong>{sameName[0].name}</strong> is already registered as <strong>{sameName.map((m) => m.id).join(', ')}</strong>. Is this the same person?</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {sameName.map((m) => <button key={m.id} type="button" className="btn small" onClick={() => onChange(m)}>Use {m.id}</button>)}
+              <button type="button" className="btn secondary small" onClick={registerNew}>Register as a different person</button>
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn small" disabled={!valid}
-            onClick={() => {
-              const parts = { first_name: toProperName(draft.first), middle_name: toProperName(draft.middle), surname: toProperName(draft.last), suffix: draft.suffix.trim() };
-              onChange({ id: studentId, name: composeFullName({ firstName: parts.first_name, middleName: parts.middle_name, lastName: parts.surname, suffix: parts.suffix }),
-                ...parts, year: Number(draft.year), isNew: true });
-            }}>Use This Patient</button>
+          <button type="button" className="btn small" disabled={!valid || checking || Boolean(sameName)}
+            onClick={checkThenRegister}>{checking ? 'Checking…' : 'Use This Patient'}</button>
           <button type="button" className="btn secondary small" onClick={() => setManual(false)}>Back to Search</button>
         </div>
       </div>
