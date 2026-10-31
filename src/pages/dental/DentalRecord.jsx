@@ -10,28 +10,36 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../../components/icons/Icons.
 import {
   STATUS_BADGE, ageFrom, formatDay, formatTimeLabel, loadDentists, recordName, recordPayload, saveDentalVisit,
 } from './dentalShared.js';
+import TablePagination from '../../components/table/TablePagination.jsx';
+import { useTablePagination } from '../../hooks/useTablePagination.js';
 import './dental.css';
 
-/** Page 2 of the pink form: one row per visit. */
-export const ServiceHistory = ({ services, compact = false }) => (
-  services.length === 0 ? <div className="dental-empty">No visits recorded yet.</div> : (
-    <div className="table-responsive">
-      <table className="table" aria-label="Services rendered">
-        <thead><tr><th>Date</th><th>Service Rendered</th>{!compact && <><th>Medicine</th><th>Anesthesia</th></>}<th>Signed By</th></tr></thead>
-        <tbody>
-          {services.map((s) => (
-            <tr key={s.id}>
-              <td style={{ whiteSpace: 'nowrap' }}>{formatDay(s.service_date)}</td>
-              <td>{s.service_rendered}{s.teeth?.length ? <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Teeth {s.teeth.join(', ')}</div> : null}</td>
-              {!compact && <><td>{s.medicine || '—'}</td><td>{s.anesthesia || '—'}</td></>}
-              <td>{s.dentist_name}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-);
+/** Page 2 of the pink form: one row per visit, three at a time. */
+export const ServiceHistory = ({ services, compact = false }) => {
+  const pagination = useTablePagination(services, { pageSize: 3 });
+  if (services.length === 0) return <div className="dental-empty">No visits recorded yet.</div>;
+  return (
+    <>
+      <div className="table-responsive">
+        <table className="table" aria-label="Services rendered">
+          <thead><tr><th>Date</th><th>Service Rendered</th>{!compact && <><th>Medicine</th><th>Anesthesia</th></>}<th>Signed By</th></tr></thead>
+          <tbody>
+            {pagination.pageRows.map((s) => (
+              <tr key={s.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{formatDay(s.service_date)}</td>
+                <td>{s.service_rendered}{s.teeth?.length ? <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Teeth {s.teeth.join(', ')}</div> : null}</td>
+                {!compact && <><td>{s.medicine || '—'}</td><td>{s.anesthesia || '—'}</td></>}
+                <td>{s.dentist_name}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination page={pagination.page} totalPages={pagination.totalPages} startIndex={pagination.startIndex}
+        endIndex={pagination.endIndex} total={pagination.total} onPageChange={pagination.goToPage} itemLabel="visits" />
+    </>
+  );
+};
 
 const formatSavedAt = (iso) => new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
 
