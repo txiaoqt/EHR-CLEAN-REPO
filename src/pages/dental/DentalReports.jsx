@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { exportCsv, logAudit } from '../../utils.js';
 import { exportSectionedPdf } from '../../utils/export/engine.js';
+import TablePagination from '../../components/table/TablePagination.jsx';
+import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { formatDay, todayIso } from './dentalShared.js';
 import './dental.css';
 
@@ -12,14 +14,20 @@ const countBy = (items, key) => Object.entries(items.reduce((acc, item) => {
   return acc;
 }, {})).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-const Breakdown = ({ title, rows, total, id }) => (
-  <section className="card" style={{ padding: 0 }} aria-labelledby={id}>
-    <div className="dental-section" style={{ paddingBottom: 8 }}><h2 className="dental-section-title" id={id} style={{ margin: 0 }}>{title}</h2></div>
+// Fixed-height cards: a long breakdown scrolls inside its card instead of
+// stretching the row, however many services or colleges a range has.
+const Breakdown = ({ title, rows, total, id, unit }) => (
+  <section className="card dental-breakdown" aria-labelledby={id}>
+    <div className="dental-breakdown-head">
+      <h2 className="dental-section-title" id={id} style={{ margin: 0 }}>{title}</h2>
+      {rows.length > 0 && <span className="badge badge-neutral">{rows.length} {rows.length === 1 ? unit : `${unit}s`}</span>}
+    </div>
     {rows.length === 0 ? <div className="dental-empty">No data in this range.</div> : (
-      <div style={{ paddingBottom: 12 }}>
+      <div className="dental-breakdown-body" tabIndex={0} aria-label={`${title} breakdown`}>
         {rows.map(([label, n]) => (
           <div className="dental-bar" key={label}>
-            <span>{label}</span><span className="dental-bar-value">{n}</span>
+            <span className="dental-bar-label" title={label}>{label}</span>
+            <span className="dental-bar-value">{n}<span className="dental-bar-pct">{total ? Math.round((n / total) * 100) : 0}%</span></span>
             <div className="dental-bar-track" aria-hidden="true"><div className="dental-bar-fill" style={{ transform: `scaleX(${total ? n / total : 0})` }} /></div>
           </div>
         ))}
@@ -107,6 +115,7 @@ const DentalReports = () => {
     } finally { setExporting(false); }
   };
 
+  const censusPages = useTablePagination(report?.census || [], { pageSize: 7, resetKey: `${range.from}|${range.to}` });
   const invalid = !range.from || !range.to || range.from > range.to;
 
   return (
@@ -150,21 +159,23 @@ const DentalReports = () => {
                   <thead><tr><th>Date</th><th className="dental-num">Visits</th><th className="dental-num">Patients</th><th className="dental-num">Consultations</th><th className="dental-num">Procedures</th></tr></thead>
                   <tbody>
                     {report.census.length === 0 ? <tr className="table-empty-row"><td colSpan={5}>No visits in this range</td></tr>
-                      : report.census.map((d) => (
+                      : censusPages.pageRows.map((d) => (
                         <tr key={d.date}><td>{formatDay(d.date)}</td><td className="dental-num">{d.visits}</td><td className="dental-num">{d.patients}</td><td className="dental-num">{d.consultations}</td><td className="dental-num">{d.procedures}</td></tr>
                       ))}
                   </tbody>
                 </table>
               </div>
+              <TablePagination page={censusPages.page} totalPages={censusPages.totalPages} startIndex={censusPages.startIndex}
+                endIndex={censusPages.endIndex} total={censusPages.total} onPageChange={censusPages.goToPage} itemLabel="days" />
             </section>
 
             <div className="dental-report-grid">
-              <Breakdown id="report-services" title="Accomplishments" rows={report.services} total={rows.length} />
-              <Breakdown id="report-dentists" title="Visits by Dentist" rows={report.dentists} total={rows.length} />
-              <Breakdown id="report-sex" title="Patients by Sex" rows={report.sex} total={report.patientCount} />
-              <Breakdown id="report-class" title="Patients by Classification" rows={report.classification} total={report.patientCount} />
-              <Breakdown id="report-year" title="Students by Year Level" rows={report.year} total={report.year.reduce((n, [, c]) => n + c, 0)} />
-              <Breakdown id="report-college" title="Patients by College / Unit" rows={report.college} total={report.patientCount} />
+              <Breakdown id="report-services" title="Accomplishments" rows={report.services} total={rows.length} unit="service" />
+              <Breakdown id="report-dentists" title="Visits by Dentist" rows={report.dentists} total={rows.length} unit="dentist" />
+              <Breakdown id="report-sex" title="Patients by Sex" rows={report.sex} total={report.patientCount} unit="group" />
+              <Breakdown id="report-class" title="Patients by Classification" rows={report.classification} total={report.patientCount} unit="group" />
+              <Breakdown id="report-year" title="Students by Year Level" rows={report.year} total={report.year.reduce((n, [, c]) => n + c, 0)} unit="level" />
+              <Breakdown id="report-college" title="Patients by College / Unit" rows={report.college} total={report.patientCount} unit="college" />
             </div>
           </div>
         )}

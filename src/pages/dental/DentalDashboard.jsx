@@ -74,7 +74,7 @@ const DentalDashboard = () => {
               </div>
               {!data ? <div className="dental-empty" role="status">Loading…</div>
                 : data.today.length === 0 ? <div className="dental-empty">No dental appointments today.</div> : (
-                  <ul className="dental-list">
+                  <ul className="dental-list dental-list--capped" tabIndex={0} aria-label="Today’s appointments">
                     {data.today.map((a) => (
                       <li key={a.id}>
                         <span className="dental-time" style={{ minWidth: 72 }}>{formatTimeLabel(a.appointment_time)}</span>

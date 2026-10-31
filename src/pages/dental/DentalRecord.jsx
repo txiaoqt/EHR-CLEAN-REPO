@@ -75,6 +75,7 @@ const DentalRecord = () => {
   const { record: latest, services, appointments, profile, versions } = state;
   // The page shows whichever saved version is selected; edits always start from the latest.
   const record = versions[versionIndex]?.record || latest;
+  const appointmentPages = useTablePagination(appointments, { pageSize: 5 });
   const version = versions[versionIndex];
   const print = (html) => { if (!printHtml(html)) setNotice('Allow pop-ups for this site to print.'); };
   const scheduled = appointments.find((a) => a.status === 'Scheduled');
@@ -179,7 +180,7 @@ const DentalRecord = () => {
             <div className="dental-section" style={{ paddingBottom: 8 }}><h2 className="dental-section-title" id="record-appointments">Appointments</h2></div>
             {appointments.length === 0 ? <div className="dental-empty">No dental appointments.</div> : (
               <ul className="dental-list">
-                {appointments.map((a) => (
+                {appointmentPages.pageRows.map((a) => (
                   <li key={a.id}>
                     <div className="dental-list-main">
                       <div className="dental-list-title">{formatDay(a.appointment_date)} · {formatTimeLabel(a.appointment_time)}</div>
@@ -190,6 +191,8 @@ const DentalRecord = () => {
                 ))}
               </ul>
             )}
+            <TablePagination page={appointmentPages.page} totalPages={appointmentPages.totalPages} startIndex={appointmentPages.startIndex}
+              endIndex={appointmentPages.endIndex} total={appointmentPages.total} onPageChange={appointmentPages.goToPage} itemLabel="appointments" />
           </section>
         </div>
 

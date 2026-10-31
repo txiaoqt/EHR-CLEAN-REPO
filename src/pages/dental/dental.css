@@ -83,7 +83,16 @@ button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px so
 .dental-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
 @media (max-width: 1200px) { .dental-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.dental-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.dental-report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 1200px) { .dental-report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .dental-report-grid { grid-template-columns: 1fr; } }
+.card.dental-breakdown { padding: 0; display: flex; flex-direction: column; height: 300px; }
+.dental-breakdown-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 24px 12px; border-bottom: 1px solid var(--border-subtle); }
+.dental-breakdown-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 12px; }
+.dental-breakdown-body:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.dental-bar-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dental-bar-pct { margin-left: 8px; font-weight: var(--font-weight-normal, 400); color: var(--text-muted); font-size: var(--font-size-xs); }
+.dental-list--capped { max-height: 380px; overflow-y: auto; }
 .dental-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 24px; }
 .dental-bar-track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--surface-raised); overflow: hidden; }
 .dental-bar-fill { height: 100%; border-radius: inherit; background: var(--color-primary); transform-origin: left; }

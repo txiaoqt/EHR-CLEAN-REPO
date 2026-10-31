@@ -5,6 +5,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import SignaturePad from '../../components/SignaturePad.jsx';
 import SignatureImage from '../../components/SignatureImage.jsx';
 import TablePagination from '../../components/table/TablePagination.jsx';
+import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { CloseIcon } from '../../components/icons/Icons.jsx';
 import { isVisitCompleted } from '../../utils/visitStatus.js';
 
@@ -39,6 +40,7 @@ const medicinesSummary = (medicines) => {
 const PatientRecords = () => {
   const { user } = useAuth();
   const [records, setRecords] = useState([]);
+  const recordPages = useTablePagination(records);
   const [loading, setLoading] = useState(true);
 
   // Which visit the patient is acknowledging, and their drawn signature.
@@ -239,7 +241,7 @@ const PatientRecords = () => {
                       <tr className="table-empty-row"><td colSpan={7}>Loading medical records…</td></tr>
                     ) : records.length === 0 ? (
                       <tr className="table-empty-row"><td colSpan={7}>No completed visits yet</td></tr>
-                    ) : records.map((r) => (
+                    ) : recordPages.pageRows.map((r) => (
                       <tr key={r.visit_id}>
                         <td style={{ padding: '14px 16px', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', whiteSpace: 'nowrap' }}>
                           {r.visit_date ? new Date(r.visit_date).toLocaleDateString() : '—'}
@@ -303,12 +305,12 @@ const PatientRecords = () => {
 
               {!loading && (
                 <TablePagination
-                  page={0}
-                  totalPages={1}
-                  startIndex={records.length ? 1 : 0}
-                  endIndex={records.length}
-                  total={records.length}
-                  onPageChange={() => {}}
+                  page={recordPages.page}
+                  totalPages={recordPages.totalPages}
+                  startIndex={recordPages.startIndex}
+                  endIndex={recordPages.endIndex}
+                  total={recordPages.total}
+                  onPageChange={recordPages.goToPage}
                   itemLabel="visits"
                   showWhenEmpty
                 />
@@ -316,7 +318,7 @@ const PatientRecords = () => {
 
               {/* Mobile Card List View (< 768px) */}
               {!loading && records.length > 0 && <div className="patient-records-cards-view" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {records.map((r) => (
+                {recordPages.pageRows.map((r) => (
                   <div
                     key={r.visit_id}
                     style={{
