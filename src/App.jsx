@@ -312,6 +312,7 @@ function AppShell() {
       className={[
         sidebarCollapsed ? 'sidebar-collapsed' : '',
         shouldRenderSidebar && !IS_USER_SURFACE ? 'has-staff-topbar' : '',
+        shouldRenderSidebar && IS_USER_SURFACE ? 'has-patient-header' : '',
         isPublicPolicyPath ? 'public-policy-view' : '',
       ].filter(Boolean).join(' ')}
     >

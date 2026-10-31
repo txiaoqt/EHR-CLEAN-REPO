@@ -4639,8 +4639,9 @@ input.enrollee-review-checkbox:focus-visible,
     display: none;
   }
 
-  .patient-app-header ~ main,
-  .patient-app-header ~ main.main {
+  /* A root class, not `~ main`: the routes sit inside .policy-route-content,
+     so <main> is not the header's sibling. */
+  #app-root.has-patient-header main.main {
     padding-top: 80px;
   }
 }
