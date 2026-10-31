@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
-import { exportCsv } from '../../utils.js';
+import { exportCsv, logAudit } from '../../utils.js';
+import { exportSectionedPdf } from '../../utils/export/engine.js';
 import { formatDay, todayIso } from './dentalShared.js';
 import './dental.css';
 
@@ -33,6 +34,7 @@ const DentalReports = () => {
   const [range, setRange] = useState({ from: `${today.slice(0, 8)}01`, to: today });
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!range.from || !range.to || range.from > range.to) return undefined;
@@ -73,15 +75,36 @@ const DentalReports = () => {
     };
   }, [rows]);
 
-  const download = () => {
-    const lines = [['Dental Clinic Report', `${range.from} to ${range.to}`], [],
-      ['Daily Census'], ['Date', 'Visits', 'Patients', 'Consultations', 'Procedures'],
-      ...report.census.map((d) => [d.date, d.visits, d.patients, d.consultations, d.procedures]), [],
-      ['Accomplishments'], ['Service Rendered', 'Count'], ...report.services, [],
-      ['Patients by Sex'], ...report.sex, [], ['Patients by Classification'], ...report.classification, [],
-      ['Students by Year Level'], ...report.year, [],
-      ['Patients by College / Unit'], ...report.college, [], ['Visits by Dentist'], ...report.dentists];
-    exportCsv(`dental-report-${range.from}-to-${range.to}.csv`, lines.map((l) => l.map(csvCell).join(',')).join('\n'));
+  // One list of tables feeds both exports, so the CSV and PDF always match.
+  const sections = () => [
+    { title: 'Summary', head: ['Measure', 'Count'], body: [['Visits', rows.length], ['Patients seen', report.patientCount],
+      ['Consultations', report.consultations], ['Procedures', rows.length - report.consultations]] },
+    { title: 'Daily Census', head: ['Date', 'Visits', 'Patients', 'Consultations', 'Procedures'],
+      body: report.census.map((d) => [formatDay(d.date), d.visits, d.patients, d.consultations, d.procedures]) },
+    { title: 'Accomplishments', head: ['Service Rendered', 'Count'], body: report.services },
+    { title: 'Visits by Dentist', head: ['Dentist', 'Visits'], body: report.dentists },
+    { title: 'Patients by Sex', head: ['Sex', 'Patients'], body: report.sex },
+    { title: 'Patients by Classification', head: ['Classification', 'Patients'], body: report.classification },
+    { title: 'Students by Year Level', head: ['Year Level', 'Students'], body: report.year },
+    { title: 'Patients by College / Unit', head: ['College / Unit', 'Patients'], body: report.college },
+  ];
+  const period = `${formatDay(range.from)} to ${formatDay(range.to)}`;
+  const filename = `dental-report-${range.from}-to-${range.to}`;
+
+  const download = async (format) => {
+    setExporting(true);
+    try {
+      try { await logAudit('EXPORT', `Exported Dental Clinic report (${range.from} → ${range.to}) as ${format.toUpperCase()} — ${rows.length} visits`); } catch { /* audit failure must not block the export */ }
+      if (format === 'pdf') {
+        await exportSectionedPdf({ title: 'Dental Clinic Report', metadataLines: [`Period: ${period}`], sections: sections(), filename: `${filename}.pdf` });
+      } else {
+        const lines = [['Dental Clinic Report'], ['Period', period], [],
+          ...sections().flatMap((t) => [[t.title], t.head, ...t.body, []])];
+        exportCsv(`${filename}.csv`, lines.map((l) => l.map(csvCell).join(',')).join('\n'));
+      }
+    } catch {
+      setError('The export could not be created. Try again.');
+    } finally { setExporting(false); }
   };
 
   const invalid = !range.from || !range.to || range.from > range.to;
@@ -95,8 +118,8 @@ const DentalReports = () => {
             <div className="page-header-subtitle">Daily census, accomplishments and patient demographics for the Dental Clinic.</div>
           </div>
           <div className="page-header-actions">
-            <button type="button" className="btn secondary" onClick={() => window.print()} disabled={!report}>Print</button>
-            <button type="button" className="btn" onClick={download} disabled={!report || !rows.length}>Export CSV</button>
+            <button type="button" className="btn secondary" onClick={() => download('csv')} disabled={!report || !rows.length || exporting}>Export CSV</button>
+            <button type="button" className="btn" onClick={() => download('pdf')} disabled={!report || !rows.length || exporting}>{exporting ? 'Exporting…' : 'Export PDF'}</button>
           </div>
         </div>
 

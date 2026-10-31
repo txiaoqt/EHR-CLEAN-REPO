@@ -554,3 +554,72 @@ export const exportReport = async (format, options) => {
   if (format === 'pdf') return exportReportAsPdf(options);
   throw new Error(`Unsupported export format: ${format}`);
 };
+
+/**
+ * A report made of several small tables (census, breakdowns), each under its
+ * own heading, with the same letterhead and footer as every other export.
+ * @param {{title: string, metadataLines?: string[], sections: {title: string, head: string[], body: any[][]}[], filename: string}} options
+ */
+export const exportSectionedPdf = async ({ title, metadataLines = [], sections, filename }) => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const [tup, clinic] = await Promise.all([loadImageAsDataUrl(tupSealUrl), loadImageAsDataUrl(clinicLogoUrl)]);
+  doc.__letterheadSeals = { tup: tup?.dataUrl ?? null, clinic: clinic?.dataUrl ?? null };
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const top = LETTERHEAD_TOP + SEAL_SIZE + 34;
+
+  let y = drawLetterhead(doc, pageWidth, margin);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...PDF_COLORS.text);
+  doc.text(pdfSafeText(title), margin, y);
+  y += 14;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...PDF_COLORS.muted);
+  [`Generated: ${formatGeneratedAt()}`, ...metadataLines].forEach((line) => { doc.text(pdfSafeText(line), margin, y); y += 11; });
+  doc.setDrawColor(...PDF_COLORS.rule);
+  doc.setLineWidth(0.8);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 18;
+
+  sections.forEach((section) => {
+    // Keep a heading with at least its table head and first row.
+    if (y > pageHeight - 120) { doc.addPage(); y = top; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(...PDF_COLORS.navy);
+    doc.text(pdfSafeText(section.title), margin, y);
+    autoTable(doc, {
+      head: [section.head.map(pdfSafeText)],
+      body: section.body.length ? section.body.map((row) => row.map((cell) => pdfSafeText(cell)))
+        : [['No data in this range.', ...section.head.slice(1).map(() => '')]],
+      startY: y + 6,
+      margin: { top, left: margin, right: margin, bottom: 46 },
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 4.5, textColor: [...PDF_COLORS.text], lineColor: [...PDF_COLORS.border], lineWidth: 0.5 },
+      headStyles: { fillColor: [...PDF_COLORS.navy], textColor: [255, 255, 255], fontStyle: 'bold' },
+      // Every column after the first holds a count.
+      columnStyles: Object.fromEntries(section.head.slice(1).map((_, i) => [i + 1, { halign: 'right', cellWidth: 80 }])),
+      didParseCell: (data) => { if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right'; },
+    });
+    y = doc.lastAutoTable.finalY + 22;
+  });
+
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+    if (page > 1) drawLetterhead(doc, pageWidth, margin);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.setDrawColor(...PDF_COLORS.rule);
+    doc.setLineWidth(0.8);
+    doc.line(margin, pageHeight - 32, pageWidth - margin, pageHeight - 32);
+    doc.text(`${CLINIC_NAME} — generated from the clinic EHR`, margin, pageHeight - 21);
+    doc.text(`Page ${page} of ${totalPages}`, pageWidth - margin, pageHeight - 21, { align: 'right' });
+  }
+  doc.save(filename);
+  return doc;
+};
