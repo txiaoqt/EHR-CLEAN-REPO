@@ -914,7 +914,7 @@ const Login = () => {
         !enrolleeData.dateOfBirth && 'your date of birth',
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enrolleeData.email) && 'a valid email',
       ]
-  ).concat(!signupPolicyAgreed && (signupKind === 'student' ? 'agreement to both policies below' : 'agreement to both policies')).filter(Boolean);
+  ).concat(!signupPolicyAgreed && 'agreement to both policies below').filter(Boolean);
   const isSendDisabled = otpSending || otpCooldown > 0 || sendMissing.length > 0;
   const sendMissingHint = !otpSent && sendMissing.length > 0 && (
     <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
@@ -1422,10 +1422,8 @@ const Login = () => {
                         <PasswordRequirements id="enrollee-password-requirements" password={enrolleeData.password} inverse />
                       </div>
 
-                      {signupConsent}
-
-                      {/* Send comes last, after everything it requires, so a
-                          disabled button never waits on a field further down. */}
+                      {/* Email and Send, then the code, then the policy agreement — the
+                          same order as the student form. */}
                       <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
                         <label htmlFor="enrollee-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Personal Email</label>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
@@ -1474,6 +1472,8 @@ const Login = () => {
                         />
                       )}
 
+                      {/* Last, just above Create Account; still required before Send. */}
+                      {signupConsent}
                     </>
                   )}
 
