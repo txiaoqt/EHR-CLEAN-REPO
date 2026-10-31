@@ -61,9 +61,13 @@ const DentalAppointments = () => {
   const filtered = useMemo(() => {
     const today = todayIso();
     const q = search.trim().toLowerCase();
+    // A visit that is completed or cancelled is past, even when it was done before
+    // its scheduled date; only open appointments are still upcoming.
+    const done = (a) => a.status !== 'Scheduled';
     const list = rows.filter((a) => (status === 'all' || a.status === status)
       && (view === 'all' || (view === 'today' && a.appointment_date === today)
-        || (view === 'upcoming' && a.appointment_date >= today) || (view === 'past' && a.appointment_date < today))
+        || (view === 'upcoming' && a.appointment_date >= today && !done(a))
+        || (view === 'past' && (a.appointment_date < today || done(a))))
       && (!q || [a.patient_name, a.patient_id, a.service_type, a.clinician_name].some((v) => (v || '').toLowerCase().includes(q))));
     return view === 'past' || view === 'all' ? [...list].reverse() : list;
   }, [rows, view, status, search]);
@@ -98,7 +102,7 @@ const DentalAppointments = () => {
           <div className="table-section-header">
             <div className="segmented-control-container" role="tablist" aria-label="Appointment dates">
               {VIEWS.map(([id, label]) => (
-                <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>{label}</button>
+                <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => { setView(id); setStatus(id === 'past' || id === 'all' ? 'all' : 'Scheduled'); }}>{label}</button>
               ))}
             </div>
           </div>
