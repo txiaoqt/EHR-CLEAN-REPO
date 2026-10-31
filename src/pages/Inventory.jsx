@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IS_DENTAL_SURFACE } from '../deploySurface.js';
 import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
@@ -510,7 +511,7 @@ const Inventory = () => {
               </button>
             </div>
             <div className="page-header-subtitle">
-              Track medicine inventory, medical supplies, reorder levels, and dispensing logs.
+              {IS_DENTAL_SURFACE ? 'Track dental supplies, materials, reorder levels, and usage logs.' : 'Track medicine inventory, medical supplies, reorder levels, and dispensing logs.'}
             </div>
           </div>
 
@@ -576,7 +577,7 @@ const Inventory = () => {
                 Stock Levels & Inventory Directory
               </h2>
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
-                Clinic medicine catalog and consumable supply status
+                {IS_DENTAL_SURFACE ? 'Dental Clinic materials and consumable supply status' : 'Clinic medicine catalog and consumable supply status'}
               </div>
             </div>
           </div>

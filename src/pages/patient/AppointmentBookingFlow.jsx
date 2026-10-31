@@ -19,7 +19,6 @@ const MONTHS = [
 ];
 const SERVICES = {
   'Medical Clinic': ['Consultation', 'Check-up'],
-  'Dental Clinic': ['Dental cleaning', 'Tooth extraction/bunot', 'Dental check-up'],
 };
 
 const pad = (v) => String(v).padStart(2, '0');
@@ -180,6 +179,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         .from('appointments')
         .select('*')
         .eq('patient_id', patientId.trim())
+        .eq('department', 'Medical Clinic')
         .eq('status', 'Scheduled')
         .order('created_at', { ascending: false })
         .limit(1);
@@ -245,6 +245,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       const { data: userAppts } = await supabase
         .from('appointments')
         .select('*')
+        .eq('department', 'Medical Clinic')
         .gte('appointment_date', today)
         .order('appointment_date', { ascending: true });
       setAppointments(userAppts || []);
@@ -353,12 +354,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     }
   }, [user?.patient_id, user?.name, kioskMode]);
 
-  const visibleStaff = useMemo(() => {
-    if (form.department === 'Dental Clinic') {
-      return staffList.filter((s) => /dent/i.test(s.name || ''));
-    }
-    return staffList;
-  }, [staffList, form.department]);
+  const visibleStaff = staffList;
 
   const selectedWeekDay = new Date(`${form.appointment_date}T00:00:00`).getDay();
 
@@ -579,6 +575,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         .from('appointments')
         .select('id, appointment_date, appointment_time, department, service_type, status, queue_number, reference_code')
         .eq('patient_id', form.patient_id.trim())
+        .eq('department', 'Medical Clinic')
         .eq('status', 'Scheduled')
         .limit(1);
 
@@ -685,7 +682,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         clinician_name: form.clinician_name || 'To be assigned',
         appointment_date: form.appointment_date,
         appointment_time: form.appointment_time,
-        type: form.department === 'Dental Clinic' ? 'Follow-up' : 'Consult',
+        type: 'Consult',
         source,
         department: form.department,
         appointment_type: form.appointment_type,
@@ -947,37 +944,15 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               >
                 <div>
                   <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)', letterSpacing: '-0.2px' }}>
-                    Select Clinic Department &amp; Preferred Date
+                    Select Appointment Type &amp; Preferred Date
                   </h3>
                   <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 3 }}>
-                    Choose your clinic department, appointment type, and schedule date
+                    Medical Clinic appointments. Dental visits begin onsite at the Dental Clinic, and the dentist schedules your follow-ups under Dental Appointment.
                   </div>
                 </div>
 
-                {/* Segmented Controls for Department & Mode */}
+                {/* Segmented Control for Mode */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 16 }}>
-                  {/* Clinic Department */}
-                  <div>
-                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', display: 'block', marginBottom: 8, color: 'var(--text)' }}>
-                      Clinic Department
-                    </label>
-                    <div className="segmented-control-container">
-                      {['Medical Clinic', 'Dental Clinic'].map((dept) => {
-                        const active = form.department === dept;
-                        return (
-                          <button
-                            key={dept}
-                            type="button"
-                            className={`segmented-tab-btn ${active ? 'active' : ''}`}
-                            onClick={() => setForm((p) => ({ ...p, department: dept }))}
-                          >
-                            {dept}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                   {/* Appointment Mode */}
                   <div>
                     <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', display: 'block', marginBottom: 8, color: 'var(--text)' }}>

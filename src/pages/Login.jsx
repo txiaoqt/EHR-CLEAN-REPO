@@ -6,6 +6,7 @@ import {
   IS_ADMIN_SURFACE,
   isRoleCompatibleWithSurface,
   IS_USER_SURFACE,
+  IS_DENTAL_SURFACE,
   accountTableForRole,
   isUserSurfaceRole,
   surfaceHomeForRole,
@@ -1278,7 +1279,7 @@ const Login = () => {
                     TUP Manila Clinic
                   </div>
                   <div style={{ fontSize: isMobile ? 'var(--font-size-2xs)' : 'var(--font-size-xs)', color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 'var(--font-weight-medium)' }}>
-                    {IS_USER_SURFACE ? 'Online Patient Portal' : 'Clinic Staff Portal'}
+                    {IS_USER_SURFACE ? 'Online Patient Portal' : IS_DENTAL_SURFACE ? 'Dental Clinic Portal' : 'Clinic Staff Portal'}
                   </div>
                 </div>
               )}
@@ -2003,7 +2004,7 @@ const Login = () => {
                       fontFamily: `"Merriweather", serif`,
                     }}
                   >
-                    {IS_USER_SURFACE ? 'Student Log In' : 'Staff Log In'}
+                    {IS_USER_SURFACE ? 'Student Log In' : IS_DENTAL_SURFACE ? 'Dentist Log In' : 'Staff Log In'}
                   </h2>
 
                   {/* Email Field */}

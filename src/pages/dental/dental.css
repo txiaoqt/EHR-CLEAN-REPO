@@ -1,0 +1,101 @@
+/* Dental Portal pages. Built on the staff portal's tokens and components
+   (card, table, btn, input, badge, modal-*, kpi-card); only what those lack is here. */
+
+.dental-muted { color: var(--text-muted); font-size: var(--font-size-xs); margin: 8px 0 0; }
+.dental-stack { display: grid; gap: 20px; }
+.dental-two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 20px; align-items: start; }
+@media (max-width: 1200px) { .dental-two-col { grid-template-columns: 1fr; } }
+
+.dental-section { padding: 20px 24px; }
+.dental-section + .dental-section { border-top: 1px solid var(--border-subtle); }
+.dental-section-title { margin: 0 0 4px; font-size: var(--font-size-md); font-weight: var(--font-weight-bold); color: var(--text); }
+.dental-section-sub { margin: 0 0 16px; font-size: var(--font-size-xs); color: var(--text-muted); }
+
+.dental-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px 16px; }
+.dental-field { display: grid; gap: 6px; min-width: 0; }
+.dental-field--wide { grid-column: 1 / -1; }
+.dental-field > span, .dental-field legend { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--text-muted); }
+.dental-field .input, .dental-field select, .dental-field textarea { width: 100%; box-sizing: border-box; }
+.dental-field textarea { min-height: 84px; resize: vertical; font: inherit; }
+.dental-field fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dental-choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.dental-choice { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-control, 6px); font-size: var(--font-size-sm); cursor: pointer; background: var(--panel); transition: border-color .15s ease, background-color .15s ease; }
+.dental-choice:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-tint); color: var(--text); }
+.dental-choice input { accent-color: var(--color-primary); margin: 0; }
+.dental-choice:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+.dental-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 20px; margin: 0; }
+.dental-facts div { min-width: 0; }
+.dental-facts dt { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--text-muted); }
+.dental-facts dd { margin: 2px 0 0; color: var(--text); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+
+.dental-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--border-subtle); background: var(--surface-raised); }
+.dental-alert { margin: 0 0 16px; padding: 10px 14px; border-radius: var(--radius-md); font-size: var(--font-size-sm); background: var(--color-rose-bg); color: var(--color-rose-text); }
+.dental-alert--ok { background: var(--color-emerald-bg); color: var(--color-emerald-text); }
+
+/* Patient search */
+.dental-picker { position: relative; }
+.dental-picker-results { margin: 8px 0 0; padding: 0; list-style: none; max-height: 240px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--panel); }
+.dental-picker-results button { display: flex; width: 100%; justify-content: space-between; gap: 12px; padding: 10px 14px; background: none; border: 0; border-bottom: 1px solid var(--border-subtle); text-align: left; cursor: pointer; color: var(--text); font: inherit; }
+.dental-picker-results li:last-child button { border-bottom: 0; }
+.dental-picker-results button:hover, .dental-picker-results button:focus-visible { background: var(--surface-raised); outline: none; }
+.dental-picker-selected { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-primary-border); border-radius: var(--radius-md); background: var(--color-primary-tint); }
+
+/* Tooth chart */
+.dental-chart { display: grid; gap: 12px; }
+.dental-chart-brushes { display: flex; flex-wrap: wrap; gap: 6px; }
+.dental-brush { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-full, 999px); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); cursor: pointer; transition: box-shadow .15s ease, transform .1s ease; }
+.dental-brush:active { transform: scale(0.97); }
+.dental-brush.is-active { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--color-primary); }
+.dental-brush-code { font-variant-numeric: tabular-nums; font-weight: var(--font-weight-extrabold); }
+.dental-chart-arch { overflow-x: auto; padding-bottom: 4px; }
+.dental-chart-quadrant-labels { display: grid; grid-template-columns: 1fr 1fr; min-width: 560px; font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--text-muted); }
+.dental-chart-quadrant-labels span:last-child { text-align: right; }
+.dental-chart-jaw { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; min-width: 560px; margin: 6px 0; background: linear-gradient(var(--border), var(--border)) center / 2px 100% no-repeat; }
+.dental-chart-jaw--lower { margin-top: 0; padding-top: 6px; border-top: 2px solid var(--border); }
+.dental-chart-row { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.dental-tooth { display: grid; place-items: center; gap: 2px; min-height: 52px; padding: 4px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font: inherit; transition: background-color .15s ease, border-color .15s ease, transform .1s ease; }
+button.dental-tooth { cursor: pointer; }
+button.dental-tooth:hover { border-color: var(--text-muted); }
+button.dental-tooth:active { transform: scale(0.96); }
+button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.dental-tooth-number { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.dental-tooth-code { min-height: 1.1em; font-size: var(--font-size-xs); font-weight: var(--font-weight-extrabold); }
+.dental-tooth--marked { box-shadow: inset 0 0 0 2px var(--color-primary); }
+.dental-tooth--caries { background: var(--color-rose-bg); color: var(--color-rose-text); }
+.dental-tooth--filled { background: var(--color-blue-bg); color: var(--color-blue-text); }
+.dental-tooth--for-extraction { background: var(--color-amber-bg); color: var(--color-amber-text); }
+.dental-tooth--extracted, .dental-tooth--missing { background: var(--surface-raised); color: var(--text-muted); }
+.dental-tooth--extracted .dental-tooth-number, .dental-tooth--missing .dental-tooth-number { text-decoration: line-through; }
+.dental-tooth--crown { background: var(--color-purple-bg); color: var(--color-purple-text); }
+.dental-tooth--sealant { background: var(--color-emerald-bg); color: var(--color-emerald-text); }
+
+/* Lists on the dashboard and record */
+.dental-list { margin: 0; padding: 0; list-style: none; }
+.dental-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--border-subtle); }
+.dental-list li:first-child { border-top: 0; }
+.dental-list-main { min-width: 0; }
+.dental-list-title { font-weight: var(--font-weight-bold); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dental-list-sub { font-size: var(--font-size-xs); color: var(--text-muted); }
+.dental-time { font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); color: var(--text); white-space: nowrap; }
+.dental-empty { padding: 28px 24px; text-align: center; color: var(--text-muted); font-size: var(--font-size-sm); }
+
+.dental-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+@media (max-width: 1200px) { .dental-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.dental-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.dental-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 24px; }
+.dental-bar-track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--surface-raised); overflow: hidden; }
+.dental-bar-fill { height: 100%; border-radius: inherit; background: var(--color-primary); transform-origin: left; }
+.dental-bar-value { font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); }
+
+.table td.dental-num, .table th.dental-num { text-align: right; font-variant-numeric: tabular-nums; }
+.dental-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 0 24px 16px; }
+.dental-filter .dental-field { min-width: 160px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dental-tooth, .dental-brush, .dental-choice { transition: none; }
+  button.dental-tooth:active, .dental-brush:active { transform: none; }
+}
+
+.patient-dental-card + .patient-dental-card { margin-top: 12px; }

@@ -59,7 +59,7 @@ const getDateDividerLabel = (isoString) => {
 const StaffPatientMessages = () => {
   const { user } = useAuth();
   const userRole = (user?.role || '').toLowerCase();
-  const isStaff = ['physician', 'nurse', 'admin'].includes(userRole);
+  const isStaff = ['physician', 'nurse', 'dentist', 'admin'].includes(userRole);
 
   // Tabs: 'active' (Open) vs 'history' (Resolved)
   const [activeTab, setActiveTab] = useState('active');

@@ -21,9 +21,9 @@ import './admin.css';
 const NAV = [
   { path: '/admin/overview', label: 'Overview', Icon: DashboardIcon, group: 'MAIN', keywords: 'dashboard summary activity' },
   { path: '/admin/administrators', label: 'Administrators', Icon: UsersIcon, keywords: 'admins administration directory access' },
-  { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon, keywords: 'directory clinic physician nurse clinician' },
+  { path: '/admin/staff', label: 'Staff Accounts', Icon: UsersIcon, keywords: 'directory clinic physician nurse dentist clinician' },
   { path: '/admin/users', label: 'User Accounts', Icon: UserIcon, keywords: 'patients students enrollees suspension access' },
-  { path: '/admin/page-access', label: 'Staff Page Access', Icon: LockIcon, keywords: 'permissions roles pages physician nurse sidebar configuration' },
+  { path: '/admin/page-access', label: 'Staff Page Access', Icon: LockIcon, keywords: 'permissions roles pages physician nurse dentist dental sidebar configuration' },
   { path: '/admin/audit-trail', label: 'Audit Trail', Icon: HistoryIcon, group: 'SYSTEM', keywords: 'logs history actions activity' },
   { path: '/admin/backup-recovery', label: 'Backup & Recovery', Icon: BackupIcon, keywords: 'restore database history' },
 ];

@@ -8,10 +8,12 @@
     "dev:admin": "node ./node_modules/vite/bin/vite.js --mode admin --port 5173 --strictPort",
     "dev:staff": "node ./node_modules/vite/bin/vite.js --mode staff --port 5175 --strictPort",
     "dev:user": "node ./node_modules/vite/bin/vite.js --mode user --port 5174 --strictPort",
+    "dev:dental": "node ./node_modules/vite/bin/vite.js --mode dental --port 5176 --strictPort",
     "build": "node ./node_modules/vite/bin/vite.js build --mode admin",
     "build:admin": "node ./node_modules/vite/bin/vite.js build --mode admin",
     "build:staff": "node ./node_modules/vite/bin/vite.js build --mode staff",
     "build:user": "node ./node_modules/vite/bin/vite.js build --mode user",
+    "build:dental": "node ./node_modules/vite/bin/vite.js build --mode dental",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

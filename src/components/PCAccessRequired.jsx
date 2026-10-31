@@ -2,6 +2,9 @@
 import React from 'react';
 import { DesktopIcon } from './icons/Icons.jsx';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
+import { IS_DENTAL_SURFACE } from '../deploySurface.js';
+
+const PORTAL = IS_DENTAL_SURFACE ? 'Dental Portal' : 'Staff Portal';
 
 const PCAccessRequired = ({ onLogout }) => {
   return (
@@ -49,7 +52,7 @@ const PCAccessRequired = ({ onLogout }) => {
               TUP CLINIC
             </div>
             <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-primary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Staff Portal
+              {PORTAL}
             </div>
           </div>
         </div>
@@ -95,7 +98,7 @@ const PCAccessRequired = ({ onLogout }) => {
             fontWeight: 'var(--font-weight-medium)'
           }}
         >
-          This Staff Portal is designed for desktop and laptop computers.
+          This {PORTAL} is designed for desktop and laptop computers.
         </p>
 
         <p
@@ -106,7 +109,7 @@ const PCAccessRequired = ({ onLogout }) => {
             color: 'var(--text)'
           }}
         >
-          Please use a PC or laptop to access the Staff Portal.
+          Please use a PC or laptop to access the {PORTAL}.
         </p>
 
         <p
@@ -117,7 +120,7 @@ const PCAccessRequired = ({ onLogout }) => {
             color: 'var(--text-muted)'
           }}
         >
-          Staff Portal access is unavailable on phones and tablets.
+          {PORTAL} access is unavailable on phones and tablets.
         </p>
 
         {/* Actions */}

@@ -33,6 +33,14 @@ import PatientProfilePortal from './pages/patient/PatientProfilePortal.jsx';
 import PatientSettings from './pages/patient/PatientSettings.jsx';
 import PatientHelp from './pages/patient/PatientHelp.jsx';
 import KioskBooking from './pages/patient/KioskBooking.jsx';
+import PatientDentalAppointments from './pages/patient/PatientDentalAppointments.jsx';
+import DentalDashboard from './pages/dental/DentalDashboard.jsx';
+import DentalAppointments from './pages/dental/DentalAppointments.jsx';
+import DentalEncounter from './pages/dental/DentalEncounter.jsx';
+import ConsultationLog from './pages/dental/ConsultationLog.jsx';
+import DentalPatients from './pages/dental/DentalPatients.jsx';
+import DentalRecord from './pages/dental/DentalRecord.jsx';
+import DentalReports from './pages/dental/DentalReports.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import AdminPortal from './admin/AdminPortal.jsx';
@@ -53,6 +61,8 @@ import { getClinicHoursMessage, hasRequiredRole, isWithinClinicHours } from './a
 import {
   DEPLOY_SURFACE,
   IS_ADMIN_SURFACE,
+  IS_CLINIC_SURFACE,
+  IS_DENTAL_SURFACE,
   IS_STAFF_SURFACE,
   IS_USER_SURFACE,
   isRoleCompatibleWithSurface,
@@ -103,6 +113,7 @@ const ProtectedRoute = ({
   if (!isRoleAllowedOnSurface) {
     const errorMessage = IS_ADMIN_SURFACE
       ? 'Student accounts are not allowed on this portal.'
+      : IS_DENTAL_SURFACE ? 'Only dentist accounts can sign in to the Dental Portal.'
       : 'Only student accounts can log in on this portal.';
     return <Navigate to="/login" replace state={{ sessionMessage: errorMessage }} />;
   }
@@ -117,7 +128,7 @@ const ProtectedRoute = ({
     return <Navigate to={fallbackHome} replace />;
   }
   // The administrator's per-role page settings; Dashboard is always allowed.
-  if (IS_STAFF_SURFACE && !canOpenStaffPage(user, location.pathname.split('/')[1])) {
+  if (IS_CLINIC_SURFACE && !canOpenStaffPage(user, location.pathname.split('/')[1])) {
     return <Navigate to="/dashboard" replace />;
   }
   if (isStaffProtected && !isStaffDeviceSupported) {
@@ -220,11 +231,11 @@ function AppShell() {
 
   // Invitation setup can be completed on a phone. Clinical pages retain their
   // existing desktop safeguard and do not mount during account setup.
-  if (IS_STAFF_SURFACE && (location.pathname === '/staff/setup' || user?.staff_setup_required)) {
+  if (IS_CLINIC_SURFACE && (location.pathname === '/staff/setup' || user?.staff_setup_required)) {
     return <StaffSetup />;
   }
   // Gating order: Evaluate PC/Laptop Access Safeguard BEFORE session initialization and Login
-  if (IS_STAFF_SURFACE && !isStaffDeviceSupported) {
+  if (IS_CLINIC_SURFACE && !isStaffDeviceSupported) {
     return <PCAccessRequired viewport={viewport} onLogout={isAuthenticated ? logout : undefined} />;
   }
 
@@ -256,7 +267,7 @@ function AppShell() {
       loading={loading}
       initializing={initializing}
       allowedRoles={allowedRoles}
-      isStaffProtected={IS_STAFF_SURFACE}
+      isStaffProtected={IS_CLINIC_SURFACE}
       isStaffDeviceSupported={isStaffDeviceSupported}
       viewport={viewport}
       logout={logout}
@@ -366,6 +377,24 @@ function AppShell() {
           </>
         )}
 
+        {IS_DENTAL_SURFACE && (
+          <>
+            <Route path="/dashboard" element={guard(<DentalDashboard />, ['dentist'])} />
+            <Route path="/appointments" element={guard(<DentalAppointments />, ['dentist'])} />
+            <Route path="/dental-encounter" element={guard(<DentalEncounter />, ['dentist'])} />
+            <Route path="/consultation-log" element={guard(<ConsultationLog />, ['dentist'])} />
+            <Route path="/patients" element={guard(<DentalPatients />, ['dentist'])} />
+            <Route path="/dental-record" element={guard(<DentalRecord />, ['dentist'])} />
+            <Route path="/inventory" element={guard(<Inventory />, ['dentist'])} />
+            <Route path="/reports" element={guard(<DentalReports />, ['dentist'])} />
+            <Route path="/patient-messages" element={guard(<StaffPatientMessages />, ['dentist'])} />
+            <Route path="/messages" element={guard(<StaffPatientMessages />, ['dentist'])} />
+            <Route path="/help" element={guard(<Help />, ['dentist'])} />
+            <Route path="/settings" element={guard(<Settings />, ['dentist'])} />
+            <Route path="/my-profile" element={guard(<MyProfile />, ['dentist'])} />
+          </>
+        )}
+
         {IS_USER_SURFACE && (
           <>
             <Route path="/kiosk" element={<KioskBooking />} />
@@ -373,6 +402,7 @@ function AppShell() {
             <Route path="/patient/events" element={guard(<PatientEvents />, ['patient'])} />
             <Route path="/patient/schedule" element={guard(<PatientSchedule />, ['patient'])} />
             <Route path="/patient/messages" element={guard(<PatientMessages />, ['patient'])} />
+            <Route path="/patient/dental" element={guard(<PatientDentalAppointments />, ['patient'])} />
             <Route path="/patient/records" element={guard(<PatientRecords />, ['patient'])} />
             <Route path="/patient/profile" element={guard(<PatientProfilePortal />, ['patient'])} />
             <Route path="/patient/settings" element={guard(<PatientSettings />, ['patient'])} />

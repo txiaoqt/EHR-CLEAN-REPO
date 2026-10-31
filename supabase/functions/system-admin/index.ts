@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
     if (identityError || !identity || !identity.active) throw new RequestError('Account access is unavailable. Sign in again or contact the administrator.', 403);
 
     if (action === 'complete_invitation') {
-      if (!identity.staff_setup_required || !['physician', 'nurse', 'admin'].includes(identity.role)) throw new RequestError('No active invitation is available.', 403);
+      if (!identity.staff_setup_required || !['physician', 'nurse', 'dentist', 'admin'].includes(identity.role)) throw new RequestError('No active invitation is available.', 403);
       if (!isPasswordValid(payload.password)) throw new RequestError(PASSWORD_POLICY_MESSAGE);
       const administrator = identity.role === 'admin';
       const username = String(payload.username || '').trim().toLowerCase();
@@ -133,11 +133,13 @@ Deno.serve(async (req: Request) => {
     const { data: settings } = await caller.rpc('admin_portal_data', { p_section: 'settings' });
     if (!settings) throw new RequestError('Could not load system settings.', 503);
     const staffOrigin = portalUrl(settings.staff_portal_url);
+    // Dentists use the Dental Portal, a separate deployment in the dental clinic.
+    const clinicOrigin = (role: string) => role === 'dentist' ? portalUrl(settings.dental_portal_url || 'http://127.0.0.1:5176') : staffOrigin;
 
     if (action === 'invite_staff' || action === 'resend_invitation') {
       let invitation;
       if (action === 'invite_staff') {
-        if (!['physician', 'nurse', 'admin'].includes(String(payload.role))) throw new RequestError('Choose Admin, Physician or Nurse.');
+        if (!['physician', 'nurse', 'dentist', 'admin'].includes(String(payload.role))) throw new RequestError('Choose Admin, Physician, Nurse or Dentist.');
         const name = String(payload.name || '').trim();
         if (name.length < 2 || name.length > 120) throw new RequestError('Enter the recipient’s full name.');
         invitation = await operation(user.id, 'invite_reserve', {
@@ -151,11 +153,11 @@ Deno.serve(async (req: Request) => {
       let invitedUserId: string | null = null;
       try {
         const administrator = invitation.role === 'admin';
-        const setupOrigin = administrator ? portalUrl(settings.admin_portal_url) : staffOrigin;
+        const setupOrigin = administrator ? portalUrl(settings.admin_portal_url) : clinicOrigin(invitation.role);
         const setupUrl = `${setupOrigin}/${administrator ? 'admin' : 'staff'}/setup`;
         const inviteData = { role: 'staff_invited', name: invitation.name, invitation_id: invitation.id,
-          staff_role_label: administrator ? 'Administrator' : invitation.role === 'physician' ? 'Physician' : 'Nurse',
-          portal_label: administrator ? 'System Admin Portal' : 'Staff Portal',
+          staff_role_label: administrator ? 'Administrator' : invitation.role === 'physician' ? 'Physician' : invitation.role === 'dentist' ? 'Dentist' : 'Nurse',
+          portal_label: administrator ? 'System Admin Portal' : invitation.role === 'dentist' ? 'Dental Portal' : 'Staff Portal',
           staff_setup_url: setupUrl,
           invitation_minutes: Math.max(1, Math.round((Date.parse(invitation.expires_at) - Date.now()) / 60000)) };
         const { data: recoverableId, error: recoveryError } = await service.rpc('admin_invitation_auth_user', {
@@ -221,8 +223,8 @@ Deno.serve(async (req: Request) => {
       if (target.user.id === user.id) throw new RequestError('Use Change password in the account menu.');
       const { data: staff } = await service.from('admins').select('role').eq('auth_user_id', target.user.id).maybeSingle();
       if (staff?.role === 'admin') throw new RequestError('System administrator accounts are protected.');
-      if (!staff || !['physician','nurse'].includes(staff.role)) throw new RequestError('User accounts reset their password through Forgot password on the patient portal.', 403);
-      const origin = staff ? staffOrigin : portalUrl(settings.user_portal_url);
+      if (!staff || !['physician','nurse','dentist'].includes(staff.role)) throw new RequestError('User accounts reset their password through Forgot password on the patient portal.', 403);
+      const origin = staff ? clinicOrigin(staff.role) : portalUrl(settings.user_portal_url);
       const { error } = await service.auth.resetPasswordForEmail(target.user.email, { redirectTo: `${origin}/auth/callback?type=recovery` });
       if (error) throw new RequestError('The password reset email could not be sent. Try again later.');
       await operation(user.id, 'password_reset', { id: target.user.id });
@@ -235,7 +237,8 @@ Deno.serve(async (req: Request) => {
       if (clinic.length < 3 || clinic.length > 120) throw new RequestError('Enter the clinic name.');
       const result = await operation(user.id, 'settings', { clinic_name: clinic,
         staff_portal_url: portalUrl(payload.staff_portal_url), admin_portal_url: portalUrl(payload.admin_portal_url),
-        user_portal_url: portalUrl(payload.user_portal_url), invitation_expiry_minutes: minutes });
+        user_portal_url: portalUrl(payload.user_portal_url),
+        ...(payload.dental_portal_url ? { dental_portal_url: portalUrl(payload.dental_portal_url) } : {}), invitation_expiry_minutes: minutes });
       return json({ settings: result });
     }
     if (action === 'save_profile') {

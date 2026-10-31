@@ -2,20 +2,28 @@
 
 ## Running the three portals
 
-The app ships as **three deployments** — system administration, clinic staff,
-and patients/enrollees — selected by `VITE_DEPLOY_SURFACE`, which Vite bakes into the
+The app ships as **four deployments** — system administration, clinic staff
+(Medical Clinic), the Dental Clinic, and patients/enrollees — selected by `VITE_DEPLOY_SURFACE`, which Vite bakes into the
 bundle at build time. It is set by **mode**, not in `.env`:
 
 ```bash
 npm run dev:admin     # .env.admin -> system admin   on :5173
 npm run dev:staff     # .env.staff -> clinic staff   on :5175
 npm run dev:user      # .env.user  -> patient portal on :5174
+npm run dev:dental    # .env.dental -> dental portal on :5176
 ```
 
 Run each in a separate terminal to keep independent sessions. `npm run dev`
 defaults to system administration. Matching builds: `build:admin`, `build:staff`,
-and `build:user`. Only role `admin` may use the admin surface; `physician` and
-`nurse` use staff; `patient` and `enrollee` use user.
+`build:user` and `build:dental`. Only role `admin` may use the admin surface; `physician` and
+`nurse` use staff; `dentist` uses dental; `patient` and `enrollee` use user.
+
+**Medical and dental data are separated in the database**, not in the pages:
+restrictive policies (`clinic_department_separation`, migration
+`20261031100000_dental_clinic.sql`) give a dentist only Dental Clinic appointments,
+inventory and messages, and everyone else only Medical Clinic ones. Patients see
+both clinics' appointments but cannot book dental; dental appointments come only
+from `save_dental_visit`, when a dentist logs a consultation or procedure.
 
 **Why separate ports rather than one combined value.** The surfaces are the same
 origin only if they share a port, and Supabase auth sessions live in

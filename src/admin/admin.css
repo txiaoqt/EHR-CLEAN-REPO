@@ -22,7 +22,7 @@
 .system-admin-metric > span:last-child { font-size: var(--font-size-xs); color: var(--muted); }
 .system-admin-overview-columns { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
 .system-admin-stack { display: grid; gap: 20px; }
-.system-admin-page-access { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.system-admin-page-access { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
 .system-admin-page-group { border: 0; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
 .system-admin-page-group legend { font-size: var(--font-size-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted, #64748b); margin-bottom: 4px; }
 .system-admin-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }

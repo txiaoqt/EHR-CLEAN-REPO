@@ -15,6 +15,9 @@ export const DEPLOY_SURFACE = (import.meta.env.VITE_DEPLOY_SURFACE || 'admin').t
 export const IS_ADMIN_SURFACE = DEPLOY_SURFACE === 'admin';
 export const IS_STAFF_SURFACE = DEPLOY_SURFACE === 'staff';
 export const IS_USER_SURFACE = DEPLOY_SURFACE === 'user';
+export const IS_DENTAL_SURFACE = DEPLOY_SURFACE === 'dental';
+/** Staff and Dental share the clinic shell: sidebar, top bar, invite setup and the desktop check. */
+export const IS_CLINIC_SURFACE = IS_STAFF_SURFACE || IS_DENTAL_SURFACE;
 
 /** The two audiences of the student portal. */
 export const USER_SURFACE_ROLES = ['patient', 'enrollee'];
@@ -30,6 +33,7 @@ export const isRoleCompatibleWithSurface = (role) => {
   if (!normalized) return false;
   if (IS_ADMIN_SURFACE) return normalized === 'admin';
   if (IS_STAFF_SURFACE) return ['physician', 'nurse'].includes(normalized);
+  if (IS_DENTAL_SURFACE) return normalized === 'dentist';
   return IS_USER_SURFACE && isUserSurfaceRole(normalized);
 };
 

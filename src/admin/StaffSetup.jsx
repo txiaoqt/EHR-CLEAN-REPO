@@ -79,13 +79,13 @@ export default function StaffSetup({ administration = false }) {
         <img src={logo} alt="TUP Clinic" width="48" height="48" />
         <div>
           <h1 id="setup-title">{administration ? 'Set Up Your Administrator Account' : 'Set Up Your Staff Account'}</h1>
-          <p>{administration ? 'Choose your username and password for the System Admin Portal.' : 'Choose your password for the Staff Portal.'}</p>
+          <p>{administration ? 'Choose your username and password for the System Admin Portal.' : `Choose your password for the ${identity?.role === 'dentist' ? 'Dental' : 'Staff'} Portal.`}</p>
         </div>
       </header>
       {loading ? <p className="system-admin-setup-status" role="status">Checking your invitation…</p> : identity && <>
         <dl className="system-admin-setup-identity">
           <div className="system-admin-setup-name"><dt className="sr-only">Name</dt><dd>{identity.name}</dd></div>
-          <div className="system-admin-setup-role"><dt className="sr-only">Assigned Role</dt><dd>{identity.role === 'admin' ? 'Administrator' : identity.role === 'physician' ? 'Physician' : 'Nurse'}</dd></div>
+          <div className="system-admin-setup-role"><dt className="sr-only">Assigned Role</dt><dd>{identity.role === 'admin' ? 'Administrator' : identity.role === 'physician' ? 'Physician' : identity.role === 'dentist' ? 'Dentist' : 'Nurse'}</dd></div>
           <div className="system-admin-setup-email"><dt className="sr-only">Email</dt><dd>{identity.email}</dd></div>
           <div className="system-admin-setup-expiry"><dt>Invitation Expires</dt><dd>{formatAdminDate(identity.invitation_expires_at)}</dd></div>
         </dl>

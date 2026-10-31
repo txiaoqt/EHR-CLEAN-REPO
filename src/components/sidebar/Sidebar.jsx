@@ -7,6 +7,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import { useStaffPresence } from '../../StaffPresenceContext.jsx';
 import StaffAvailability from '../StaffAvailability.jsx';
 import { canOpenStaffPage } from '../../staffPageAccess.mjs';
+import { IS_DENTAL_SURFACE } from '../../deploySurface.js';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 
@@ -24,12 +25,11 @@ import {
   ChevronRightIcon,
   MedicalLogIcon,
   ArchiveIcon,
+  EncountersIcon,
   LogoutIcon
 } from '../icons/Icons.jsx';
 
-// Exported so the command palette searches the same list the sidebar renders —
-// a page reachable in one must be reachable in the other.
-export const NAV_GROUPS = [
+const MEDICAL_NAV_GROUPS = [
   {
     label: 'MAIN',
     items: [
@@ -68,6 +68,42 @@ export const NAV_GROUPS = [
     ]
   }
 ];
+
+const DENTAL_NAV_GROUPS = [
+  {
+    label: 'MAIN',
+    items: [
+      { page: 'dashboard', label: 'dashboard', icon: DashboardIcon },
+      { page: 'appointments', label: 'appointments', icon: CalendarIcon },
+      { page: 'consultation-log', label: 'Consultation Log', icon: EncountersIcon },
+      { page: 'patients', label: 'patients', icon: UsersIcon },
+    ]
+  },
+  {
+    label: 'CLINICAL',
+    items: [
+      { page: 'inventory', label: 'inventory', icon: InventoryIcon },
+      { page: 'reports', label: 'reports', icon: ReportsIcon },
+    ]
+  },
+  {
+    label: 'COMMUNICATION',
+    items: [
+      { page: 'patient-messages', label: 'Patient Messages', icon: MessagesIcon },
+    ]
+  },
+  {
+    label: 'SUPPORT',
+    items: [
+      { page: 'help', label: 'help', icon: HelpIcon },
+      { page: 'settings', label: 'Settings', icon: SettingsIcon },
+    ]
+  }
+];
+
+// Exported so the command palette searches the same list the sidebar renders —
+// a page reachable in one must be reachable in the other.
+export const NAV_GROUPS = IS_DENTAL_SURFACE ? DENTAL_NAV_GROUPS : MEDICAL_NAV_GROUPS;
 
 const Sidebar = ({ collapsed = false, toggle }) => {
   const navigate = useNavigate();
@@ -121,11 +157,11 @@ const Sidebar = ({ collapsed = false, toggle }) => {
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Primary navigation">
         {/* Top Header: Logo + Brand + Collapse/Expand Toggle */}
         <div className="sidebar-header">
-          <div className="brand" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }} title="TUP Clinic Staff Portal">
+          <div className="brand" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }} title={IS_DENTAL_SURFACE ? "TUP Dental Clinic Portal" : "TUP Clinic Staff Portal"}>
             <img src={tupehrlogo} alt="TUP EHR logo" className="logo-img" />
             <div className="brand-text">
               <h1 className="brand-title">TUP CLINIC</h1>
-              <div className="brand-sub">Staff Portal</div>
+              <div className="brand-sub">{IS_DENTAL_SURFACE ? 'Dental Portal' : 'Staff Portal'}</div>
             </div>
           </div>
 
