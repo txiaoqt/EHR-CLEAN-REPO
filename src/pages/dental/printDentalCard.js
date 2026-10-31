@@ -79,11 +79,64 @@ export const dentalCardHtml = (record, services) => {
   </section></body></html>`;
 };
 
-export const printDentalCard = (record, services) => {
+/**
+ * The Dental Card: the patient's details as a plain list, then every dental
+ * consultation. The pink form above is the clinic's official layout of the same data.
+ */
+export const dentalSummaryHtml = (record, services, profile = {}) => {
+  const value = (v) => (String(v ?? '').trim() ? esc(v) : '<span class="na">—</span>');
+  const list = (rows) => `<dl>${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${value(v)}</dd></div>`).join('')}</dl>`;
+  const name = [record.first_name, record.middle_name, record.surname].filter(Boolean).join(' ');
+  const age = ageFrom(record.date_of_birth);
+  const rows = [...services].sort((a, b) => b.service_date.localeCompare(a.service_date));
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Dental Card · ${esc(record.surname)}, ${esc(record.first_name)}</title>
+  <style>
+    @page { size: letter; margin: 14mm; }
+    * { box-sizing: border-box; } body { font: 10.5pt Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+    header { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #111; padding-bottom: 10px; }
+    header img { width: 48px; } header .uni { font-size: 9pt; line-height: 1.35; } header .uni strong { font-size: 10.5pt; }
+    h1 { font-size: 16pt; margin: 16px 0 2px; } .meta { color: #555; font-size: 9.5pt; }
+    h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #bbb; }
+    dl { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; margin: 0; }
+    dl div { display: grid; grid-template-columns: 150px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px dotted #ccc; break-inside: avoid; }
+    dt { color: #555; } dd { margin: 0; font-weight: bold; } .na { color: #999; font-weight: normal; }
+    ol { list-style: none; margin: 0; padding: 0; }
+    li { padding: 8px 0; border-bottom: 1px solid #ddd; break-inside: avoid; }
+    li .top { display: flex; justify-content: space-between; gap: 12px; } li .date { font-weight: bold; } li .by { color: #555; }
+    li .what { margin-top: 2px; } li .extra { color: #555; font-size: 9.5pt; margin-top: 2px; }
+    .empty { color: #777; padding: 8px 0; }
+  </style></head><body onload="window.focus(); window.print();">
+  <header><img src="${esc(new URL(seal, window.location.href).href)}" alt="">
+    <div class="uni"><strong>TECHNOLOGICAL UNIVERSITY OF THE PHILIPPINES</strong><br>University Clinic · Dental Clinic · Ayala Blvd., Ermita, Manila</div></header>
+  <h1>${esc(name)}</h1>
+  <div class="meta">Dental Card · ${esc(record.patient_id)} · ${esc(transactionId(record))}</div>
+  <h2>Patient Information</h2>
+  ${list([
+    ['Surname', record.surname], ['First Name', record.first_name], ['Middle Name', record.middle_name], ['ID Number', record.patient_id],
+    ['Age', age === '' ? '' : `${age} yrs`], ['Date of Birth', record.date_of_birth ? formatDay(record.date_of_birth) : ''],
+    ['Sex', record.sex === 'F' ? 'Female' : record.sex === 'M' ? 'Male' : ''], ['Place of Birth', record.place_of_birth],
+    ['Classification', record.classification], ['College / Course / Unit', record.college_course_unit || profile.course], ['Year', profile.year],
+    ['Address', record.address || profile.address], ['Contact Number', profile.contact_number], ['Email', profile.email],
+    ['Blood Type', profile.blood_type], ['Allergies', profile.allergies], ['Medications', profile.medications],
+  ])}
+  <h2>In Case of Emergency</h2>
+  ${list([['Name', record.emergency_name], ['Relationship', record.emergency_relationship],
+    ['Contact Number', record.emergency_contact], ['Address', record.emergency_address]])}
+  ${record.remarks ? `<h2>Remarks</h2><p style="white-space:pre-wrap;margin:0">${esc(record.remarks)}</p>` : ''}
+  <h2>Dental Consultation History (${rows.length})</h2>
+  ${rows.length === 0 ? '<div class="empty">No consultations recorded yet.</div>' : `<ol>${rows.map((s) => `<li>
+    <div class="top"><span class="date">${esc(formatDay(s.service_date))}</span><span class="by">${esc(s.dentist_name)}</span></div>
+    <div class="what">${esc(s.service_rendered)}${s.teeth?.length ? ` · Teeth ${esc(s.teeth.join(', '))}` : ''}</div>
+    ${s.medicine || s.anesthesia ? `<div class="extra">${[s.medicine && `Medicine: ${esc(s.medicine)}`, s.anesthesia && `Anesthesia: ${esc(s.anesthesia)}`].filter(Boolean).join(' · ')}</div>` : ''}
+  </li>`).join('')}</ol>`}
+  </body></html>`;
+};
+
+export const printHtml = (html) => {
   const win = window.open('', '_blank', 'width=900,height=1000');
   if (!win) return false;
   win.document.open();
-  win.document.write(dentalCardHtml(record, services));
+  win.document.write(html);
   win.document.close();
   return true;
 };

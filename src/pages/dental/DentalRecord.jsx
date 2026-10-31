@@ -5,7 +5,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import ToothChart from './ToothChart.jsx';
 import { RecordFields, NextAppointmentFields, emptyNext, nextPayload } from './DentalForms.jsx';
 import { DentalDialog } from './DentalAppointments.jsx';
-import { printDentalCard, transactionId } from './printDentalCard.js';
+import { dentalCardHtml, dentalSummaryHtml, printHtml, transactionId } from './printDentalCard.js';
 import {
   STATUS_BADGE, ageFrom, formatDay, formatTimeLabel, loadDentists, recordName, recordPayload, saveDentalVisit,
 } from './dentalShared.js';
@@ -38,7 +38,7 @@ const DentalRecord = () => {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const patientId = params.get('id');
-  const [state, setState] = useState({ loading: true, record: null, services: [], appointments: [] });
+  const [state, setState] = useState({ loading: true, record: null, services: [], appointments: [], profile: null });
   const [notice, setNotice] = useState(location.state?.notice || '');
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,17 +46,20 @@ const DentalRecord = () => {
   const [dentists, setDentists] = useState([]);
 
   const load = useCallback(async () => {
-    const [{ data: record }, { data: services }, { data: appointments }] = await Promise.all([
+    const [{ data: record }, { data: services }, { data: appointments }, { data: profile }] = await Promise.all([
       supabase.from('dental_records').select('*').eq('patient_id', patientId).maybeSingle(),
       supabase.from('dental_services').select('*').eq('patient_id', patientId).order('service_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('appointments').select('id, appointment_date, appointment_time, service_type, clinician_name, status')
         .eq('patient_id', patientId).eq('department', 'Dental Clinic').order('appointment_date', { ascending: false }).limit(20),
+      supabase.from('patient_profiles').select('email, contact_number, address, year, course, blood_type, allergies, medications')
+        .eq('patient_id', patientId).limit(1).maybeSingle(),
     ]);
-    setState({ loading: false, record, services: services || [], appointments: appointments || [] });
+    setState({ loading: false, record, services: services || [], appointments: appointments || [], profile });
   }, [patientId]);
   useEffect(() => { load(); loadDentists().then(setDentists); }, [load]);
 
-  const { record, services, appointments } = state;
+  const { record, services, appointments, profile } = state;
+  const print = (html) => { if (!printHtml(html)) setNotice('Allow pop-ups for this site to print.'); };
   const scheduled = appointments.find((a) => a.status === 'Scheduled');
   const close = () => { setDialog(null); setDialogError(''); };
   const save = async (args, message) => {
@@ -86,7 +89,8 @@ const DentalRecord = () => {
           </div>
           <div className="page-header-actions">
             <button type="button" className="btn secondary" onClick={() => navigate('/patients')}>All Patients</button>
-            <button type="button" className="btn secondary" onClick={() => { if (!printDentalCard({ ...record }, services)) setNotice('Allow pop-ups for this site to print the Dental Card.'); }}>Print Dental Card</button>
+            <button type="button" className="btn secondary" onClick={() => print(dentalSummaryHtml(record, services, profile || {}))}>Print Dental Card</button>
+            <button type="button" className="btn secondary" onClick={() => print(dentalCardHtml(record, services))}>Print Pink Form</button>
             <button type="button" className="btn secondary" onClick={() => setDialog({ type: 'edit', record: { ...record } })}>Edit Record</button>
             {scheduled ? (
               <button type="button" className="btn" onClick={() => navigate(`/dental-encounter?appointment=${scheduled.id}`)}>Open Encounter</button>
