@@ -29,7 +29,7 @@ const ConsultationForm = ({ initialPatientId, onDone, onCancel }) => {
   useEffect(() => { loadDentists().then(setDentists); }, []);
   useEffect(() => {
     if (!initialPatientId) return;
-    supabase.from('students').select('id, name, year').eq('id', initialPatientId).maybeSingle()
+    supabase.from('students').select('id, name, year, first_name, middle_name, surname, suffix').eq('id', initialPatientId).maybeSingle()
       .then(({ data }) => { if (data) setPatient(data); });
   }, [initialPatientId]);
   useEffect(() => {
@@ -47,7 +47,8 @@ const ConsultationForm = ({ initialPatientId, onDone, onCancel }) => {
     setSaving(true); setError('');
     try {
       if (patient.isNew) {
-        const { error: studentError } = await supabase.from('students').insert({ id: patient.id, name: patient.name, year: patient.year });
+        const { error: studentError } = await supabase.from('students').insert({ id: patient.id, name: patient.name, year: patient.year,
+          first_name: patient.first_name, middle_name: patient.middle_name || null, surname: patient.surname, suffix: patient.suffix || null });
         if (studentError && studentError.code !== '23505') throw new Error('The new patient could not be registered. Check the ID number.');
       }
       await saveDentalVisit({ patientId: patient.id, record: recordPayload(record), service, next: nextPayload(next) });

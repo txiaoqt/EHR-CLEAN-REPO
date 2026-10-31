@@ -11,6 +11,10 @@ import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { patientsExportConfig } from '../utils/export/configs.js';
+import { composeFullName, toProperName } from '../utils/nameFormat.js';
+
+const EMPTY_MANUAL = { first: '', middle: '', last: '', suffix: '', id: '', year: 1 };
+const manualName = (m) => composeFullName({ firstName: m.first, middleName: m.middle, lastName: m.last, suffix: m.suffix });
 
 const Patients = () => {
   const navigate = useNavigate();
@@ -34,7 +38,7 @@ const Patients = () => {
   const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   // manual mode
-  const [manualStudent, setManualStudent] = useState({ name: '', id: '', year: 1 });
+  const [manualStudent, setManualStudent] = useState(EMPTY_MANUAL);
 
   const [showNewStudentForm, setShowNewStudentForm] = useState(false);
 
@@ -210,15 +214,15 @@ const Patients = () => {
   // create student (manual tab) - insert into students table and select it automatically
   const submitCreateStudent = async () => {
     // VALIDATION: ensure name and id meet rules
-    const name = (manualStudent.name || '').trim();
+    const name = manualName(manualStudent);
     const id = (manualStudent.id || '').trim();
 
-    if (!name || !id) {
-      showToast('Student name and ID are required', 'error');
+    if (!manualStudent.first.trim() || !manualStudent.last.trim() || !id) {
+      showToast('First name, last name and student ID are required', 'error');
       return;
     }
 
-    if (!validateName(name)) {
+    if (![manualStudent.first, manualStudent.middle, manualStudent.last].every((part) => !part.trim() || validateName(part.trim())) || !validateName(name)) {
       showToast(`Invalid name. Letters, spaces, dot, apostrophe, and hyphen only. Max ${NAME_MAX} chars.`, 'error');
       return;
     }
@@ -229,7 +233,11 @@ const Patients = () => {
     }
 
     try {
-      const payload = { id: id, name: name, year: Number(manualStudent.year || 1) };
+      const payload = {
+        id, name, year: Number(manualStudent.year || 1),
+        first_name: toProperName(manualStudent.first), middle_name: toProperName(manualStudent.middle) || null,
+        surname: toProperName(manualStudent.last), suffix: manualStudent.suffix.trim() || null,
+      };
       const { error } = await supabase.from('students').insert([payload]).select();
 
       if (error) {
@@ -305,7 +313,7 @@ const Patients = () => {
         // close modal and reset
         setShowRegisterModal(false);
         setSelectedStudent(null);
-        setManualStudent({ name: '', id: '', year: 1 });
+        setManualStudent(EMPTY_MANUAL);
         setStudentSearch('');
         setStudentSuggestions([]);
         setShowNewStudentForm(false);
@@ -323,7 +331,7 @@ const Patients = () => {
   const handleNewEncounter = (patient) => navigate('/encounter', { state: { patientId: patient.id, patientName: patient.name } });
 
   // preview item (student to show in modal)
-  const previewStudent = selectedStudent ? selectedStudent : (manualStudent.name ? manualStudent : null);
+  const previewStudent = selectedStudent ? selectedStudent : (manualName(manualStudent) ? { ...manualStudent, name: manualName(manualStudent) } : null);
 
   return (
     <main className="main">
@@ -344,7 +352,7 @@ const Patients = () => {
             <button
               type="button"
               className="btn"
-              onClick={() => { setShowRegisterModal(true); setRegisterTab('search'); setSelectedStudent(null); setManualStudent({ name: '', id: '', year: 1 }); }}
+              onClick={() => { setShowRegisterModal(true); setRegisterTab('search'); setSelectedStudent(null); setManualStudent(EMPTY_MANUAL); }}
             >
               Register Patient
             </button>
@@ -366,7 +374,7 @@ const Patients = () => {
                 <button
                   type="button"
                   className="modal-close-btn"
-                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}
+                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent(EMPTY_MANUAL); }}
                   aria-label="Close modal"
                 >
                   <CloseIcon size={18} />
@@ -382,7 +390,7 @@ const Patients = () => {
                       onClick={() => {
                         setRegisterTab('search');
                         setSelectedStudent(null);
-                        setManualStudent({ name: '', id: '', year: 1 });
+                        setManualStudent(EMPTY_MANUAL);
                       }}
                     >
                       Search Student Directory
@@ -443,15 +451,23 @@ const Patients = () => {
                   {/* Manual tab */}
                   {registerTab === 'manual' && (
                     <div style={{ display: 'grid', gap: 14 }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Full name</label>
-                        <input
-                          value={manualStudent.name}
-                          onChange={(e) => setManualStudent(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="e.g. Juan Dela Cruz"
-                          className="input"
-                          style={{ width: '100%' }}
-                        />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {[['first', 'First name', 'e.g. Juan'], ['middle', 'Middle name (optional)', 'e.g. Santos'],
+                          ['last', 'Last name', 'e.g. Dela Cruz'], ['suffix', 'Suffix (optional)', 'e.g. Jr., III']].map(([key, label, placeholder]) => (
+                          <div key={key}>
+                            <label htmlFor={`manual-${key}`} style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>{label}</label>
+                            <input
+                              id={`manual-${key}`}
+                              value={manualStudent[key]}
+                              maxLength={80}
+                              onChange={(e) => setManualStudent(prev => ({ ...prev, [key]: e.target.value }))}
+                              onBlur={(e) => setManualStudent(prev => ({ ...prev, [key]: key === 'suffix' ? e.target.value.trim() : toProperName(e.target.value) }))}
+                              placeholder={placeholder}
+                              className="input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        ))}
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
@@ -472,7 +488,7 @@ const Patients = () => {
                       </div>
 
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-                        <button className="btn secondary small" onClick={() => { setManualStudent({ name: '', id: '', year: 1 }); }}>Reset</button>
+                        <button className="btn secondary small" onClick={() => { setManualStudent(EMPTY_MANUAL); }}>Reset</button>
                         <button className="btn small" onClick={async () => { await submitCreateStudent(); }}>
                           Create & Select
                         </button>
@@ -507,7 +523,7 @@ const Patients = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
                 <button
                   className="btn secondary"
-                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent({ name: '', id: '', year: 1 }); }}
+                  onClick={() => { setShowRegisterModal(false); setSelectedStudent(null); setStudentSearch(''); setStudentSuggestions([]); setManualStudent(EMPTY_MANUAL); }}
                 >
                   Cancel
                 </button>

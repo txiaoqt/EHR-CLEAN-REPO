@@ -7,7 +7,12 @@ import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { ageFrom, formatDay, recordSortName } from './dentalShared.js';
 import './dental.css';
 
-/** Patients with a dental record, i.e. everyone who has had a dental consultation. */
+const sexLetter = (sex) => ({ f: 'F', female: 'F', m: 'M', male: 'M' }[String(sex || '').toLowerCase()] || '');
+
+/**
+ * The same patient directory as the Medical Clinic, plus anyone registered here
+ * first. Only directory fields are read: the medical notes stay on the medical side.
+ */
 const DentalPatients = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
@@ -17,21 +22,34 @@ const DentalPatients = () => {
 
   useEffect(() => {
     (async () => {
-      const [{ data: records, error }, { data: visits }] = await Promise.all([
-        supabase.from('dental_records').select('patient_id, surname, first_name, middle_name, classification, college_course_unit, sex, date_of_birth').order('surname'),
+      const [patientsRes, recordsRes, { data: visits }, { data: profiles }] = await Promise.all([
+        supabase.from('patients').select('id, name, year, date_of_birth').order('name'),
+        supabase.from('dental_records').select('patient_id, surname, first_name, middle_name, classification, college_course_unit, sex, date_of_birth'),
         supabase.from('dental_services').select('patient_id, service_date').order('service_date', { ascending: false }),
+        supabase.from('patient_profiles').select('patient_id, sex, course'),
       ]);
-      if (error) setLoadError('Patients could not be loaded. Refresh the page to try again.');
+      if (patientsRes.error || recordsRes.error) setLoadError('Patients could not be loaded. Refresh the page to try again.');
       const last = {};
       (visits || []).forEach((v) => { if (!last[v.patient_id]) last[v.patient_id] = v.service_date; });
-      setRows((records || []).map((r) => ({ ...r, last_visit: last[r.patient_id] || null })));
+      const profileOf = Object.fromEntries((profiles || []).map((p) => [p.patient_id, p]));
+      const byId = new Map();
+      (patientsRes.data || []).forEach((p) => byId.set(p.id, {
+        patient_id: p.id, name: p.name, date_of_birth: p.date_of_birth, classification: 'Student',
+        college_course_unit: profileOf[p.id]?.course || '', sex: sexLetter(profileOf[p.id]?.sex), hasRecord: false,
+      }));
+      (recordsRes.data || []).forEach((r) => byId.set(r.patient_id, {
+        ...byId.get(r.patient_id), ...r, name: recordSortName(r), hasRecord: true,
+        college_course_unit: r.college_course_unit || byId.get(r.patient_id)?.college_course_unit || '',
+      }));
+      setRows([...byId.values()].map((r) => ({ ...r, last_visit: last[r.patient_id] || null }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       setLoading(false);
     })();
   }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? rows.filter((r) => [recordSortName(r), r.patient_id, r.college_course_unit].some((v) => (v || '').toLowerCase().includes(q))) : rows;
+    return q ? rows.filter((r) => [r.name, r.patient_id, r.college_course_unit].some((v) => (v || '').toLowerCase().includes(q))) : rows;
   }, [rows, search]);
   const pagination = useTablePagination(filtered, { resetKey: search });
 
@@ -41,7 +59,7 @@ const DentalPatients = () => {
         <div className="page-header">
           <div className="page-header-title-block">
             <h1 className="page-header-title">Patients</h1>
-            <div className="page-header-subtitle">Everyone with a dental record. Open one for the pink form, visit history and Dental Card.</div>
+            <div className="page-header-subtitle">The clinic’s patient directory. Open a record for the pink form, visit history and Dental Card, or log a first consultation.</div>
           </div>
           <div className="page-header-actions">
             <button type="button" className="btn" onClick={() => navigate('/consultation-log?new=1')}>Log Consultation</button>
@@ -64,17 +82,19 @@ const DentalPatients = () => {
               <thead><tr><th>Patient</th><th>ID Number</th><th>Classification</th><th>College / Unit</th><th>Age · Sex</th><th>Last Visit</th><th style={{ textAlign: 'right' }}>Record</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patients…</td></tr>
-                  : filtered.length === 0 ? <tr className="table-empty-row"><td colSpan={7}>{rows.length ? 'No matching patients' : 'No dental patients yet. They are added when you log a consultation.'}</td></tr>
+                  : filtered.length === 0 ? <tr className="table-empty-row"><td colSpan={7}>{rows.length ? 'No matching patients' : 'No patients yet. Register one when you log a consultation.'}</td></tr>
                   : pagination.pageRows.map((r) => (
                     <tr key={r.patient_id}>
-                      <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{recordSortName(r)}</td>
+                      <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{r.name}</td>
                       <td><span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>{r.patient_id}</span></td>
-                      <td>{r.classification}</td>
+                      <td>{r.classification || '—'}</td>
                       <td>{r.college_course_unit || '—'}</td>
                       <td>{[ageFrom(r.date_of_birth), r.sex].filter((v) => v !== '' && v != null).join(' · ') || '—'}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{r.last_visit ? formatDay(r.last_visit) : '—'}</td>
                       <td style={{ textAlign: 'right' }}>
-                        <button type="button" className="btn secondary small" onClick={() => navigate(`/dental-record?id=${encodeURIComponent(r.patient_id)}`)}>View Record</button>
+                        {r.hasRecord
+                          ? <button type="button" className="btn secondary small" onClick={() => navigate(`/dental-record?id=${encodeURIComponent(r.patient_id)}`)}>View Record</button>
+                          : <button type="button" className="btn small" onClick={() => navigate(`/consultation-log?new=1&patient=${encodeURIComponent(r.patient_id)}`)}>Log Consultation</button>}
                       </td>
                     </tr>
                   ))}

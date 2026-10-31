@@ -409,6 +409,11 @@ const Login = () => {
               middleName: signupData.middleName,
               lastName: signupData.lastName,
             }) || 'Patient',
+            // PSA name parts: copied onto the student record when it is created.
+            first_name: toProperName(signupData.firstName),
+            middle_name: toProperName(signupData.middleName),
+            surname: toProperName(signupData.lastName),
+            suffix: signupData.suffix.trim(),
             role: 'patient',
             policy_agreement: signupAgreement,
             patient_id: studentId,
@@ -893,7 +898,7 @@ const Login = () => {
         !enrolleeData.dateOfBirth && 'your date of birth',
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enrolleeData.email) && 'a valid email',
       ]
-  ).concat(!signupPolicyAgreed && 'agreement to both policies').filter(Boolean);
+  ).concat(!signupPolicyAgreed && (signupKind === 'student' ? 'agreement to both policies below' : 'agreement to both policies')).filter(Boolean);
   const isSendDisabled = otpSending || otpCooldown > 0 || sendMissing.length > 0;
   const sendMissingHint = !otpSent && sendMissing.length > 0 && (
     <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
@@ -1687,9 +1692,7 @@ const Login = () => {
                       </div>
                     )}
                   </div>
-                  {signupConsent}
-
-                  {/* 8. Email with Send/Resend Button — last, after everything Send requires */}
+                  {/* 8. Email with Send/Resend Button */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <label htmlFor="signup-email" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Email</label>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1755,6 +1758,9 @@ const Login = () => {
                     />
                   )}
 
+                  {/* 10. Policy agreement — last, just above Create Account. It is still
+                      required before Send, since sending the code creates the Auth account. */}
+                  {signupConsent}
                 </>
               )}
 

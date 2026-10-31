@@ -2,14 +2,26 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { SearchIcon } from '../../components/icons/Icons.jsx';
 import CourseSearch from '../../components/CourseSearch.jsx';
+import { isValidStudentId } from '../../utils/authValidation.js';
+import { composeFullName, toProperName } from '../../utils/nameFormat.js';
 import { CLASSIFICATIONS, DENTAL_TIMES, EMPTY_RECORD, ageFrom, formatTimeLabel, addDaysIso, todayIso } from './dentalShared.js';
 
 /** Finds a patient in the student directory, or registers one by ID and name. */
+// "230123" or "23-0123" -> "23-0123"; the TUPM- prefix is shown, not typed.
+const STUDENT_FIELDS = 'id, name, year, first_name, middle_name, surname, suffix';
+// "G." or "A. B." is an initial, not the full middle name the pink form asks for.
+const isInitialOnly = (text) => /^[A-Za-z]\.?(\s+[A-Za-z]\.?)*$/.test((text || '').trim());
+
+const formatIdDigits = (text) => {
+  const digits = text.replace(/\D/g, '').slice(0, 6);
+  return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
+};
+
 export const PatientPicker = ({ value, onChange, disabled }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [manual, setManual] = useState(false);
-  const [draft, setDraft] = useState({ id: '', name: '', year: '1' });
+  const [draft, setDraft] = useState({ id: '', first: '', middle: '', last: '', suffix: '', year: '1' });
 
   useEffect(() => {
     const q = query.trim();
@@ -17,7 +29,7 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
     let current = true;
     const timer = setTimeout(async () => {
       const safe = q.replace(/[%,()]/g, ' ');
-      const { data } = await supabase.from('students').select('id, name, year')
+      const { data } = await supabase.from('students').select(STUDENT_FIELDS)
         .or(`name.ilike.%${safe}%,id.ilike.%${safe}%`).order('name').limit(8);
       if (current) setResults(data || []);
     }, 250);
@@ -37,22 +49,41 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
   }
 
   if (manual) {
-    const valid = draft.id.trim().length >= 3 && draft.name.trim().length >= 2;
+    const studentId = `TUPM-${draft.id}`;
+    const valid = isValidStudentId(studentId) && draft.first.trim() && draft.last.trim();
+    const nameInput = (key, label, placeholder, optional) => (
+      <label className="dental-field"><span>{label}{optional && ' (optional)'}</span>
+        <input className="input" value={draft[key]} maxLength={80} placeholder={placeholder}
+          onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+          onBlur={(e) => setDraft({ ...draft, [key]: key === 'suffix' ? e.target.value.trim() : toProperName(e.target.value) })} /></label>
+    );
     return (
       <div className="dental-stack" style={{ gap: 12 }}>
         <div className="dental-fields">
           <label className="dental-field"><span>ID Number</span>
-            <input className="input" value={draft.id} maxLength={40} onChange={(e) => setDraft({ ...draft, id: e.target.value })} placeholder="e.g. TUPM-23-0123" /></label>
-          <label className="dental-field"><span>Full Name</span>
-            <input className="input" value={draft.name} maxLength={120} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Juan Dela Cruz" /></label>
+            <span className="dental-id-input">
+              <span className="dental-id-prefix" aria-hidden="true">TUPM-</span>
+              <input className="input" value={draft.id} inputMode="numeric" aria-label="ID number after TUPM-"
+                onChange={(e) => setDraft({ ...draft, id: formatIdDigits(e.target.value.replace(/^TUPM-?/i, '')) })} placeholder="23-0123" />
+            </span></label>
           <label className="dental-field"><span>Year Level</span>
             <select className="input" value={draft.year} onChange={(e) => setDraft({ ...draft, year: e.target.value })}>
               {[1, 2, 3, 4, 5].map((y) => <option key={y} value={y}>Year {y}</option>)}
             </select></label>
         </div>
+        <div className="dental-fields">
+          {nameInput('last', 'Surname', 'e.g. Dela Cruz')}
+          {nameInput('first', 'First Name', 'e.g. Juan')}
+          {nameInput('middle', 'Middle Name', 'Full middle name, e.g. Santos', true)}
+          {nameInput('suffix', 'Suffix', 'e.g. Jr., III', true)}
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn small" disabled={!valid}
-            onClick={() => onChange({ id: draft.id.trim().toUpperCase(), name: draft.name.trim(), year: Number(draft.year), isNew: true })}>Use This Patient</button>
+            onClick={() => {
+              const parts = { first_name: toProperName(draft.first), middle_name: toProperName(draft.middle), surname: toProperName(draft.last), suffix: draft.suffix.trim() };
+              onChange({ id: studentId, name: composeFullName({ firstName: parts.first_name, middleName: parts.middle_name, lastName: parts.surname, suffix: parts.suffix }),
+                ...parts, year: Number(draft.year), isNew: true });
+            }}>Use This Patient</button>
           <button type="button" className="btn secondary small" onClick={() => setManual(false)}>Back to Search</button>
         </div>
       </div>
@@ -88,19 +119,32 @@ export const loadRecordFor = async (patient) => {
   if (saved) return { record: saved, existing: true };
   const { data: profile } = await supabase.from('patient_profiles')
     .select('full_name, sex, course, address, emergency_contact, emergency_contact_number').eq('patient_id', patient.id).maybeSingle();
-  const parts = (profile?.full_name || patient.name || '').trim().split(/\s+/);
+  let names = patient;
+  if (!patient.surname && !patient.isNew) {
+    const { data } = await supabase.from('students').select(STUDENT_FIELDS).eq('id', patient.id).maybeSingle();
+    if (data) names = data;
+  }
+  const words = (names.name || profile?.full_name || '').trim().split(/\s+/);
+  const surname = names.surname || (words.length > 1 ? words[words.length - 1] : '');
+  const firstName = names.surname ? names.first_name : (words.length > 1 ? words.slice(0, -1).join(' ') : words[0] || '');
   const sex = (profile?.sex || '').trim().charAt(0).toUpperCase();
   return {
     existing: false,
     record: {
       ...EMPTY_RECORD,
-      surname: parts.length > 1 ? parts[parts.length - 1] : '',
-      first_name: parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '',
+      surname: surname || '',
+      // The pink form has no suffix box; it reads naturally after the given name.
+      first_name: [firstName, names.suffix].filter(Boolean).join(' '),
+      // Only a full middle name belongs on the form: leave an initial for the dentist to ask.
+      middle_name: isInitialOnly(names.middle_name) ? '' : names.middle_name || '',
       college_course_unit: profile?.course || '',
       sex: sex === 'F' || sex === 'M' ? sex : '',
       address: profile?.address || '',
-      emergency_name: profile?.emergency_contact || '',
-      emergency_contact: profile?.emergency_contact_number || '',
+      // N/A marks what the student left blank, as the paper form would.
+      emergency_name: profile?.emergency_contact?.trim() || 'N/A',
+      emergency_relationship: 'N/A',
+      emergency_contact: profile?.emergency_contact_number?.trim() || 'N/A',
+      emergency_address: 'N/A',
     },
   };
 };
@@ -114,7 +158,7 @@ export const RecordFields = ({ record, onChange, disabled }) => {
   const set = (key) => (e) => onChange({ ...record, [key]: e.target.value });
   const text = (key, label, props = {}) => (
     <Field label={label} wide={props.wide}>
-      <input className="input" value={record[key] || ''} onChange={set(key)} disabled={disabled} maxLength={props.max || 160} required={props.required} />
+      <input className="input" value={record[key] || ''} onChange={set(key)} disabled={disabled} maxLength={props.max || 160} required={props.required} placeholder={props.placeholder} />
     </Field>
   );
   return (
@@ -122,7 +166,7 @@ export const RecordFields = ({ record, onChange, disabled }) => {
       <div className="dental-fields">
         {text('surname', 'Surname', { required: true, max: 80 })}
         {text('first_name', 'Name', { required: true, max: 80 })}
-        {text('middle_name', 'Middle Name', { max: 80 })}
+        {text('middle_name', 'Middle Name', { max: 80, placeholder: 'Full middle name, not the initial' })}
       </div>
       <div className="dental-fields" style={{ marginTop: 14 }}>
         <Field label="College / Course / Unit / Department" wide={false}>
