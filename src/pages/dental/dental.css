@@ -98,7 +98,34 @@ button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px so
   button.dental-tooth:active, .dental-brush:active { transform: none; }
 }
 
+.patient-dental-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+@media (max-width: 1100px) { .patient-dental-layout { grid-template-columns: 1fr; } }
+.patient-dental-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.patient-dental-empty-title { display: block; margin-bottom: 4px; color: var(--text); font-size: var(--font-size-base); }
+
+.card.patient-dental-card { display: flex; gap: 20px; padding: 20px 24px; }
 .patient-dental-card + .patient-dental-card { margin-top: 12px; }
+.patient-dental-date { flex: 0 0 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  height: 84px; border-radius: 12px; background: var(--surface-raised); border: 1px solid var(--border); }
+.patient-dental-date-month { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--primary); }
+.patient-dental-date-day { font-size: 28px; font-weight: var(--font-weight-extrabold); line-height: 1; color: var(--text); }
+.patient-dental-date-weekday { font-size: var(--font-size-xs); color: var(--text-muted); }
+.patient-dental-body { flex: 1; min-width: 0; }
+.patient-dental-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.patient-dental-title { margin: 8px 0 14px; font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); color: var(--text); }
+.patient-dental-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px; margin: 0; }
+.patient-dental-meta dt { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--text-muted); }
+.patient-dental-meta dd { margin: 4px 0 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--text); }
+@media (max-width: 560px) {
+  .card.patient-dental-card { flex-direction: column; gap: 14px; padding: 16px; }
+  .patient-dental-date { flex: none; flex-direction: row; height: auto; padding: 8px 12px; gap: 8px; align-self: flex-start; }
+  .patient-dental-date-day { font-size: var(--font-size-lg); }
+}
+
+.patient-dental-aside { padding: 20px 24px; }
+.patient-dental-aside p { margin: 6px 0 14px; font-size: var(--font-size-sm); color: var(--text-muted); line-height: 1.5; }
+.patient-dental-aside .btn { width: 100%; justify-content: center; gap: 8px; }
+.patient-dental-aside hr { margin: 20px 0; border: 0; border-top: 1px solid var(--border-subtle); }
 
 /* Student ID with the fixed TUPM- prefix inside the field. */
 .dental-id-input { position: relative; display: block; }
