@@ -59,10 +59,7 @@ const DentalPatients = () => {
         <div className="page-header">
           <div className="page-header-title-block">
             <h1 className="page-header-title">Patients</h1>
-            <div className="page-header-subtitle">The clinic’s patient directory. Open a record for the pink form, visit history and Dental Card, or log a first consultation.</div>
-          </div>
-          <div className="page-header-actions">
-            <button type="button" className="btn" onClick={() => navigate('/consultation-log?new=1')}>Log Consultation</button>
+            <div className="page-header-subtitle">The clinic’s patient directory. Open a record for the pink form, visit history and Dental Card. Consultations are logged in the Consultation Log.</div>
           </div>
         </div>
 
@@ -82,7 +79,7 @@ const DentalPatients = () => {
               <thead><tr><th>Patient</th><th>ID Number</th><th>Classification</th><th>College / Unit</th><th>Age · Sex</th><th>Last Visit</th><th style={{ textAlign: 'right' }}>Record</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patients…</td></tr>
-                  : filtered.length === 0 ? <tr className="table-empty-row"><td colSpan={7}>{rows.length ? 'No matching patients' : 'No patients yet. Register one when you log a consultation.'}</td></tr>
+                  : filtered.length === 0 ? <tr className="table-empty-row"><td colSpan={7}>{rows.length ? 'No matching patients' : 'No patients yet.'}</td></tr>
                   : pagination.pageRows.map((r) => (
                     <tr key={r.patient_id}>
                       <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{r.name}</td>
@@ -94,7 +91,7 @@ const DentalPatients = () => {
                       <td style={{ textAlign: 'right' }}>
                         {r.hasRecord
                           ? <button type="button" className="btn secondary small" onClick={() => navigate(`/dental-record?id=${encodeURIComponent(r.patient_id)}`)}>View Record</button>
-                          : <button type="button" className="btn small" onClick={() => navigate(`/consultation-log?new=1&patient=${encodeURIComponent(r.patient_id)}`)}>Log Consultation</button>}
+                          : <span className="dental-list-sub">No record yet</span>}
                       </td>
                     </tr>
                   ))}

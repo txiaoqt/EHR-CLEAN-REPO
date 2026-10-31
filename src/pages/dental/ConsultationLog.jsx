@@ -64,7 +64,7 @@ const ConsultationForm = ({ initialPatientId, onDone, onCancel }) => {
         <h2 className="dental-section-title" id="consult-patient">Patient</h2>
         <p className="dental-section-sub">Find the patient who came in for their first consultation, or register them.</p>
         <PatientPicker value={patient} onChange={setPatient} disabled={saving} />
-        {patient && existing && <p className="dental-muted">This patient already has a dental record. Saving updates it.</p>}
+        {patient && existing && <p className="dental-muted">Returning patient. This is a new visit: earlier visits stay in their visit history.</p>}
       </section>
 
       {patient && !record && <div className="dental-empty" role="status">Loading the patient’s details…</div>}

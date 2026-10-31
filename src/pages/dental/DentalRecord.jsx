@@ -73,7 +73,7 @@ const DentalRecord = () => {
     return (
       <main className="main"><div className="page">
         <div className="card dental-empty" role="alert">
-          No dental record for {patientId}. <button type="button" className="btn small" onClick={() => navigate(`/consultation-log?new=1&patient=${encodeURIComponent(patientId)}`)}>Log Their Consultation</button>
+          No dental record for {patientId} yet. One is created when their first consultation is logged in the Consultation Log.
         </div>
       </div></main>
     );

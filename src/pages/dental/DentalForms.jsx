@@ -134,8 +134,10 @@ export const PatientPicker = ({ value, onChange, disabled }) => {
 
 /** Starting values for page 1: the saved dental record, else what the patient portal knows. */
 export const loadRecordFor = async (patient) => {
-  const { data: saved } = await supabase.from('dental_records').select('*').eq('patient_id', patient.id).maybeSingle();
-  if (saved) return { record: saved, existing: true };
+  // Every log is a new visit, so the form always starts fresh from the directory,
+  // never from the last visit's chart and remarks. `existing` only says whether
+  // the patient has been seen before.
+  const { data: saved } = await supabase.from('dental_records').select('patient_id').eq('patient_id', patient.id).maybeSingle();
   const { data: profile } = await supabase.from('patient_profiles')
     .select('full_name, sex, course, address, emergency_contact, emergency_contact_number').eq('patient_id', patient.id).maybeSingle();
   let names = patient;
@@ -148,7 +150,7 @@ export const loadRecordFor = async (patient) => {
   const firstName = names.surname ? names.first_name : (words.length > 1 ? words.slice(0, -1).join(' ') : words[0] || '');
   const sex = (profile?.sex || '').trim().charAt(0).toUpperCase();
   return {
-    existing: false,
+    existing: Boolean(saved),
     record: {
       ...EMPTY_RECORD,
       surname: surname || '',

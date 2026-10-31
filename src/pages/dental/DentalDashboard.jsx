@@ -54,9 +54,6 @@ const DentalDashboard = () => {
             <h1 className="page-header-title">{first ? `Good day, ${first}` : 'Dental Clinic'}</h1>
             <div className="page-header-subtitle">{formatDay(todayIso())} · Dental Clinic</div>
           </div>
-          <div className="page-header-actions">
-            <button type="button" className="btn" onClick={() => navigate('/consultation-log?new=1')}>Log Consultation</button>
-          </div>
         </div>
 
         {data?.failed && <p className="dental-alert" role="alert">Some figures could not be loaded. Refresh the page to try again.</p>}

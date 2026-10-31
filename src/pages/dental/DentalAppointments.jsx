@@ -90,9 +90,6 @@ const DentalAppointments = () => {
             <h1 className="page-header-title">Appointments</h1>
             <div className="page-header-subtitle">Procedure visits scheduled from the Consultation Log. Open one to record the procedure.</div>
           </div>
-          <div className="page-header-actions">
-            <button type="button" className="btn" onClick={() => navigate('/consultation-log?new=1')}>Log Consultation</button>
-          </div>
         </div>
 
         {notice && <p className="dental-alert dental-alert--ok" role="status">{notice}</p>}
