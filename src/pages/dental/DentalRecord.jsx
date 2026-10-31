@@ -6,6 +6,7 @@ import ToothChart from './ToothChart.jsx';
 import { RecordFields, NextAppointmentFields, emptyNext, nextPayload } from './DentalForms.jsx';
 import { DentalDialog } from './DentalAppointments.jsx';
 import { dentalCardHtml, dentalSummaryHtml, printHtml, transactionId } from './printDentalCard.js';
+import { ChevronLeftIcon, ChevronRightIcon } from '../../components/icons/Icons.jsx';
 import {
   STATUS_BADGE, ageFrom, formatDay, formatTimeLabel, loadDentists, recordName, recordPayload, saveDentalVisit,
 } from './dentalShared.js';
@@ -32,13 +33,16 @@ export const ServiceHistory = ({ services, compact = false }) => (
   )
 );
 
+const formatSavedAt = (iso) => new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
+
 const DentalRecord = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const [params] = useSearchParams();
   const patientId = params.get('id');
-  const [state, setState] = useState({ loading: true, record: null, services: [], appointments: [], profile: null });
+  const [state, setState] = useState({ loading: true, record: null, services: [], appointments: [], profile: null, versions: [] });
+  const [versionIndex, setVersionIndex] = useState(0); // 0 is the latest save
   const [notice, setNotice] = useState(location.state?.notice || '');
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,19 +50,24 @@ const DentalRecord = () => {
   const [dentists, setDentists] = useState([]);
 
   const load = useCallback(async () => {
-    const [{ data: record }, { data: services }, { data: appointments }, { data: profile }] = await Promise.all([
+    const [{ data: record }, { data: services }, { data: appointments }, { data: profile }, { data: versions }] = await Promise.all([
       supabase.from('dental_records').select('*').eq('patient_id', patientId).maybeSingle(),
       supabase.from('dental_services').select('*').eq('patient_id', patientId).order('service_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('appointments').select('id, appointment_date, appointment_time, service_type, clinician_name, status')
         .eq('patient_id', patientId).eq('department', 'Dental Clinic').order('appointment_date', { ascending: false }).limit(20),
       supabase.from('patient_profiles').select('email, contact_number, address, year, course, blood_type, allergies, medications')
         .eq('patient_id', patientId).limit(1).maybeSingle(),
+      supabase.from('dental_record_versions').select('id, record, saved_at').eq('patient_id', patientId).order('saved_at', { ascending: false }),
     ]);
-    setState({ loading: false, record, services: services || [], appointments: appointments || [], profile });
+    setState({ loading: false, record, services: services || [], appointments: appointments || [], profile, versions: versions || [] });
+    setVersionIndex(0);
   }, [patientId]);
   useEffect(() => { load(); loadDentists().then(setDentists); }, [load]);
 
-  const { record, services, appointments, profile } = state;
+  const { record: latest, services, appointments, profile, versions } = state;
+  // The page shows whichever saved version is selected; edits always start from the latest.
+  const record = versions[versionIndex]?.record || latest;
+  const version = versions[versionIndex];
   const print = (html) => { if (!printHtml(html)) setNotice('Allow pop-ups for this site to print.'); };
   const scheduled = appointments.find((a) => a.status === 'Scheduled');
   const close = () => { setDialog(null); setDialogError(''); };
@@ -69,7 +78,7 @@ const DentalRecord = () => {
   };
 
   if (state.loading) return <main className="main"><div className="page"><div className="card dental-empty" role="status">Loading the dental record…</div></div></main>;
-  if (!record) {
+  if (!latest) {
     return (
       <main className="main"><div className="page">
         <div className="card dental-empty" role="alert">
@@ -89,9 +98,9 @@ const DentalRecord = () => {
           </div>
           <div className="page-header-actions">
             <button type="button" className="btn secondary" onClick={() => navigate('/patients')}>All Patients</button>
-            <button type="button" className="btn secondary" onClick={() => print(dentalSummaryHtml(record, services, profile || {}))}>Print Dental Card</button>
-            <button type="button" className="btn secondary" onClick={() => print(dentalCardHtml(record, services))}>Print Pink Form</button>
-            <button type="button" className="btn secondary" onClick={() => setDialog({ type: 'edit', record: { ...record } })}>Edit Record</button>
+            <button type="button" className="btn secondary" onClick={() => print(dentalSummaryHtml(latest, services, profile || {}))}>Print Dental Card</button>
+            <button type="button" className="btn secondary" onClick={() => print(dentalCardHtml(latest, services))}>Print Pink Form</button>
+            <button type="button" className="btn secondary" onClick={() => setDialog({ type: 'edit', record: { ...latest } })}>Edit Record</button>
             {scheduled ? (
               <button type="button" className="btn" onClick={() => navigate(`/dental-encounter?appointment=${scheduled.id}`)}>Open Encounter</button>
             ) : (
@@ -106,8 +115,25 @@ const DentalRecord = () => {
           <div className="dental-stack">
             <section className="card" style={{ padding: 0 }} aria-labelledby="record-info">
               <div className="dental-section">
-                <h2 className="dental-section-title" id="record-info">Patient Information</h2>
-                <p className="dental-section-sub">Page 1 of the pink form</p>
+                <div className="dental-version-bar">
+                  <div>
+                    <h2 className="dental-section-title" id="record-info">Patient Information</h2>
+                    <p className="dental-section-sub" style={{ margin: 0 }}>
+                      Page 1 of the pink form{version ? ` · saved ${formatSavedAt(version.saved_at)}` : ''}
+                    </p>
+                  </div>
+                  {versions.length > 1 && (
+                    <div className="dental-version-nav" role="group" aria-label="Earlier versions of this record">
+                      <button type="button" className="btn secondary small" aria-label="Older version"
+                        disabled={versionIndex >= versions.length - 1} onClick={() => setVersionIndex(versionIndex + 1)}><ChevronLeftIcon size={16} /></button>
+                      <span aria-live="polite">{versionIndex === 0 ? 'Latest' : `Version ${versions.length - versionIndex}`} of {versions.length}</span>
+                      <button type="button" className="btn secondary small" aria-label="Newer version"
+                        disabled={versionIndex === 0} onClick={() => setVersionIndex(versionIndex - 1)}><ChevronRightIcon size={16} /></button>
+                    </div>
+                  )}
+                </div>
+                {versionIndex > 0 && <p className="dental-alert dental-alert--warn" style={{ margin: '12px 0 0' }}>You are viewing an earlier version. Edit Record and the prints use the latest.</p>}
+                <div style={{ height: 16 }} />
                 <dl className="dental-facts">
                   <div><dt>Classification</dt><dd>{record.classification}</dd></div>
                   <div><dt>College / Course / Unit</dt><dd>{record.college_course_unit || '—'}</dd></div>

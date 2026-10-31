@@ -137,3 +137,7 @@ button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px so
 .dental-list-link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
 .dental-list-link:hover .dental-list-title { color: var(--primary); }
 .dental-list-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+.dental-version-bar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.dental-version-nav { display: inline-flex; align-items: center; gap: 8px; font-size: var(--font-size-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dental-version-nav .btn { padding: 4px 8px; min-width: 32px; justify-content: center; }
