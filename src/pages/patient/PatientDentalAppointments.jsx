@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { ClockIcon, MessagesIcon, UserIcon } from '../../components/icons/Icons.jsx';
-import { STATUS_BADGE, formatDay, formatTimeLabel, todayIso } from '../dental/dentalShared.js';
-import TablePagination from '../../components/table/TablePagination.jsx';
-import { useTablePagination } from '../../hooks/useTablePagination.js';
+import { formatDay, formatTimeLabel, todayIso } from '../dental/dentalShared.js';
 import '../dental/dental.css';
 
 const dateParts = (iso) => {
@@ -45,8 +43,6 @@ const PatientDentalAppointments = () => {
 
   const today = todayIso();
   const upcoming = (rows || []).filter((a) => a.status === 'Scheduled' && a.appointment_date >= today).reverse();
-  const history = (rows || []).filter((a) => !upcoming.includes(a));
-  const historyPages = useTablePagination(history, { pageSize: 5 });
 
   return (
     <main className="main">
@@ -55,7 +51,7 @@ const PatientDentalAppointments = () => {
           <div>
             <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>Dental Appointment</h2>
             <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
-              Your dentist sets these after your consultation at the Dental Clinic. Come on the date and time shown.
+              Your dentist sets these after your consultation at the Dental Clinic. Come on the date and time shown. Past dental visits are in Records.
             </div>
           </div>
         </div>
@@ -102,24 +98,6 @@ const PatientDentalAppointments = () => {
                 })}
               </section>
 
-              {history.length > 0 && (
-                <section className="card" style={{ padding: 0 }} aria-labelledby="dental-history">
-                  <div className="dental-section" style={{ paddingBottom: 8 }}><h3 id="dental-history" className="dental-section-title" style={{ margin: 0 }}>Past Appointments</h3></div>
-                  <ul className="dental-list">
-                    {historyPages.pageRows.map((a) => (
-                      <li key={a.id}>
-                        <div className="dental-list-main">
-                          <div className="dental-list-title">{a.service_type || 'Dental procedure'}</div>
-                          <div className="dental-list-sub">{formatDay(a.appointment_date)} · {formatTimeLabel(a.appointment_time)} · {a.clinician_name}</div>
-                        </div>
-                        <span className={`badge ${STATUS_BADGE[a.status] || 'badge-neutral'}`}>{a.status === 'Scheduled' ? 'Missed' : a.status}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <TablePagination page={historyPages.page} totalPages={historyPages.totalPages} startIndex={historyPages.startIndex}
-                    endIndex={historyPages.endIndex} total={historyPages.total} onPageChange={historyPages.goToPage} itemLabel="appointments" />
-                </section>
-              )}
             </div>
 
             <aside className="card patient-dental-aside" aria-labelledby="dental-help">

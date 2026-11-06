@@ -23,7 +23,7 @@ import {
 const PATIENT_NAV = [
   { path: '/patient/dashboard', label: 'Home', icon: DashboardIcon },
   { path: '/patient/events', label: 'Events', icon: CalendarIcon },
-  { path: '/patient/schedule', label: 'Schedule', icon: ClockIcon },
+  { path: '/patient/schedule', label: 'Medical Appointment', icon: ClockIcon },
   { path: '/patient/dental', label: 'Dental Appointment', icon: CalendarIcon },
   { path: '/patient/messages', label: 'Messages', icon: MessagesIcon },
   { path: '/patient/records', label: 'Records', icon: EncountersIcon },

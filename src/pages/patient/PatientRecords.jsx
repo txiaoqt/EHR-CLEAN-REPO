@@ -8,6 +8,7 @@ import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { CloseIcon } from '../../components/icons/Icons.jsx';
 import { isVisitCompleted } from '../../utils/visitStatus.js';
+import PatientDentalHistory from './PatientDentalHistory.jsx';
 
 // Patient acknowledgements live in the same public bucket as clinician
 // signatures, under a distinct folder so the two can never be confused.
@@ -39,6 +40,7 @@ const medicinesSummary = (medicines) => {
 
 const PatientRecords = () => {
   const { user } = useAuth();
+  const [historyTab, setHistoryTab] = useState('medical');
   const [records, setRecords] = useState([]);
   const recordPages = useTablePagination(records);
   const [loading, setLoading] = useState(true);
@@ -61,12 +63,12 @@ const PatientRecords = () => {
       // scheduled appointment cannot inherit a completed same-day encounter.
       const { data, error } = await supabase
         .from('medical_log_visits')
-        .select('visit_id, visit_source, appointment_id, encounter_id, patient_id, visit_date, visit_time, chief_complaint, assessment_plan, clinician_name, appointment_status, encounter_status, patient_signature_path, patient_signed_at, vitals')
+        .select('visit_id, visit_source, appointment_id, department, encounter_id, patient_id, visit_date, visit_time, chief_complaint, assessment_plan, clinician_name, appointment_status, encounter_status, patient_signature_path, patient_signed_at, vitals')
         .eq('patient_id', user.patient_id)
         .order('visit_date', { ascending: false });
 
       if (error) throw error;
-      const visits = (data || []).filter(isVisitCompleted);
+      const visits = (data || []).filter((v) => v.department !== 'Dental Clinic' && isVisitCompleted(v));
 
       // Medicines given on each visit, keyed by whichever record holds them.
       const appointmentIds = visits.map((v) => v.appointment_id).filter(Boolean);
@@ -192,12 +194,24 @@ const PatientRecords = () => {
           </div>
         </div>
 
-        {/* Encounter History Container */}
+        <div className="patient-messages-segmented-track-wrap">
+          <div className="patient-messages-segmented-track" role="tablist" aria-label="Record type">
+            {[['medical', 'Medical History'], ['dental', 'Dental History']].map(([key, label]) => (
+              <button key={key} type="button" role="tab" aria-selected={historyTab === key}
+                className={`patient-messages-segmented-tab ${historyTab === key ? 'active' : ''}`}
+                onClick={() => setHistoryTab(key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {historyTab === 'dental' ? <PatientDentalHistory /> : (
         <div className="card table-section-card patient-records-section">
           <div className="table-section-header">
             <div>
               <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
-                Encounter History
+                Medical History
               </h3>
               <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
                 Authorized consultation summaries and clinical notes provided by your clinician
@@ -425,6 +439,7 @@ const PatientRecords = () => {
                 ))}
               </div>}
         </div>
+        )}
       </section>
 
       {/* Acknowledgement Modal */}

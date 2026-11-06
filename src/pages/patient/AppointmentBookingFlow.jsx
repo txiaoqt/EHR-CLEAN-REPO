@@ -828,7 +828,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         <div className="page-header" style={{ marginBottom: 24 }}>
           <div className="page-header-title-block">
             <h2 className="patient-page-title" style={{ margin: 0, fontSize: 'var(--font-size-page-title)', fontWeight: 'var(--font-weight-extrabold)', color: 'var(--text)' }}>
-              {kioskMode ? 'Clinic Kiosk Booking' : 'Schedule'}
+              {kioskMode ? 'Clinic Kiosk Booking' : 'Medical Appointment'}
             </h2>
             <div className="patient-page-subtitle" style={{ marginTop: 4, color: 'var(--muted)', fontSize: 'var(--font-size-base)' }}>
               Manage your appointments and available clinic schedules.
