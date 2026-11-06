@@ -13,6 +13,7 @@ export const TOOTH_CONDITIONS = [
   { value: 'extract', label: 'Extract', code: 'X' },
   { value: 'root-fragment', label: 'Root Fragment', code: 'Rf' },
   { value: 'lcf', label: 'Light-Cured Filling / Composite Resto', code: 'LCF' },
+  { value: 'sound', label: 'Okay', code: '✓' },
 ];
 // Marks from the first chart, still shown on records saved with them but no
 // longer offered when charting.

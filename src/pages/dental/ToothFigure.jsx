@@ -16,6 +16,7 @@ const ToothFigure = ({ tooth, jaw, condition }) => {
       <img src={src} alt="" draggable={false} />
       {look && <><span className="tooth-photo-layer tooth-photo-fade" /><span className="tooth-photo-layer tooth-photo-tint" /></>}
       {look === 'decay' && <span className="tooth-photo-spot" />}
+      {look === 'sound' && <span className="tooth-photo-check">✓</span>}
       {look === 'extract' && (
         <svg className="tooth-photo-x" viewBox="0 0 40 80" preserveAspectRatio="none" focusable="false">
           <line x1="6" y1="10" x2="34" y2="70" /><line x1="34" y1="10" x2="6" y2="70" />
