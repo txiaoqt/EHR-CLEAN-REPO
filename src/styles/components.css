@@ -7435,3 +7435,7 @@ select {
 .course-search-program { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
 .course-search-college { font-size: var(--font-size-xs); color: var(--text-muted); }
 .course-search-empty { padding: 10px 12px; font-size: var(--font-size-sm); color: var(--text-muted); }
+
+/* Medical | Dental switch at the top of Start New Inquiry: full width, equal halves. */
+.patient-messages-segmented-track.patient-inquiry-clinic-tabs { display: flex; width: 100%; margin: 0 0 16px 0 !important; }
+.patient-inquiry-clinic-tabs .patient-messages-segmented-tab { flex: 1; }

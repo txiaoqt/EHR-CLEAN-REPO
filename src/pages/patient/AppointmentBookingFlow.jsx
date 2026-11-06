@@ -331,6 +331,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         const { data, error } = await supabase
           .from('staff_directory')
           .select('name, role')
+          .in('role', ['physician', 'nurse'])
           .order('name', { ascending: true });
         if (!error && data && data.length > 0) {
           setStaffList(data);
@@ -342,6 +343,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
         .from('admins')
         .select('name, role')
         .eq('active', true)
+        .in('role', ['physician', 'nurse'])
         .order('name', { ascending: true });
       setStaffList(data || []);
     };

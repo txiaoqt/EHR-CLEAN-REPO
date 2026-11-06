@@ -14,13 +14,21 @@ import {
   formatFileSize,
 } from '../../utils/messageAttachments.js';
 
-const CONCERN_TYPES = [
-  'General clinic inquiry',
-  'Appointment concern',
-  'Follow-up question',
-  'Medical inquiry',
-  'Dental inquiry',
-];
+// Each clinic has its own staff and categories; a dental inquiry reaches only
+// the dentist chosen, a medical one only the physician or nurse chosen.
+const CLINICS = {
+  medical: {
+    label: 'Medical', roles: ['physician', 'nurse'], staffNoun: 'clinician',
+    concerns: ['General clinic inquiry', 'Appointment concern', 'Follow-up question', 'Medical inquiry'],
+  },
+  dental: {
+    label: 'Dental', roles: ['dentist'], staffNoun: 'dentist',
+    concerns: ['Dental inquiry', 'Appointment concern', 'Follow-up question'],
+  },
+};
+const emptyInquiry = (clinic = 'medical') => ({
+  clinic, recipient_staff_id: '', concern_type: CLINICS[clinic].concerns[0], message_text: '',
+});
 
 // Date and Time Helper Utilities
 const formatMessageTime = (isoString) => {
@@ -91,11 +99,7 @@ const PatientMessages = () => {
 
   // New Inquiry Modal State
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
-  const [inquiryForm, setInquiryForm] = useState({
-    recipient_staff_id: '',
-    concern_type: CONCERN_TYPES[0],
-    message_text: '',
-  });
+  const [inquiryForm, setInquiryForm] = useState(() => emptyInquiry());
   const [inquiryRecipientError, setInquiryRecipientError] = useState('');
   const [inquirySendError, setInquirySendError] = useState('');
 
@@ -264,7 +268,9 @@ const PatientMessages = () => {
 
   const isCurrentConversationResolved = (activeConversation?.status || 'open').toLowerCase() !== 'open';
   const activeStaffStatus = conversationStatus(activeConversation);
-  const selectedOnlineStaff = onlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
+  const inquiryClinic = CLINICS[inquiryForm.clinic];
+  const clinicOnlineStaff = onlineStaff.filter((staff) => inquiryClinic.roles.includes(staff.role));
+  const selectedOnlineStaff = clinicOnlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
 
   // 3. Load messages for the currently active conversation only
   useEffect(() => {
@@ -625,9 +631,9 @@ const PatientMessages = () => {
   const handleSendNewInquiry = async (e) => {
     e.preventDefault();
     if (!inquiryForm.message_text.trim() || !user?.patient_id || sending) return;
-    const staffTarget = onlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
+    const staffTarget = clinicOnlineStaff.find((staff) => staff.id === inquiryForm.recipient_staff_id);
     if (!staffTarget || statusForAuthId(staffTarget.auth_user_id) !== 'online') {
-      setInquiryRecipientError('Choose an online staff member before sending your inquiry.');
+      setInquiryRecipientError(`Choose an online ${inquiryClinic.staffNoun} before sending your inquiry.`);
       return;
     }
 
@@ -642,6 +648,7 @@ const PatientMessages = () => {
         p_concern_type: inquiryForm.concern_type,
         p_message_text: inquiryForm.message_text.trim(),
         p_recipient_name: staffTarget.name,
+        p_clinic: inquiryForm.clinic,
       });
       if (rpcError) throw rpcError;
       if (!rpcData?.conversation_id) throw new Error('The inquiry could not be created.');
@@ -657,11 +664,7 @@ const PatientMessages = () => {
 
       // 2. Close modal before transitioning viewport
       setInquiryModalOpen(false);
-      setInquiryForm({
-        recipient_staff_id: '',
-        concern_type: CONCERN_TYPES[0],
-        message_text: '',
-      });
+      setInquiryForm(emptyInquiry(inquiryForm.clinic));
 
       // 3. Transition to active chat and execute multi-frame scroll reset
       if (newConvId) {
@@ -1178,7 +1181,7 @@ const PatientMessages = () => {
                     Start New Inquiry
                   </h3>
                   <div className="patient-inquiry-modal-sub">
-                    Send a new inquiry directly to an online clinic staff member.
+                    Send a new inquiry directly to an online clinician or dentist.
                   </div>
                 </div>
                 <button
@@ -1194,9 +1197,29 @@ const PatientMessages = () => {
               {/* Modal Form Body */}
               <form onSubmit={handleSendNewInquiry}>
                 <div className="patient-inquiry-modal-body">
+                  <div className="patient-messages-segmented-track patient-inquiry-clinic-tabs" role="tablist" aria-label="Clinic">
+                    {Object.entries(CLINICS).map(([key, clinic]) => {
+                      const online = onlineStaff.filter((staff) => clinic.roles.includes(staff.role)).length;
+                      return (
+                        <button key={key} type="button" role="tab" aria-selected={inquiryForm.clinic === key}
+                          className={`patient-messages-segmented-tab ${inquiryForm.clinic === key ? 'active' : ''}`}
+                          disabled={sending}
+                          onClick={() => {
+                            if (inquiryForm.clinic === key) return;
+                            // The message carries over; the recipient and category belong to the clinic.
+                            setInquiryForm((p) => ({ ...emptyInquiry(key), message_text: p.message_text }));
+                            setInquiryRecipientError('');
+                            setInquirySendError('');
+                          }}>
+                          <span>{clinic.label}</span>
+                          <span className="patient-messages-tab-badge" aria-label={`${online} online`}>{online}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                   <div className="patient-form-field">
                     <label className="patient-form-label" htmlFor="inquiry-recipient">
-                      Recipient Clinician / Staff *
+                      {inquiryForm.clinic === 'dental' ? 'Recipient Dentist *' : 'Recipient Clinician *'}
                     </label>
                     <div className="patient-select-wrapper">
                       <select
@@ -1210,17 +1233,17 @@ const PatientMessages = () => {
                           setInquirySendError('');
                         }}
                         required
-                        disabled={sending || onlineStaff.length === 0}
+                        disabled={sending || clinicOnlineStaff.length === 0}
                         aria-invalid={Boolean(inquiryRecipientError)}
                         aria-describedby="inquiry-recipient-help inquiry-recipient-error"
                       >
                         <option value="" disabled>
-                          {onlineStaff.length > 0 ? 'Select an online staff member'
+                          {clinicOnlineStaff.length > 0 ? `Select an online ${inquiryClinic.staffNoun}`
                             : checkingStaff ? 'Checking staff availability…'
                             : availabilityUnavailable ? 'Staff availability unavailable'
-                            : 'No staff currently online'}
+                            : `No ${inquiryClinic.staffNoun} currently online`}
                         </option>
-                        {onlineStaff.map((s) => (
+                        {clinicOnlineStaff.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name} ({s.role.charAt(0).toUpperCase() + s.role.slice(1)}) — Online
                           </option>
@@ -1231,10 +1254,10 @@ const PatientMessages = () => {
                       </span>
                     </div>
                     <p id="inquiry-recipient-help" className="staff-presence-note" aria-live="polite">
-                      {onlineStaff.length > 0 ? 'Only online staff are listed. Your inquiry goes directly to the person you select.'
+                      {clinicOnlineStaff.length > 0 ? 'Only online staff are listed. Only the person you select sees your inquiry.'
                         : checkingStaff ? 'Checking who is available…'
                         : availabilityUnavailable ? 'Unable to check availability. Check your connection and try again.'
-                        : 'No clinic staff are online right now. You can write your message here and send it when someone is available.'}
+                        : `No ${inquiryClinic.staffNoun} is online right now. You can write your message here and send it when one is available.`}
                     </p>
                     {availabilityUnavailable && (
                       <button type="button" className="btn secondary" onClick={() => refreshStaff({ retryPresence: true })} disabled={sending}>
@@ -1260,7 +1283,7 @@ const PatientMessages = () => {
                         required
                         disabled={sending}
                       >
-                        {CONCERN_TYPES.map((c) => (
+                        {inquiryClinic.concerns.map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
