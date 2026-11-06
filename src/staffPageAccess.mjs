@@ -17,7 +17,7 @@ export const STAFF_PAGE_OPTIONS = [
 // The Dental Portal's pages, for dentists and clerks.
 export const DENTAL_PAGE_OPTIONS = [
   { page: 'appointments', label: 'Appointments', group: 'Main', note: 'Includes the procedure encounter' },
-  { page: 'consultation-log', label: 'Consultation Log', group: 'Main', note: 'Clerks can view the log; only dentists record visits' },
+  { page: 'consultation-log', label: 'Consultation Log', group: 'Main', roleNote: { clerk: 'View only: dentists record visits' } },
   { page: 'patients', label: 'Patients', group: 'Main', note: 'Includes the dental record and Dental Card' },
   { page: 'inventory', label: 'Inventory', group: 'Clinical' },
   { page: 'reports', label: 'Reports', group: 'Clinical' },

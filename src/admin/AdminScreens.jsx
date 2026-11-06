@@ -100,7 +100,11 @@ export function AdminOverview() {
   </div></main>;
 }
 
-const PAGE_ACCESS_ROLES = [['physician', 'Physician'], ['nurse', 'Nurse'], ['dentist', 'Dentist'], ['clerk', 'Clerk']];
+const PAGE_ACCESS_PORTALS = [
+  { title: 'Staff Portal', description: 'Medical Clinic', roles: [['physician', 'Physician'], ['nurse', 'Nurse']] },
+  { title: 'Dental Portal', description: 'Dental Clinic', roles: [['dentist', 'Dentist'], ['clerk', 'Clerk']] },
+];
+const PAGE_ACCESS_ROLES = PAGE_ACCESS_PORTALS.flatMap(portal => portal.roles);
 const pageOptionsFor = pageOptionsForRole;
 const pageLabels = (role, pages) => pageOptionsFor(role).filter(option => pages.includes(option.page)).map(option => option.label);
 
@@ -136,28 +140,32 @@ export function AdminPageAccess() {
     <Feedback message={feedback} onDismiss={() => setFeedback('')} />
     <LoadError error={state.error} retry={load} />
     {state.loading && <p role="status">Loading page access…</p>}
-    {state.saved && <div className="system-admin-page-access">
-      {PAGE_ACCESS_ROLES.map(([role, label]) => {
+    {state.saved && PAGE_ACCESS_PORTALS.map(portal => <section key={portal.title} className="system-admin-portal-access" aria-labelledby={`portal-${portal.title}`}>
+      <header className="system-admin-portal-access-head"><h2 id={`portal-${portal.title}`}>{portal.title}</h2><span className="system-admin-muted">{portal.description}</span></header>
+      <div className="system-admin-page-access">
+      {portal.roles.map(([role, label]) => {
         const draft = drafts[role] || [];
         const dirty = [...draft].sort().join() !== [...state.saved[role]].sort().join();
         const options = pageOptionsFor(role);
-        return <section className="card" key={role} aria-labelledby={`page-access-${role}`}>
-          <div className="system-admin-section-head"><div><h2 id={`page-access-${role}`}>{label}</h2><p className="system-admin-muted">{draft.length} of {options.length} pages enabled</p></div></div>
+        return <section className="card system-admin-access-card" key={role} aria-labelledby={`page-access-${role}`}>
+          <div className="system-admin-section-head"><h3 id={`page-access-${role}`}>{label}</h3><span className="badge badge-neutral">{draft.length} of {options.length} pages</span></div>
           {[...new Set(options.map(option => option.group))].map(group => <fieldset key={group} className="system-admin-page-group" disabled={Boolean(saving)}>
             <legend>{group}</legend>
             {options.filter(option => option.group === group).map(option => <label key={option.page} className="system-admin-check">
               <input type="checkbox" checked={draft.includes(option.page)} onChange={() => toggle(role, option.page)} />
-              <span>{option.label}{option.note && <small className="system-admin-muted">{option.note}</small>}</span>
+              <span>{option.label}{(option.roleNote?.[role] || option.note) && <small className="system-admin-muted">{option.roleNote?.[role] || option.note}</small>}</span>
             </label>)}
           </fieldset>)}
           <LoadError error={saveError[role]} />
           <footer className="system-admin-page-access-actions">
-            <button type="button" className="btn secondary" disabled={!dirty || Boolean(saving)} onClick={() => setDrafts(previous => ({ ...previous, [role]: state.saved[role] }))}>Discard Changes</button>
-            <button type="button" className="btn" disabled={!dirty || Boolean(saving)} onClick={() => save(role, label)}>{saving === role ? 'Saving…' : `Save ${label} Access`}</button>
+            <span className="system-admin-muted" aria-live="polite">{dirty ? 'Unsaved changes' : 'Saved'}</span>
+            <button type="button" className="btn secondary" disabled={!dirty || Boolean(saving)} onClick={() => setDrafts(previous => ({ ...previous, [role]: state.saved[role] }))}>Discard</button>
+            <button type="button" className="btn" disabled={!dirty || Boolean(saving)} onClick={() => save(role, label)}>{saving === role ? 'Saving…' : 'Save'}</button>
           </footer>
         </section>;
       })}
-    </div>}
+      </div>
+    </section>)}
     <p className="system-admin-muted system-admin-directory-note">Dashboard, Help, Settings and My Profile are always available.</p>
   </div></main>;
 }
