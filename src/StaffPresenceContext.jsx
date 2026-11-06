@@ -6,10 +6,10 @@ import { registerStaffPresenceStop } from './utils/staffPresenceLifecycle.js';
 const StaffPresenceContext = createContext(null);
 const EMPTY = [];
 const STAFF_ROLES = ['physician', 'nurse'];
-// A dentist tracks their own status; the medical roster stays medical-only.
-const DENTAL_ROLES = ['dentist'];
+// Dental staff watch each other; the medical roster stays medical-only.
+const DENTAL_ROLES = ['dentist', 'clerk'];
 // Patients message either clinic, so they watch both rosters.
-const PATIENT_ROSTER = [...STAFF_ROLES, ...DENTAL_ROLES];
+const PATIENT_ROSTER = [...STAFF_ROLES, 'dentist'];
 const TOPIC_PREFIX = 'clinic-staff-presence:';
 
 export const useStaffPresence = () => {
@@ -27,8 +27,8 @@ export const StaffPresenceProvider = ({ children }) => {
     (!user?.auth_user_id || user.auth_user_id === authId)
   );
   const role = (user?.role || '').toLowerCase();
-  const rosterRoles = role === 'dentist' ? DENTAL_ROLES : role === 'patient' ? PATIENT_ROSTER : STAFF_ROLES;
-  const isStaff = enabled && (STAFF_ROLES.includes(role) || role === 'dentist');
+  const rosterRoles = DENTAL_ROLES.includes(role) ? DENTAL_ROLES : role === 'patient' ? PATIENT_ROSTER : STAFF_ROLES;
+  const isStaff = enabled && (STAFF_ROLES.includes(role) || DENTAL_ROLES.includes(role));
   const [networkOnline, setNetworkOnline] = useState(() => navigator.onLine !== false);
   const [directory, setDirectory] = useState(null);
   const [presence, setPresence] = useState(null);

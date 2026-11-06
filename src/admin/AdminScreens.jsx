@@ -100,7 +100,7 @@ export function AdminOverview() {
   </div></main>;
 }
 
-const PAGE_ACCESS_ROLES = [['physician', 'Physician'], ['nurse', 'Nurse'], ['dentist', 'Dentist']];
+const PAGE_ACCESS_ROLES = [['physician', 'Physician'], ['nurse', 'Nurse'], ['dentist', 'Dentist'], ['clerk', 'Clerk']];
 const pageOptionsFor = pageOptionsForRole;
 const pageLabels = (role, pages) => pageOptionsFor(role).filter(option => pages.includes(option.page)).map(option => option.label);
 
@@ -130,7 +130,7 @@ export function AdminPageAccess() {
     } catch (err) { setSaveError(previous => ({ ...previous, [role]: err.message })); } finally { setSaving(''); }
   };
   return <main className="main"><div className="page">
-    <Heading title="Staff Page Access" description="Choose which pages each role can open: the Staff Portal for physicians and nurses, the Dental Portal for dentists. Set this before inviting; every account with the role follows it.">
+    <Heading title="Staff Page Access" description="Choose which pages each role can open: the Staff Portal for physicians and nurses, the Dental Portal for dentists and clerks. Set this before inviting; every account with the role follows it.">
       <button className="btn secondary" onClick={load} disabled={state.loading || Boolean(saving)}>Refresh</button>
     </Heading>
     <Feedback message={feedback} onDismiss={() => setFeedback('')} />
@@ -202,7 +202,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
     event.preventDefault(); if (busyRef.current || (deleting && !deletionConfirmed) || (action.type === 'invite_staff' && !validPersonName(invite))) return;
     busyRef.current = true; setBusy(true); setError('');
     try {
-      const payload = action.type === 'invite_staff' ? { name: composeFullName(invite), email: invite.email, role: invite.role, department: invite.role === 'dentist' ? 'Dental Clinic' : 'University Clinic' } : { id: action.row.id,
+      const payload = action.type === 'invite_staff' ? { name: composeFullName(invite), email: invite.email, role: invite.role, department: ['dentist', 'clerk'].includes(invite.role) ? 'Dental Clinic' : 'University Clinic' } : { id: action.row.id,
         reason: reason.trim(), until: until ? new Date(until).toISOString() : null, role, confirmation_email: confirmationEmail.trim() };
       const result = await adminAction(action.type, payload);
       onComplete(action.type === 'invite_staff' || action.type === 'resend_invitation'
@@ -221,7 +221,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
         <p className="system-admin-muted">Send an email invitation so the recipient can create their own sign-in credentials. Their assigned role determines which portal they can access.</p>
         <PersonNameFields value={invite} onChange={setInvite} disabled={busy} />
         <label>Email Address<input type="email" required maxLength={254} value={invite.email} disabled={busy} onChange={e => setInvite({ ...invite, email: e.target.value })} autoComplete="email" /></label>
-        <label>Assigned Role{action.inviteRole === 'admin' ? <input value="Admin" readOnly /> : <select value={invite.role} disabled={busy} onChange={e => setInvite({ ...invite, role: e.target.value })}><option value="nurse">Nurse</option><option value="physician">Physician</option><option value="dentist">Dentist (Dental Portal)</option></select>}</label>
+        <label>Assigned Role{action.inviteRole === 'admin' ? <input value="Admin" readOnly /> : <select value={invite.role} disabled={busy} onChange={e => setInvite({ ...invite, role: e.target.value })}><option value="nurse">Nurse</option><option value="physician">Physician</option><option value="dentist">Dentist (Dental Portal)</option><option value="clerk">Clerk (Dental Portal)</option></select>}</label>
         {invite.role !== 'admin' && <InvitePageAccess role={invite.role} />}
         {invite.role === 'admin' && <p className="system-admin-muted">Administrators can invite accounts, manage portal access, and view system activity. They choose a username and password for the System Admin Portal.</p>}
       </>}
@@ -229,7 +229,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
       {action.type === 'reactivate_account' && <p>Restore this account’s portal access. The account holder will need to sign in again.</p>}
       {requiresReason && <label>Reason<textarea required minLength={5} maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} autoFocus placeholder="Explain this access change for the audit trail…" /></label>}
       {action.type === 'suspend_account' && <label>Suspended Until <span className="system-admin-muted">(optional)</span><input type="datetime-local" value={until} min={new Date(Date.now() + 60000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)} onChange={e => setUntil(e.target.value)} /><small>Leave blank to keep the account suspended until you reactivate it.</small></label>}
-      {action.type === 'change_staff_role' && <><label>Assigned Role<select value={role} onChange={e => setRole(e.target.value)}><option value="nurse">Nurse</option><option value="physician">Physician</option><option value="dentist">Dentist (Dental Portal)</option></select></label><p className="system-admin-muted">Their sessions will end and the new role applies on their next sign-in.</p></>}
+      {action.type === 'change_staff_role' && <><label>Assigned Role<select value={role} onChange={e => setRole(e.target.value)}><option value="nurse">Nurse</option><option value="physician">Physician</option><option value="dentist">Dentist (Dental Portal)</option><option value="clerk">Clerk (Dental Portal)</option></select></label><p className="system-admin-muted">Their sessions will end and the new role applies on their next sign-in.</p></>}
       {action.type === 'revoke_invitation' && <p>This setup link will stop working. The recipient will not gain access. You can resend an invitation later.</p>}
       {action.type === 'delete_invitation' && <p>This permanently removes the unaccepted invitation and its pending sign-in. The setup link will stop working. You can invite this email again. The deletion remains in the audit trail.</p>}
       {action.type === 'delete_administrator' && <p>This permanently removes this administrator’s sign-in and profile. Their sessions will end immediately. Audit history and clinic records are retained. This cannot be undone.</p>}

@@ -113,8 +113,9 @@ const ConsultationForm = ({ initialPatientId, onDone, onCancel }) => {
 
       <div className="dental-actions">
         {error && <p className="dental-alert" role="alert" style={{ margin: '0 auto 0 0' }}>{error}</p>}
+        {user?.role === 'clerk' && <p className="dental-muted" style={{ margin: '0 auto 0 0' }}>Only a dentist can record a dental visit.</p>}
         <button type="button" className="btn secondary" onClick={onCancel} disabled={saving}>Cancel</button>
-        <button type="submit" className="btn" disabled={!record || saving}>{saving ? 'Saving…' : 'Save Consultation'}</button>
+        <button type="submit" className="btn" disabled={!record || saving || user?.role === 'clerk'}>{saving ? 'Saving…' : 'Save Consultation'}</button>
       </div>
     </form>
   );

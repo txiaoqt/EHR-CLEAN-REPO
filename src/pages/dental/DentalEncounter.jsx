@@ -122,7 +122,8 @@ const DentalEncounter = () => {
                 <div className="dental-actions">
                   {error && <p className="dental-alert" role="alert" style={{ margin: '0 auto 0 0' }}>{error}</p>}
                   <button type="button" className="btn secondary" onClick={() => navigate('/appointments')} disabled={saving}>Cancel</button>
-                  <button type="submit" className="btn" disabled={done || saving}>{saving ? 'Saving…' : 'Complete Visit'}</button>
+                  {user?.role === 'clerk' && <p className="dental-muted" style={{ margin: '0 auto 0 0' }}>Only a dentist can record a dental visit.</p>}
+                  <button type="submit" className="btn" disabled={done || saving || user?.role === 'clerk'}>{saving ? 'Saving…' : 'Complete Visit'}</button>
                 </div>
               </form>
 

@@ -33,7 +33,7 @@ export const isRoleCompatibleWithSurface = (role) => {
   if (!normalized) return false;
   if (IS_ADMIN_SURFACE) return normalized === 'admin';
   if (IS_STAFF_SURFACE) return ['physician', 'nurse'].includes(normalized);
-  if (IS_DENTAL_SURFACE) return normalized === 'dentist';
+  if (IS_DENTAL_SURFACE) return ['dentist', 'clerk'].includes(normalized);
   return IS_USER_SURFACE && isUserSurfaceRole(normalized);
 };
 

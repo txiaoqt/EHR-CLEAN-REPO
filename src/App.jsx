@@ -113,7 +113,7 @@ const ProtectedRoute = ({
   if (!isRoleAllowedOnSurface) {
     const errorMessage = IS_ADMIN_SURFACE
       ? 'Student accounts are not allowed on this portal.'
-      : IS_DENTAL_SURFACE ? 'Only dentist accounts can sign in to the Dental Portal.'
+      : IS_DENTAL_SURFACE ? 'Only dentist and clerk accounts can sign in to the Dental Portal.'
       : 'Only student accounts can log in on this portal.';
     return <Navigate to="/login" replace state={{ sessionMessage: errorMessage }} />;
   }
@@ -380,19 +380,19 @@ function AppShell() {
 
         {IS_DENTAL_SURFACE && (
           <>
-            <Route path="/dashboard" element={guard(<DentalDashboard />, ['dentist'])} />
-            <Route path="/appointments" element={guard(<DentalAppointments />, ['dentist'])} />
-            <Route path="/dental-encounter" element={guard(<DentalEncounter />, ['dentist'])} />
-            <Route path="/consultation-log" element={guard(<ConsultationLog />, ['dentist'])} />
-            <Route path="/patients" element={guard(<DentalPatients />, ['dentist'])} />
-            <Route path="/dental-record" element={guard(<DentalRecord />, ['dentist'])} />
-            <Route path="/inventory" element={guard(<Inventory />, ['dentist'])} />
-            <Route path="/reports" element={guard(<DentalReports />, ['dentist'])} />
-            <Route path="/patient-messages" element={guard(<StaffPatientMessages />, ['dentist'])} />
-            <Route path="/messages" element={guard(<StaffPatientMessages />, ['dentist'])} />
-            <Route path="/help" element={guard(<Help />, ['dentist'])} />
-            <Route path="/settings" element={guard(<Settings />, ['dentist'])} />
-            <Route path="/my-profile" element={guard(<MyProfile />, ['dentist'])} />
+            <Route path="/dashboard" element={guard(<DentalDashboard />, ['dentist', 'clerk'])} />
+            <Route path="/appointments" element={guard(<DentalAppointments />, ['dentist', 'clerk'])} />
+            <Route path="/dental-encounter" element={guard(<DentalEncounter />, ['dentist', 'clerk'])} />
+            <Route path="/consultation-log" element={guard(<ConsultationLog />, ['dentist', 'clerk'])} />
+            <Route path="/patients" element={guard(<DentalPatients />, ['dentist', 'clerk'])} />
+            <Route path="/dental-record" element={guard(<DentalRecord />, ['dentist', 'clerk'])} />
+            <Route path="/inventory" element={guard(<Inventory />, ['dentist', 'clerk'])} />
+            <Route path="/reports" element={guard(<DentalReports />, ['dentist', 'clerk'])} />
+            <Route path="/patient-messages" element={guard(<StaffPatientMessages />, ['dentist', 'clerk'])} />
+            <Route path="/messages" element={guard(<StaffPatientMessages />, ['dentist', 'clerk'])} />
+            <Route path="/help" element={guard(<Help />, ['dentist', 'clerk'])} />
+            <Route path="/settings" element={guard(<Settings />, ['dentist', 'clerk'])} />
+            <Route path="/my-profile" element={guard(<MyProfile />, ['dentist', 'clerk'])} />
           </>
         )}
 
