@@ -7,7 +7,16 @@ export const TOOTH_ROWS = {
   lower: [[48, 47, 46, 45, 44, 43, 42, 41], [31, 32, 33, 34, 35, 36, 37, 38]],
 };
 
+// The marks the Dental Clinic uses on the pink form.
 export const TOOTH_CONDITIONS = [
+  { value: 'decay', label: 'Decay', code: 'D' },
+  { value: 'extract', label: 'Extract', code: 'X' },
+  { value: 'root-fragment', label: 'Root Fragment', code: 'Rf' },
+  { value: 'lcf', label: 'Light-Cured Filling / Composite Resto', code: 'LCF' },
+];
+// Marks from the first chart, still shown on records saved with them but no
+// longer offered when charting.
+const LEGACY_CONDITIONS = [
   { value: 'caries', label: 'Caries', code: 'C' },
   { value: 'filled', label: 'Filled', code: 'F' },
   { value: 'for-extraction', label: 'For Extraction', code: 'FX' },
@@ -16,7 +25,7 @@ export const TOOTH_CONDITIONS = [
   { value: 'crown', label: 'Crown', code: 'Cr' },
   { value: 'sealant', label: 'Sealant', code: 'S' },
 ];
-export const conditionOf = (value) => TOOTH_CONDITIONS.find((c) => c.value === value);
+export const conditionOf = (value) => [...TOOTH_CONDITIONS, ...LEGACY_CONDITIONS].find((c) => c.value === value);
 
 export const CLASSIFICATIONS = ['Student', 'Faculty', 'Admin', 'Other'];
 

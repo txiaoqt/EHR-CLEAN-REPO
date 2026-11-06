@@ -69,6 +69,26 @@ button.dental-tooth:focus-visible, .dental-brush:focus-visible { outline: 2px so
 .dental-tooth--extracted .dental-tooth-number, .dental-tooth--missing .dental-tooth-number { text-decoration: line-through; }
 .dental-tooth--crown { background: var(--color-purple-bg); color: var(--color-purple-text); }
 .dental-tooth--sealant { background: var(--color-emerald-bg); color: var(--color-emerald-text); }
+.dental-tooth--decay { background: var(--color-rose-bg); color: var(--color-rose-text); }
+.dental-tooth--extract { background: var(--color-amber-bg); color: var(--color-amber-text); }
+.dental-tooth--root-fragment { background: var(--color-purple-bg); color: var(--color-purple-text); }
+.dental-tooth--lcf { background: var(--color-blue-bg); color: var(--color-blue-text); }
+/* Drawn teeth between the numbered rows. */
+.dental-chart-figures { padding: 4px 0; }
+.dental-chart-figures .dental-chart-jaw { margin: 0; }
+.dental-chart-figures .dental-chart-jaw--lower { padding-top: 4px; border-top: 1px dashed var(--border); }
+.dental-figure { display: flex; justify-content: center; }
+.dental-figure--editable { cursor: pointer; }
+.dental-figure svg { width: 100%; max-width: 34px; height: auto; overflow: visible; }
+.tooth-figure-crown, .tooth-figure-root { fill: var(--panel); stroke: var(--text-muted); stroke-width: 1.4; stroke-linejoin: round; }
+.tooth-figure-root { fill: var(--surface-raised); }
+.tooth-figure--decay .tooth-figure-crown { fill: var(--color-rose-bg); stroke: var(--color-rose-text); }
+.tooth-figure-decay-spot { fill: var(--color-rose-text); }
+.tooth-figure--lcf .tooth-figure-crown { fill: var(--color-blue-bg); stroke: var(--color-blue-text); }
+.tooth-figure--root-fragment .tooth-figure-crown { fill: none; stroke-dasharray: 3 3; }
+.tooth-figure--root-fragment .tooth-figure-root { fill: var(--color-purple-bg); stroke: var(--color-purple-text); }
+.tooth-figure-x { stroke: var(--color-amber-text); stroke-width: 3; stroke-linecap: round; }
+.tooth-figure--extract .tooth-figure-crown, .tooth-figure--extract .tooth-figure-root { opacity: .55; }
 
 /* Lists on the dashboard and record */
 .dental-list { margin: 0; padding: 0; list-style: none; }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TOOTH_ROWS, TOOTH_CONDITIONS, conditionOf } from './dentalShared.js';
+import ToothFigure from './ToothFigure.jsx';
 
 /**
  * The pink form's tooth grid. Editable: pick a condition, then click teeth to mark
@@ -15,6 +16,19 @@ const ToothChart = ({ value = {}, onChange, marked = [], label = 'Dental chart' 
     else next[tooth] = brush;
     onChange(next);
   };
+
+  // The drawn teeth, between the numbered rows as on the pink form. Clicking a
+  // drawing marks it like its numbered box, which stays the keyboard control.
+  const renderFigures = (teeth, side, jaw) => (
+    <div className={`dental-chart-row dental-chart-row--${side}`} aria-hidden="true">
+      {teeth.map((tooth) => (
+        <div key={tooth} className={`dental-figure${editable ? ' dental-figure--editable' : ''}`}
+          onClick={editable ? () => paint(tooth) : undefined}>
+          <ToothFigure tooth={tooth} jaw={jaw} condition={conditionOf(value[tooth])?.value} />
+        </div>
+      ))}
+    </div>
+  );
 
   const renderRow = (teeth, side) => (
     <div className={`dental-chart-row dental-chart-row--${side}`}>
@@ -53,7 +67,11 @@ const ToothChart = ({ value = {}, onChange, marked = [], label = 'Dental chart' 
       <div className="dental-chart-arch">
         <div className="dental-chart-quadrant-labels"><span>Upper Right</span><span>Upper Left</span></div>
         <div className="dental-chart-jaw">{renderRow(TOOTH_ROWS.upper[0], 'right')}{renderRow(TOOTH_ROWS.upper[1], 'left')}</div>
-        <div className="dental-chart-jaw dental-chart-jaw--lower">{renderRow(TOOTH_ROWS.lower[0], 'right')}{renderRow(TOOTH_ROWS.lower[1], 'left')}</div>
+        <div className="dental-chart-figures">
+          <div className="dental-chart-jaw">{renderFigures(TOOTH_ROWS.upper[0], 'right', 'upper')}{renderFigures(TOOTH_ROWS.upper[1], 'left', 'upper')}</div>
+          <div className="dental-chart-jaw dental-chart-jaw--lower">{renderFigures(TOOTH_ROWS.lower[0], 'right', 'lower')}{renderFigures(TOOTH_ROWS.lower[1], 'left', 'lower')}</div>
+        </div>
+        <div className="dental-chart-jaw">{renderRow(TOOTH_ROWS.lower[0], 'right')}{renderRow(TOOTH_ROWS.lower[1], 'left')}</div>
         <div className="dental-chart-quadrant-labels"><span>Lower Right</span><span>Lower Left</span></div>
       </div>
       {!editable && Object.keys(value).length === 0 && <p className="dental-muted">No conditions charted.</p>}
