@@ -40,6 +40,31 @@ import {
 
 export { ALLOWED_USER_EMAIL_DOMAIN, STUDENT_ID_REGEX, isValidTupEmail, isValidStudentId };
 
+// The welcome copy beside the sign-in card, one per portal.
+const PORTAL_INTROS = {
+  admin: {
+    name: 'System Administration Portal',
+    description: 'The Admin Portal serves as the central management area of TUP iCARE, designed for authorized administrators responsible for managing user accounts, staff access, roles, and system settings. It supports proper access control and system monitoring to help maintain an organized, secure, and well-managed platform for the TUP Manila Clinic.',
+    motto: 'Behind Every Organized System is Care in Good Hands.',
+  },
+  staff: {
+    name: 'Medical Portal',
+    description: 'The TUP iCARE Medical Portal is a centralized platform designed to support medical personnel in managing and delivering healthcare services within the TUP Manila community. It provides an organized digital environment for handling patient information, clinical activities, and medical services, helping healthcare staff manage their responsibilities and maintain accurate, accessible, and well-organized medical records.',
+    motto: 'Every Record, A Step Toward Better Care.',
+  },
+  dental: {
+    name: 'Dental Portal',
+    description: 'The TUP iCARE Dental Portal is a dedicated platform designed to support dental personnel in managing and providing dental healthcare services to the TUP Manila community. It offers an organized digital environment for handling patient information, dental care activities, and clinical documentation, helping dental staff maintain accurate records and coordinate dental services more effectively.',
+    motto: 'Where Every Smile Matters.',
+  },
+  user: {
+    name: 'Patient Portal',
+    description: 'The TUP iCARE Patient Portal is a user-friendly platform designed for TUP students, new enrollees, faculty members, and other eligible university personnel. It serves as a personal space where users can access their permitted health information, stay updated on clinic appointments and schedules, communicate with clinic personnel, and conveniently manage their clinic-related activities.',
+    motto: 'Your Health, Your Care, Your Connection.',
+  },
+};
+const PORTAL_INTRO = IS_USER_SURFACE ? PORTAL_INTROS.user : IS_DENTAL_SURFACE ? PORTAL_INTROS.dental : IS_ADMIN_SURFACE ? PORTAL_INTROS.admin : PORTAL_INTROS.staff;
+
 
 const Login = () => {
   const navigate = useNavigate();
@@ -1070,37 +1095,21 @@ const Login = () => {
                 style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'contain', padding: 4, flexShrink: 0 }}
               />
               <div>
-                {IS_USER_SURFACE ? (
-                  <h1
-                    style={{
-                      margin: 0,
-                      fontSize: isTabletLandscape ? 'var(--font-size-page-title)' : 'var(--font-size-4xl)',
-                      lineHeight: 1.15,
-                      fontWeight: 'var(--font-weight-extrabold)',
-                      fontFamily: `"Merriweather", serif`,
-                      color: '#111',
-                      letterSpacing: '-0.4px',
-                    }}
-                  >
-                    TUP Manila Clinic Online Patient Portal
-                  </h1>
-                ) : (
-                  <h1
-                    style={{
-                      margin: 0,
-                      fontSize: isTabletLandscape ? 'var(--font-size-page-title)' : 'var(--font-size-4xl)',
-                      lineHeight: 1.15,
-                      fontWeight: 'var(--font-weight-extrabold)',
-                      fontFamily: `"Merriweather", serif`,
-                      color: '#111',
-                      letterSpacing: '-0.4px',
-                    }}
-                  >
-                    Technological University of the
-                    <br />
-                    Philippines (TUP) Manila – Clinic
-                  </h1>
-                )}
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: isTabletLandscape ? 'var(--font-size-page-title)' : 'var(--font-size-4xl)',
+                    lineHeight: 1.15,
+                    fontWeight: 'var(--font-weight-extrabold)',
+                    fontFamily: `"Merriweather", serif`,
+                    color: '#111',
+                    letterSpacing: '-0.4px',
+                  }}
+                >
+                  Technological University of the
+                  <br />
+                  Philippines (TUP) Manila Clinic – {PORTAL_INTRO.name}
+                </h1>
               </div>
             </div>
 
@@ -1117,9 +1126,7 @@ const Login = () => {
                 textAlign: 'left',
               }}
             >
-              {IS_USER_SURFACE
-                ? 'The TUP Manila Clinic Online Patient Portal helps students, faculty, staff, and authorized TUP personnel access clinic services online. Users can book same-day or future appointments, view clinic visit history, and send non-emergency messages to doctors or clinic staff. The portal is built to make clinic coordination faster, easier, and more convenient for the whole TUP community.'
-                : `TUP-M Electronic Health Records System is a streamlined, modern electronic health record platform designed to support efficient, accurate, and student-centered clinical care. It centralizes patient information, simplifies consultation documentation, improves workflow for clinicians, and ensures secure, role-based access to medical records — all tailored to the needs of the Technological University of the Philippines community.`}
+              {PORTAL_INTRO.description}
             </p>
 
             <div
@@ -1133,7 +1140,7 @@ const Login = () => {
                 width: '100%',
               }}
             >
-              “Where records don’t get lost—just students.”
+              “{PORTAL_INTRO.motto}”
             </div>
           </div>
 
@@ -1219,7 +1226,7 @@ const Login = () => {
                     TUP Manila Clinic
                   </div>
                   <div style={{ fontSize: isMobile ? 'var(--font-size-2xs)' : 'var(--font-size-xs)', color: 'rgba(255, 255, 255, 0.85)', marginTop: 2, fontWeight: 'var(--font-weight-medium)' }}>
-                    {IS_USER_SURFACE ? 'Online Patient Portal' : IS_DENTAL_SURFACE ? 'Dental Clinic Portal' : 'Clinic Staff Portal'}
+                    {PORTAL_INTRO.name}
                   </div>
                 </div>
               )}
