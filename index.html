@@ -7,7 +7,9 @@
   <meta name="theme-color" content="#8C1515" />
   <meta name="apple-mobile-web-app-title" content="TUP Clinic EHR" />
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <!-- Each portal's own icon; Vite fills in the surface from the build mode (.env.<mode>). -->
+  <link rel="icon" type="image/png" href="/icons/portal-%VITE_DEPLOY_SURFACE%.png" />
+  <link rel="apple-touch-icon" href="/icons/portal-%VITE_DEPLOY_SURFACE%-180.png" />
   <script>
     (function() {
       try {
