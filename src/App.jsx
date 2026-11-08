@@ -162,7 +162,10 @@ function AppShell() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const { isSupported: isStaffDeviceSupported, viewport } = useStaffDeviceCheck();
 
-  useEffect(() => { document.title = 'TUP Clinic EHR'; }, []);
+  // Named per portal, like the admin's 'TUP Clinic · System Admin', so open tabs are told apart.
+  useEffect(() => {
+    document.title = `TUP Clinic · ${IS_USER_SURFACE ? 'Patient Portal' : IS_DENTAL_SURFACE ? 'Dental Portal' : 'Medical Portal'}`;
+  }, []);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', onResize);
