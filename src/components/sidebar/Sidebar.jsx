@@ -207,16 +207,17 @@ const Sidebar = ({ collapsed = false, toggle }) => {
 
         {/* Grouped Navigation */}
         <div className="menu" role="navigation" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          {NAV_GROUPS.map((group, gIdx) => (
-            <div key={gIdx} className="nav-group">
-              <div className="nav-group-label">{group.label}</div>
-              {group.items.filter((item) =>
+          {/* A group whose pages are all turned off in Page Access is left out, heading included. */}
+          {NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) =>
                 (!item.roles || item.roles.includes((user?.role || '').toString().trim().toLowerCase())) &&
                 canOpenStaffPage(user, item.page) &&
                 // Some destinations are reachable from Search pages but kept out
                 // of the sidebar, which otherwise grows past the viewport.
                 !item.paletteOnly
-              ).map(({ page, label, icon: IconComponent }) => {
+              ) })).filter((group) => group.items.length > 0).map((group, gIdx) => (
+            <div key={gIdx} className="nav-group">
+              <div className="nav-group-label">{group.label}</div>
+              {group.items.map(({ page, label, icon: IconComponent }) => {
                 const isActive = location.pathname === `/${page}`
                   || location.pathname.startsWith(`/${page}/`)
                   || (page === 'dashboard' && location.pathname === '/');

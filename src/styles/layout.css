@@ -339,7 +339,7 @@ main.login-page-main,
   display: grid;
   grid-template-columns: minmax(0, 2.25fr) minmax(280px, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
 }
 
@@ -459,6 +459,16 @@ main.login-page-main,
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+}
+
+/* A lone or odd last action takes the full row instead of half of it. */
+.quick-actions-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* The last card fills the column, so both columns end level. */
+.dashboard-operations-column > .card:last-child {
+  flex: 1 1 auto;
 }
 
 /* ========================================================= */
