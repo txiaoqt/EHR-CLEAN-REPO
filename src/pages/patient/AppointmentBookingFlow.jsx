@@ -1019,7 +1019,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   </div>
 
                   {/* Weekday headers */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4, marginBottom: 8 }}>
                     {DAYS_SHORT.map((day) => (
                       <div
                         key={day}
@@ -1040,7 +1040,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                   </div>
 
                   {/* Calendar Cells */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
                     {calendarCells.map((cell, idx) => {
                       if (!cell) {
                         return <div key={`empty-${idx}`} className="calendar-empty-cell" style={{ height: 54, borderRadius: 10, background: 'var(--surface-raised, #f8fafc)' }} />;

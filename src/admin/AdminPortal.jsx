@@ -57,7 +57,7 @@ function AdminLogin() {
   const [password, setPassword] = useState('');
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.sessionMessage || '');
   const submit = async (event) => {
     event.preventDefault(); setBusy(true); setError('');
     try {

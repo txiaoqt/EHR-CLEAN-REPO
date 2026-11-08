@@ -29,6 +29,7 @@ import {
 import { loadSettings, logAudit } from '../utils.js';
 import { buildCsv, downloadBlob, exportFilename } from '../utils/export/csv.js';
 import { useAuth } from '../AuthContext.jsx';
+import { canOpenStaffPage } from '../staffPageAccess.mjs';
 import { useTheme } from '../ThemeContext.jsx';
 
 ChartJS.register(
@@ -407,6 +408,14 @@ const Dashboard = () => {
     exportCensus();
   };
 
+  // Only actions this role can use: a page turned off in Page Access would bounce back here.
+  const quickActions = [
+    { label: 'Register Patient', page: 'patients', onClick: () => navigate('/patients') },
+    { label: 'New Encounter', page: 'encounter', onClick: () => navigate('/encounter') },
+    { label: 'Export Census', show: user?.role === 'physician', onClick: requestExportCensus },
+    { label: 'View Reports', page: 'reports', onClick: () => navigate('/reports') },
+  ].filter(action => (action.page ? canOpenStaffPage(user, action.page) : action.show));
+
   const goToInventoryItem = (item) => {
     navigate('/inventory', { state: { focus: item.id } });
     setShowAlertsModal(false);
@@ -623,28 +632,21 @@ const Dashboard = () => {
             </div>
             )}
 
-            <div className="card" style={{ padding: '18px 20px' }}>
+            {quickActions.length > 0 && <div className="card" style={{ padding: '18px 20px' }}>
               <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', marginBottom: 12 }}>Quick Actions</h3>
               <div className="quick-actions-grid">
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/patients')}>
-                  Register Patient
-                </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/encounter')}>
-                  New Encounter
-                </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={requestExportCensus}>
-                  Export Census
-                </button>
-                <button className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={() => navigate('/reports')}>
-                  View Reports
-                </button>
+                {quickActions.map(action => (
+                  <button key={action.label} className="btn secondary" style={{ justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', padding: '10px 12px', minHeight: 42 }} onClick={action.onClick}>
+                    {action.label}
+                  </button>
+                ))}
               </div>
-            </div>
+            </div>}
 
             <div className="card" style={{ padding: '18px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <h3 className="card-title" style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>Recent Encounters</h3>
-                <button
+                {canOpenStaffPage(user, 'medical-log') && <button
                   type="button"
                   onClick={() => navigate('/medical-log')}
                   style={{
@@ -665,7 +667,7 @@ const Dashboard = () => {
                   aria-label="View all encounters"
                 >
                   View All →
-                </button>
+                </button>}
               </div>
               {recentEncounters.length === 0 ? (
                 <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>No recent encounters</div>

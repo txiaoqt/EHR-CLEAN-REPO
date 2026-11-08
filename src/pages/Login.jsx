@@ -28,6 +28,7 @@ import { EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import VerificationCodeField from '../components/VerificationCodeField.jsx';
 import { PolicyLinks } from '../components/PolicyAgreement.jsx';
 import SignupPolicyConsent from '../components/SignupPolicyConsent.jsx';
+import SignupReviewDialog from '../components/SignupReviewDialog.jsx';
 import useAppPolicy from '../hooks/useAppPolicy.js';
 import bg1Image from '../assets/images/bg1.jpg';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
@@ -143,6 +144,8 @@ const Login = () => {
   // Which sign-up the visitor is completing. Defaults to the enrolled student
   // path, since that is the one that already existed.
   const [signupKind, setSignupKind] = useState('student');
+  // Details shown for a last check before Create Account goes ahead.
+  const [signupReview, setSignupReview] = useState(null);
 
   // OTP Verification State
   const [otpSent, setOtpSent] = useState(false);
@@ -651,7 +654,7 @@ const Login = () => {
    * The RPC checks email_confirmed_at, so a code that was never confirmed cannot
    * produce a record even if this is reached some other way.
    */
-  const handleEnrolleeSignup = async () => {
+  const handleEnrolleeSignup = async (reviewed = false) => {
     if (!await requireSignupPolicy()) return;
     const email = enrolleeData.email.trim().toLowerCase();
 
@@ -663,6 +666,19 @@ const Login = () => {
     }
     if (enrolleeData.password !== enrolleeData.confirmPassword) {
       setMsg('The two passwords do not match.');
+      return;
+    }
+    if (!reviewed) {
+      setSignupReview({
+        rows: [
+          ['Applicant ID', enrolleeData.applicantId.trim()],
+          ['Name', composeFullName(enrolleeData)],
+          ['Date of Birth', enrolleeData.dateOfBirth, 'date'],
+          ['Email', email],
+        ],
+        note: 'You can still update these from your profile later.',
+        onConfirm: () => handleEnrolleeSignup(true),
+      });
       return;
     }
 
@@ -743,7 +759,7 @@ const Login = () => {
     }
   };
 
-  const handlePatientSignup = async () => {
+  const handlePatientSignup = async (reviewed = false) => {
     if (!await requireSignupPolicy()) return;
     // Composed from the PSA-style name parts and normalized before storing.
     const fullName = composeFullName({
@@ -796,6 +812,22 @@ const Login = () => {
     }
     if (!payload.otp) {
       setMsg('Please enter the verification code sent to your email.');
+      return;
+    }
+    if (!reviewed) {
+      setSignupReview({
+        rows: [
+          ['Student ID', payload.studentId],
+          ['Name', payload.fullName],
+          ['Date of Birth', payload.dateOfBirth, 'date'],
+          ['Sex', payload.sex],
+          ['Degree Program', payload.course],
+          ['Year Level', String(payload.year)],
+          ['Email', payload.email],
+        ],
+        note: 'Your name and Student ID cannot be changed from your profile once the account is created.',
+        onConfirm: () => handlePatientSignup(true),
+      });
       return;
     }
 
@@ -1164,6 +1196,14 @@ const Login = () => {
               margin: isSingleColumn ? 'auto 0' : 0,
             }}
           >
+            {signupReview && (
+              <SignupReviewDialog
+                rows={signupReview.rows}
+                note={signupReview.note}
+                onEdit={() => setSignupReview(null)}
+                onConfirm={() => { const { onConfirm } = signupReview; setSignupReview(null); onConfirm(); }}
+              />
+            )}
             <form
               className="login-card"
               onSubmit={(e) => {

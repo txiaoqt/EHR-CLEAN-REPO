@@ -5,7 +5,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { useTheme } from '../ThemeContext.jsx';
 import PasswordRequirements from '../components/PasswordRequirements.jsx';
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy.js';
-import { SunIcon, MoonIcon, DesktopIcon } from '../components/icons/Icons.jsx';
+import { SunIcon, MoonIcon, DesktopIcon, EyeIcon, EyeOffIcon } from '../components/icons/Icons.jsx';
 import { IS_DENTAL_SURFACE } from '../deploySurface.js';
 
 /**
@@ -35,6 +35,7 @@ const Settings = () => {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswordText, setShowPasswordText] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
@@ -176,23 +177,35 @@ const Settings = () => {
             <div className="settings-password-grid">
               <div className="settings-field" style={{ marginBottom: 0 }}>
                 <label htmlFor="new-password">New password</label>
-                <input
-                  id="new-password"
-                  minLength={PASSWORD_MIN_LENGTH}
-                  maxLength={PASSWORD_MAX_LENGTH}
-                  aria-describedby="staff-password-requirements"
-                  type="password"
-                  className="input"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="new-password"
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
+                    aria-describedby="staff-password-requirements"
+                    type={showPasswordText ? 'text' : 'password'}
+                    className="input"
+                    style={{ paddingRight: 40 }}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText((v) => !v)}
+                    aria-label={showPasswordText ? 'Hide passwords' : 'Show passwords'}
+                    aria-pressed={showPasswordText}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}
+                  >
+                    {showPasswordText ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                </div>
               </div>
               <div className="settings-field" style={{ marginBottom: 0 }}>
                 <label htmlFor="confirm-password">Confirm password</label>
                 <input
                   id="confirm-password"
-                  type="password"
+                  type={showPasswordText ? 'text' : 'password'}
                   className="input"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

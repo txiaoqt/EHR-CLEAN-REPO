@@ -45,6 +45,7 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import AdminPortal from './admin/AdminPortal.jsx';
 import { canOpenStaffPage } from './staffPageAccess.mjs';
+import IdleLogout from './components/IdleLogout.jsx';
 import StaffSetup from './admin/StaffSetup.jsx';
 import PCAccessRequired from './components/PCAccessRequired.jsx';
 import PolicyAgreement from './components/PolicyAgreement.jsx';
@@ -425,6 +426,7 @@ function AppShell() {
 function App() {
   return (
     <Router>
+      <IdleLogout />
       {IS_ADMIN_SURFACE ? <AdminPortal /> : <StaffPresenceProvider>
         <AppShell />
       </StaffPresenceProvider>}

@@ -389,7 +389,8 @@ const PatientProfile = () => {
                   ← Back
                 </button>
 
-                <div style={{ position: 'relative' }}>
+                {/* The menu holds Export (physicians) and Delete; a nurse has neither. */}
+                {(user?.role === 'physician' || canDeleteRecord(user)) && <div style={{ position: 'relative' }}>
                   <button
                     type="button"
                     className="btn secondary"
@@ -489,7 +490,7 @@ const PatientProfile = () => {
                       )}
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
 

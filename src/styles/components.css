@@ -7439,3 +7439,23 @@ select {
 /* Medical | Dental switch at the top of Start New Inquiry: full width, equal halves. */
 .patient-messages-segmented-track.patient-inquiry-clinic-tabs { display: flex; width: 100%; margin: 0 0 16px 0 !important; }
 .patient-inquiry-clinic-tabs .patient-messages-segmented-tab { flex: 1; }
+
+/* Idle sign-out warning (components/IdleLogout.jsx). */
+.idle-logout-dialog { width: min(420px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25); }
+.idle-logout-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.idle-logout-dialog h2 { margin: 0 0 8px; font-size: var(--font-size-lg); }
+.idle-logout-dialog p { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.5; }
+.idle-logout-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+
+/* Sign-up review before the account is created (components/SignupReviewDialog.jsx). */
+.signup-review-dialog { width: min(480px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25); }
+.signup-review-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.signup-review-dialog h2 { margin: 0 0 6px; font-size: var(--font-size-lg); }
+.signup-review-dialog p { margin: 0 0 16px; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.5; }
+.signup-review-dialog dl { margin: 0; border: 1px solid var(--border); border-radius: 10px; }
+.signup-review-dialog dl > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding: 9px 14px; }
+.signup-review-dialog dl > div + div { border-top: 1px solid var(--border); }
+.signup-review-dialog dt { color: var(--text-muted); font-size: var(--font-size-sm); }
+.signup-review-dialog dd { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+.signup-review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+@media (max-width: 480px) { .signup-review-dialog dl > div { grid-template-columns: 1fr; gap: 2px; } }
