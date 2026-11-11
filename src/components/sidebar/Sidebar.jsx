@@ -1,6 +1,6 @@
 // src/components/sidebar/Sidebar.jsx
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import SignOutDialog from '../SignOutDialog.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { translate } from '../../utils';
 import { useAuth } from '../../AuthContext.jsx';
@@ -139,7 +139,6 @@ const Sidebar = ({ collapsed = false, toggle }) => {
   };
 
   const handleSignOut = async () => {
-    setShowConfirm(false);
     try {
       await logout();
     } catch (err) {
@@ -294,50 +293,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
         </div>
       </aside>
 
-      {/* Inline Confirm Popup for Sign Out */}
-      {showConfirm && createPortal((
-        <div
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--panel)',
-              padding: '22px',
-              width: '360px',
-              borderRadius: '12px',
-              boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
-              textAlign: 'center'
-            }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-heading"
-          >
-            <h3 id="confirm-heading" style={{ margin: '0 0 8px' }}>Sign Out?</h3>
-            <p style={{ margin: '0 0 18px', color: 'var(--muted)' }}>
-              Are you sure you want to sign out?
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-              <button className="btn secondary" onClick={() => setShowConfirm(false)}>Cancel</button>
-              <button
-                className="btn"
-                onClick={handleSignOut}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
+      {showConfirm && <SignOutDialog onCancel={() => setShowConfirm(false)} onConfirm={handleSignOut} />}
     </>
   );
 };

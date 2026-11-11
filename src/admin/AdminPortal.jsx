@@ -73,16 +73,15 @@ function AdminLogin() {
   return <div className="system-admin-login">
     <div className="system-admin-login-layout">
       <section className="system-admin-login-intro" aria-label="TUP Clinic system administration">
-        <div className="system-admin-login-brand"><img src={logo} alt="TUP Clinic" /><h1>TUP Manila Clinic</h1></div>
-        <h2>System Admin Portal</h2>
-        <p>Manage staff access, invitations, account security, and system activity for the clinic.</p>
-        <p className="system-admin-muted">For authorized system administrators.</p>
+        <div className="system-admin-login-brand"><img src={logo} alt="TUP Clinic" /><h1>Technological University of the<br />Philippines (TUP) Manila Clinic – System Administration Portal</h1></div>
+        <p>The Admin Portal serves as the central management area of TUP iCARE, designed for authorized administrators responsible for managing user accounts, staff access, roles, and system settings. It supports proper access control and system monitoring to help maintain an organized, secure, and well-managed platform for the TUP Manila Clinic.</p>
+        <p className="system-admin-muted">“Behind Every Organized System is Care in Good Hands.”</p>
       </section>
       <section className="system-admin-login-card" aria-labelledby="system-admin-login-title">
         <div className="system-admin-login-mobile-brand">
           <img src={logo} alt="TUP Clinic" />
           <strong>TUP Manila Clinic</strong>
-          <span>System Admin Portal</span>
+          <span>System Administration Portal</span>
         </div>
         <h2 id="system-admin-login-title">Administrator Log In</h2>
         <form onSubmit={submit}>

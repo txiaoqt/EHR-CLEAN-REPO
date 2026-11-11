@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
+import { useAuth } from '../AuthContext.jsx';
+import { canOpenStaffPage } from '../staffPageAccess.mjs';
 import EmptyState from '../components/EmptyState.jsx';
 import RecordSummaryCard from '../components/RecordSummaryCard.jsx';
 import ResultDialog from '../components/ResultDialog.jsx';
@@ -15,6 +17,7 @@ import { ArchiveIcon, FolderIcon, SearchIcon } from '../components/icons/Icons.j
  */
 const ArchiveFiles = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -170,13 +173,15 @@ const ArchiveFiles = () => {
               TUP students.
             </div>
           </div>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => navigate('/enrollees')}
-          >
-            Back to Enrollees Queue
-          </button>
+          {canOpenStaffPage(user, 'enrollees') && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => navigate('/enrollees')}
+            >
+              Back to Enrollees Queue
+            </button>
+          )}
         </div>
 
         <section

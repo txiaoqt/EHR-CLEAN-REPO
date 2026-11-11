@@ -1,10 +1,10 @@
 // src/components/sidebar/PatientSidebar.jsx
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
+import SignOutDialog from '../SignOutDialog.jsx';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
-import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
+import PatientAvatar from '../PatientAvatar.jsx';
 import {
   DashboardIcon,
   CalendarIcon,
@@ -58,8 +58,6 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
   };
 
   const confirmLogout = async () => {
-    setShowConfirm(false);
-    if (onClose) onClose();
     try {
       await logout();
     } catch (err) {
@@ -132,9 +130,9 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
             if (e.key === 'Enter' || e.key === ' ') handleNavigation('/patient/profile');
           }}
         >
-          <img
-            src={user?.avatar || avatarPlaceholder}
-            alt={displayName}
+          <PatientAvatar
+            src={user?.avatar}
+            name={displayName}
             className="sidebar-user-avatar"
           />
           <div className="sidebar-user-info" style={{ minWidth: 0, flex: 1 }}>
@@ -191,9 +189,9 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
             title={`Profile: ${displayName}`}
             aria-label={`View Profile for ${displayName}`}
           >
-            <img
-              src={user?.avatar || avatarPlaceholder}
-              alt={displayName}
+            <PatientAvatar
+              src={user?.avatar}
+              name={displayName}
               style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
             />
           </button>
@@ -213,62 +211,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
         </div>
       </aside>
 
-      {/* Logout Confirmation Modal */}
-      {showConfirm &&
-        createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'var(--overlay-bg, rgba(0,0,0,0.65))',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 3000,
-              padding: 16,
-            }}
-            onClick={() => setShowConfirm(false)}
-          >
-            <div
-              style={{
-                background: 'var(--panel)',
-                color: 'var(--text)',
-                border: '1px solid var(--border)',
-                borderRadius: 12,
-                width: 'min(92vw, 380px)',
-                padding: 24,
-                boxShadow: 'var(--shadow-lg)',
-                textAlign: 'center',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
-                Sign Out?
-              </h3>
-              <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
-                Are you sure you want to log out of the Patient Portal?
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={() => setShowConfirm(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn danger"
-                  onClick={confirmLogout}
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {showConfirm && <SignOutDialog message="Are you sure you want to log out of the Patient Portal?" onCancel={() => setShowConfirm(false)} onConfirm={confirmLogout} />}
     </>
   );
 };

@@ -732,6 +732,30 @@ const StaffPatientMessages = () => {
     }
   };
 
+  // Reopen a resolved inquiry so staff can follow up (they cannot start a new one).
+  // Photos removed on resolve stay removed; new ones are removed again on the next resolve.
+  const handleReopenConversation = async () => {
+    if (!activeConversationId || resolving || activeConversation?.isFallback) return;
+    setResolving(true);
+    try {
+      const updatedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from('patient_message_conversations')
+        .update({ status: 'open', updated_at: updatedAt })
+        .eq('id', activeConversationId);
+      if (error) throw error;
+      setConversations((prev) => prev.map((c) => (
+        c.id === activeConversationId ? { ...c, status: 'open', updated_at: updatedAt } : c
+      )));
+      setActiveTab('active');
+    } catch (err) {
+      console.error('Reopen conversation error:', err);
+      setMsgNotice('Failed to reopen inquiry. Please try again.');
+    } finally {
+      setResolving(false);
+    }
+  };
+
   // Delete a resolved inquiry.
   //
   // Photos go first: a plpgsql function cannot remove a Storage object, so if
@@ -978,6 +1002,18 @@ const StaffPatientMessages = () => {
                       <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-2xs)', padding: '3px 8px', background: 'var(--color-emerald-bg)', color: 'var(--success, #10b981)' }}>
                         Resolved
                       </span>
+                      {!activeConversation?.isFallback && (
+                        <button
+                          type="button"
+                          className="btn small secondary"
+                          onClick={handleReopenConversation}
+                          disabled={resolving || deleting}
+                          style={{ fontSize: 'var(--font-size-xs)', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, borderColor: 'var(--border)' }}
+                          title="Reopen this inquiry to send the patient another message"
+                        >
+                          <span>{resolving ? 'Reopening…' : 'Reopen'}</span>
+                        </button>
+                      )}
                       {/* Only a closed inquiry can be deleted. */}
                       <button
                         type="button"

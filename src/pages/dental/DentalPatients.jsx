@@ -19,11 +19,12 @@ const DentalPatients = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
+  const [view, setView] = useState('active');
 
   useEffect(() => {
     (async () => {
       const [patientsRes, recordsRes, { data: visits }, { data: profiles }] = await Promise.all([
-        supabase.from('patients').select('id, name, year, date_of_birth').order('name'),
+        supabase.from('patients').select('id, name, year, date_of_birth, archived_at, archived_reason').order('name'),
         supabase.from('dental_records').select('patient_id, surname, first_name, middle_name, classification, college_course_unit, sex, date_of_birth'),
         supabase.from('dental_services').select('patient_id, service_date').order('service_date', { ascending: false }),
         supabase.from('patient_profiles').select('patient_id, sex, course'),
@@ -34,7 +35,7 @@ const DentalPatients = () => {
       const profileOf = Object.fromEntries((profiles || []).map((p) => [p.patient_id, p]));
       const byId = new Map();
       (patientsRes.data || []).forEach((p) => byId.set(p.id, {
-        patient_id: p.id, name: p.name, date_of_birth: p.date_of_birth, classification: 'Student',
+        patient_id: p.id, name: p.name, date_of_birth: p.date_of_birth, archived_reason: p.archived_at ? (p.archived_reason || 'Archived') : null, classification: 'Student',
         college_course_unit: profileOf[p.id]?.course || '', sex: sexLetter(profileOf[p.id]?.sex), hasRecord: false,
       }));
       (recordsRes.data || []).forEach((r) => byId.set(r.patient_id, {
@@ -47,11 +48,14 @@ const DentalPatients = () => {
     })();
   }, []);
 
+  // Archived in the Medical Portal (graduated, left TUP, account deleted); records stay readable.
+  const archivedCount = rows.filter((r) => r.archived_reason).length;
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? rows.filter((r) => [r.name, r.patient_id, r.college_course_unit].some((v) => (v || '').toLowerCase().includes(q))) : rows;
-  }, [rows, search]);
-  const pagination = useTablePagination(filtered, { resetKey: search });
+    const inView = rows.filter((r) => (view === 'archived') === Boolean(r.archived_reason));
+    return q ? inView.filter((r) => [r.name, r.patient_id, r.college_course_unit].some((v) => (v || '').toLowerCase().includes(q))) : inView;
+  }, [rows, search, view]);
+  const pagination = useTablePagination(filtered, { resetKey: `${view}|${search}` });
 
   return (
     <main className="main">
@@ -64,7 +68,14 @@ const DentalPatients = () => {
         </div>
 
         <div className="card table-section-card">
-          <div className="patients-toolbar table-section-toolbar" style={{ paddingTop: 20 }}>
+          <div className="table-section-header">
+            <div className="segmented-control-container" role="tablist" aria-label="Patient list">
+              {[['active', `Active (${rows.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
+                <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="patients-toolbar table-section-toolbar">
             <div className="patients-search-wrapper">
               <span style={{ color: 'var(--text-light)', display: 'inline-flex' }}><SearchIcon size={16} /></span>
               <input type="search" className="patients-search-input" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -82,7 +93,7 @@ const DentalPatients = () => {
                   : filtered.length === 0 ? <tr className="table-empty-row"><td colSpan={7}>{rows.length ? 'No matching patients' : 'No patients yet.'}</td></tr>
                   : pagination.pageRows.map((r) => (
                     <tr key={r.patient_id}>
-                      <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{r.name}</td>
+                      <td style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{r.name}{r.archived_reason && <div><span className="badge badge-neutral" style={{ marginTop: 4 }}>Archived · {r.archived_reason}</span></div>}</td>
                       <td><span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>{r.patient_id}</span></td>
                       <td>{r.classification || '—'}</td>
                       <td>{r.college_course_unit || '—'}</td>

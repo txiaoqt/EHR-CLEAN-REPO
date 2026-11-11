@@ -4,7 +4,7 @@ import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import PatientRecordForm from '../../components/PatientRecordForm.jsx';
 import { CheckIcon } from '../../components/icons/Icons.jsx';
-import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
+import PatientAvatar from '../../components/PatientAvatar.jsx';
 import { isValidPhMobile, limitPhone, normalizePhMobile } from '../../utils/courses.js';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -403,6 +403,15 @@ const PatientProfilePortal = () => {
     try {
       const authUid = user?.auth_user_id || (await supabase.auth.getUser())?.data?.user?.id || user?.id || null;
 
+      // A birthday can be added once, when none is on file; staff correct a recorded one.
+      if (!originalProfileRef.current?.date_of_birth && profile.date_of_birth) {
+        const { error: dobErr } = await supabase.rpc('set_my_date_of_birth', { p_date_of_birth: profile.date_of_birth });
+        if (dobErr) {
+          setMsg(dobErr.code === '22007' || dobErr.code === '42501' ? dobErr.message : 'Unable to save your birthday. Please try again.');
+          return;
+        }
+      }
+
       // 1. Update patients master table (preserving immutable registered name, strictly using existing columns)
       const { error: pErr } = await supabase
         .from('patients')
@@ -549,9 +558,10 @@ const PatientProfilePortal = () => {
           <div className="patient-profile-hero-top">
             <div className="patient-profile-identity">
               <div className="patient-profile-avatar-column">
-                <img
-                  src={profile.avatar_url || user?.avatar || avatarPlaceholder}
-                  alt={profile.name || 'Patient profile photo'}
+                <PatientAvatar
+                  src={profile.avatar_url || user?.avatar}
+                  name={profile.name || user?.name || 'Patient'}
+                  fontSize="var(--font-size-2xl)"
                   className="patient-profile-avatar"
                 />
                 <input
@@ -612,7 +622,22 @@ const PatientProfilePortal = () => {
           </div>
 
           <div className="patient-profile-facts">
-            <div><span>Birthday</span><strong>{formatProfileDate(profile.date_of_birth)}</strong></div>
+            <div>
+              <span>Birthday</span>
+              {editing && !originalProfileRef.current?.date_of_birth ? (
+                <input
+                  type="date"
+                  className="input"
+                  aria-label="Birthday"
+                  value={profile.date_of_birth || ''}
+                  min="1900-01-01"
+                  max={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, date_of_birth: event.target.value }))}
+                />
+              ) : (
+                <strong>{formatProfileDate(profile.date_of_birth)}</strong>
+              )}
+            </div>
             <div><span>Degree / Course</span><strong>{profile.course || 'Not on file'}</strong></div>
             <div><span>Last visit</span><strong>{formatProfileDate(profile.last_visit_date)}</strong></div>
           </div>

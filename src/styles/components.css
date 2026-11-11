@@ -7445,7 +7445,7 @@ select {
 .idle-logout-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .idle-logout-dialog h2 { margin: 0 0 8px; font-size: var(--font-size-lg); }
 .idle-logout-dialog p { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.5; }
-.idle-logout-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+.idle-logout-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 /* Sign-up review before the account is created (components/SignupReviewDialog.jsx). */
 .signup-review-dialog { width: min(480px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25); }

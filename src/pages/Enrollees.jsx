@@ -67,13 +67,22 @@ const Enrollees = () => {
         .neq('status', 'draft');
       if (documentsError) throw documentsError;
 
+      // Enrollee messages arrive in each applicant's review page; flag the unread ones here.
+      const { data: unread } = await supabase
+        .from('enrollee_messages')
+        .select('enrollee_id')
+        .eq('sender_role', 'enrollee')
+        .eq('read_by_staff', false);
+      const unreadBy = new Map();
+      for (const m of unread || []) unreadBy.set(m.enrollee_id, (unreadBy.get(m.enrollee_id) || 0) + 1);
+
       const byEnrollee = new Map();
       for (const doc of docs || []) {
         if (!byEnrollee.has(doc.enrollee_id)) byEnrollee.set(doc.enrollee_id, []);
         byEnrollee.get(doc.enrollee_id).push(doc);
       }
 
-      setRows((enrollees || []).map((e) => ({ ...e, documents: byEnrollee.get(e.id) || [] })));
+      setRows((enrollees || []).map((e) => ({ ...e, documents: byEnrollee.get(e.id) || [], unread: unreadBy.get(e.id) || 0 })));
     } catch (err) {
       console.error('Could not load enrollees:', err);
       if (!quiet) setResult({ tone: 'error', title: 'Could not load enrollees', message: 'Try refreshing the page.' });
@@ -370,6 +379,11 @@ const Enrollees = () => {
                         </td>
                         <td>
                           <div className="enrollees-student-name">{nameOf(row) || 'Unnamed applicant'}</div>
+                          {row.unread > 0 && (
+                            <span className="badge badge-warning" style={{ marginTop: 4 }}>
+                              {row.unread} new {row.unread === 1 ? 'message' : 'messages'}
+                            </span>
+                          )}
                           <div className="enrollees-student-email">{row.personal_email || 'No personal email'}</div>
                         </td>
                         <td>

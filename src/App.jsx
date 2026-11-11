@@ -243,8 +243,9 @@ function AppShell() {
     return <PCAccessRequired viewport={viewport} onLogout={isAuthenticated ? logout : undefined} />;
   }
 
-  // Gate entire AppShell rendering until Supabase Auth session & profile are initialized
-  if (loading || initializing) {
+  // Gate entire AppShell rendering until Supabase Auth session & profile are initialized.
+  // The policy check waits here too, so an already-accepted account never sees the agreement flash.
+  if (loading || initializing || (policyCheckEnabled && policyAgreement.checking)) {
     return (
       <div
         id="app-loading"

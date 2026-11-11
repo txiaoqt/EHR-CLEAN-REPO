@@ -13,13 +13,17 @@ const VIEWS = [['upcoming', 'Upcoming'], ['today', 'Today'], ['past', 'Past'], [
 /** A small dialog with focus moved in on open and Escape to close. */
 export const DentalDialog = ({ title, subtitle, onClose, children, footer, busy }) => {
   const ref = useRef(null);
+  // Callers pass a new onClose each render; reading it through a ref keeps the
+  // focus effect to mount only, so typing never jumps back to the first field.
+  const latest = useRef({ onClose, busy });
+  latest.current = { onClose, busy };
   useEffect(() => {
     const previous = document.activeElement;
     ref.current?.querySelector('input, select, textarea, button:not(.modal-close-btn)')?.focus();
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape' && !latest.current.busy) latest.current.onClose(); };
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('keydown', onKey); if (previous instanceof HTMLElement) previous.focus(); };
-  }, [onClose, busy]);
+  }, []);
   return (
     <div className="modal-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={ref} className="modal-container" role="dialog" aria-modal="true" aria-labelledby="dental-dialog-title" style={{ width: 640, maxWidth: '100%' }}>

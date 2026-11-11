@@ -1,10 +1,11 @@
 // src/components/header/PatientHeader.jsx
 import React, { useState, useRef, useEffect } from 'react';
+import SignOutDialog from '../SignOutDialog.jsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
 import { useTheme } from '../../ThemeContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
-import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
+import PatientAvatar from '../PatientAvatar.jsx';
 import { UserIcon, SettingsIcon, LogoutIcon, SunIcon, MoonIcon } from '../icons/Icons.jsx';
 
 const PatientHeader = ({ onToggleNav }) => {
@@ -18,7 +19,6 @@ const PatientHeader = ({ onToggleNav }) => {
   const displayName = user?.name || 'Angel Keith Carbon';
   const displayRole = (user?.role || '').toLowerCase() === 'enrollee' ? 'Enrollee' : 'Student / Patient';
   const studentId = user?.patient_id || 'TUPM-XX-XXXX';
-  const avatarSrc = user?.avatar || avatarPlaceholder;
 
   // Close dropdown menu on outside click
   useEffect(() => {
@@ -43,7 +43,6 @@ const PatientHeader = ({ onToggleNav }) => {
   };
 
   const handleConfirmLogout = async () => {
-    setShowLogoutConfirm(false);
     setMenuOpen(false);
     try {
       await logout();
@@ -138,9 +137,9 @@ const PatientHeader = ({ onToggleNav }) => {
                 borderRadius: '50%',
               }}
             >
-              <img
-                src={avatarSrc}
-                alt={displayName}
+              <PatientAvatar
+                src={user?.avatar}
+                name={displayName}
                 style={{
                   width: 36,
                   height: 36,
@@ -263,57 +262,7 @@ const PatientHeader = ({ onToggleNav }) => {
         </div>
       </header>
 
-      {/* Logout Confirmation Dialog Modal */}
-      {showLogoutConfirm && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3500,
-            padding: 16,
-          }}
-          onClick={() => setShowLogoutConfirm(false)}
-        >
-          <div
-            style={{
-              background: 'var(--panel, #ffffff)',
-              borderRadius: 12,
-              width: 'min(92vw, 380px)',
-              padding: 24,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              textAlign: 'center',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
-              Sign Out?
-            </h3>
-            <p style={{ margin: '0 0 20px 0', color: 'var(--muted)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
-              Are you sure you want to log out of the Patient Portal?
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => setShowLogoutConfirm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={handleConfirmLogout}
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showLogoutConfirm && <SignOutDialog message="Are you sure you want to log out of the Patient Portal?" onCancel={() => setShowLogoutConfirm(false)} onConfirm={handleConfirmLogout} />}
     </>
   );
 };

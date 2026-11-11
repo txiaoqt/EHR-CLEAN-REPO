@@ -14,6 +14,39 @@ import { patientsExportConfig } from '../utils/export/configs.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import { findSameNamePatients } from '../utils/duplicatePatients.js';
 
+const ARCHIVE_REASONS = ['Graduated', 'No longer at TUP', 'Account deleted', 'Other'];
+
+const ArchivePatientDialog = ({ patient, onCancel, onConfirm }) => {
+  const dialogRef = useRef(null);
+  const [reason, setReason] = useState(ARCHIVE_REASONS[0]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog.open) dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, []);
+  return (
+    <dialog ref={dialogRef} className="idle-logout-dialog" aria-labelledby="archive-patient-title"
+      onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }}>
+      <h2 id="archive-patient-title">Archive {patient.name}?</h2>
+      <p>The record is kept and can be restored. It moves from Active to the Archived list.</p>
+      <label style={{ display: 'grid', gap: 6, marginTop: 16, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+        Reason
+        <select className="input" value={reason} onChange={(event) => setReason(event.target.value)} disabled={busy}>
+          {ARCHIVE_REASONS.map((r) => <option key={r}>{r}</option>)}
+        </select>
+      </label>
+      <div className="idle-logout-actions">
+        <button type="button" className="btn secondary" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="button" className="btn" disabled={busy}
+          onClick={async () => { setBusy(true); try { await onConfirm(reason); } finally { setBusy(false); } }}>
+          {busy ? 'Archiving…' : 'Archive'}
+        </button>
+      </div>
+    </dialog>
+  );
+};
+
 const EMPTY_MANUAL = { first: '', middle: '', last: '', suffix: '', id: '', year: 1 };
 const manualName = (m) => composeFullName({ firstName: m.first, middleName: m.middle, lastName: m.last, suffix: m.suffix });
 
@@ -28,6 +61,8 @@ const Patients = () => {
 
   // search & sort (separate field and direction)
   const [search, setSearch] = useState('');
+  const [view, setView] = useState('active'); // 'active' | 'archived'
+  const [archiveTarget, setArchiveTarget] = useState(null);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('desc');
 
@@ -173,11 +208,12 @@ const Patients = () => {
   }, [studentSearch]);
 
   // Sorting and filtering
-  const filteredPatients = patients.filter(p =>
+  const filteredPatients = patients.filter(p => (view === 'archived') === Boolean(p.archived_at) && (
     search.trim() === '' ||
     (p.name && p.name.toLowerCase().includes(search.toLowerCase())) ||
     (p.id && p.id.toString().toLowerCase().includes(search.toLowerCase()))
-  );
+  ));
+  const archivedCount = patients.filter(p => p.archived_at).length;
 
   const sortedPatients = React.useMemo(() => {
     const arr = (filteredPatients || []).slice();
@@ -197,7 +233,7 @@ const Patients = () => {
   }, [filteredPatients, sortField, sortDirection]);
 
   const pagination = useTablePagination(sortedPatients, {
-    resetKey: `${search}|${sortField}|${sortDirection}`,
+    resetKey: `${view}|${search}|${sortField}|${sortDirection}`,
   });
 
   const exporter = useTableExport({
@@ -348,6 +384,22 @@ const Patients = () => {
   // navigation helpers
   const handleOpenProfile = (patientId) => navigate('/patient-profile', { state: { patientId } });
   const handleNewEncounter = (patient) => navigate('/encounter', { state: { patientId: patient.id, patientName: patient.name } });
+
+  // Archiving keeps the record; it only leaves the active list. A null reason restores.
+  const handleArchive = async (patient, reason) => {
+    const archived_at = reason ? new Date().toISOString() : null;
+    const { data, error } = await supabase.from('patients')
+      .update({ archived_at, archived_reason: reason })
+      .eq('id', patient.id).select('id');
+    if (error || !data?.length) {
+      showToast(reason ? 'The patient could not be archived.' : 'The patient could not be restored.', 'error');
+      return;
+    }
+    setPatients(prev => prev.map(p => (p.id === patient.id ? { ...p, archived_at, archived_reason: reason } : p)));
+    setArchiveTarget(null);
+    showToast(reason ? `${patient.name} moved to Archived.` : `${patient.name} restored to active patients.`);
+    try { await logAudit(reason ? 'Patient Archived' : 'Patient Restored', `${patient.name} (${patient.id})${reason ? `: ${reason}` : ''}`); } catch (e) { console.warn('audit failed', e); }
+  };
 
   // preview item (student to show in modal)
   const previewStudent = selectedStudent ? selectedStudent : (manualName(manualStudent) ? { ...manualStudent, name: manualName(manualStudent) } : null);
@@ -586,6 +638,14 @@ const Patients = () => {
             </div>
           </div>
 
+          <div className="table-section-header">
+            <div className="segmented-control-container" role="tablist" aria-label="Patient list">
+              {[['active', `Active (${patients.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
+                <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>{label}</button>
+              ))}
+            </div>
+          </div>
+
           {/* Table Toolbar: Fluid Search + Sort Field + Sort Direction */}
           <div className="patients-toolbar table-section-toolbar">
             {/* 1. Full-Width Search Input (Single visible input shell) */}
@@ -661,12 +721,17 @@ const Patients = () => {
                 {loading ? (
                   <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patient records…</td></tr>
                 ) : sortedPatients.length === 0 ? (
-                  <tr className="table-empty-row"><td colSpan={5}>{patients.length === 0 ? 'No patients yet' : 'No matching patients'}</td></tr>
+                  <tr className="table-empty-row"><td colSpan={5}>{patients.length === 0 ? 'No patients yet' : view === 'archived' && !search.trim() ? 'No archived patients' : 'No matching patients'}</td></tr>
                 ) : (
                   pagination.pageRows.map(pat => (
                     <tr key={pat.id}>
                       <td>
                         <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{pat.name}</div>
+                        {pat.archived_at && (
+                          <span className="badge badge-neutral" style={{ marginTop: 4 }}>
+                            Archived · {pat.archived_reason || 'No reason given'}
+                          </span>
+                        )}
                         {isPhysician(user) && getSensitivityLevel(pat) && getSensitivityLevel(pat) !== 'normal' && (
                           <span className="badge badge-warning" style={{ marginTop: 4 }}>
                             Sensitivity: {getSensitivityLevel(pat)}
@@ -687,9 +752,20 @@ const Patients = () => {
                           <button className="btn secondary small" onClick={() => handleOpenProfile(pat.id)}>
                             View Profile
                           </button>
-                          <button className="btn small" onClick={() => handleNewEncounter(pat)}>
-                            Encounter
-                          </button>
+                          {pat.archived_at ? (
+                            <button className="btn secondary small" onClick={() => handleArchive(pat, null)}>
+                              Restore
+                            </button>
+                          ) : (
+                            <>
+                              <button className="btn small" onClick={() => handleNewEncounter(pat)}>
+                                Encounter
+                              </button>
+                              <button className="btn secondary small" onClick={() => setArchiveTarget(pat)}>
+                                Archive
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -721,6 +797,10 @@ const Patients = () => {
           onClose={exporter.closeExport}
           onExport={exporter.runExport}
         />
+
+        {archiveTarget && (
+          <ArchivePatientDialog patient={archiveTarget} onCancel={() => setArchiveTarget(null)} onConfirm={(reason) => handleArchive(archiveTarget, reason)} />
+        )}
 
         {toast && (
           <div style={{

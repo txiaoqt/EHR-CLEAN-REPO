@@ -10,7 +10,7 @@ import RecordSummaryCard from '../components/RecordSummaryCard.jsx';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { patientProfileExportConfig } from '../utils/export/configs.js';
 import { normalizePhMobile } from '../utils/courses.js';
-import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
+import PatientAvatar from '../components/PatientAvatar.jsx';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -346,21 +346,17 @@ const PatientProfile = () => {
             {/* Top row: Patient Avatar + Identity + Actions */}
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <img
-                  src={patientAvatar || avatarPlaceholder}
-                  alt={patient.name}
+                <PatientAvatar
+                  src={patientAvatar}
+                  name={patient.name}
+                  fontSize="var(--font-size-lg)"
                   style={{
                     width: 56,
                     height: 56,
                     borderRadius: '50%',
                     objectFit: 'cover',
                     border: '2px solid var(--border)',
-                    background: 'var(--surface-raised)',
                     flexShrink: 0,
-                  }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = avatarPlaceholder;
                   }}
                 />
                 <div className="page-header-title-block">

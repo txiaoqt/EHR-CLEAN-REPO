@@ -347,3 +347,5 @@
 }
 @media (pointer: coarse) { .system-admin-tabs button { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .system-admin #sidebar-container, .system-admin-tabs button { transition: none; } }
+/* Admin forms already space the box with their grid gap. */
+.system-admin-dialog .password-requirements { margin-top: 0; }

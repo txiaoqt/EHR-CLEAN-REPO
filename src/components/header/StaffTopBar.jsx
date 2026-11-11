@@ -11,6 +11,7 @@ import {
   DesktopIcon,
 } from '../icons/Icons.jsx';
 import CommandPalette from '../CommandPalette.jsx';
+import SignOutDialog from '../SignOutDialog.jsx';
 
 /**
  * Shared clinic top bar: page search and the account menu. Administration
@@ -31,6 +32,7 @@ const StaffTopBar = ({ pages, searchLabel = 'Search pages', accountActions = [],
   const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
 
@@ -153,12 +155,7 @@ const StaffTopBar = ({ pages, searchLabel = 'Search pages', accountActions = [],
                 type="button"
                 role="menuitem"
                 className="topbar-menu-item is-danger"
-                onClick={() => {
-                  setMenuOpen(false);
-                  if (onSignOut) { onSignOut(); return; }
-                  logout();
-                  navigate('/login');
-                }}
+                onClick={() => { setMenuOpen(false); setConfirmSignOut(true); }}
               >
                 <LogoutIcon size={15} />
                 <span>Sign out</span>
@@ -168,6 +165,11 @@ const StaffTopBar = ({ pages, searchLabel = 'Search pages', accountActions = [],
         </div>
       </header>
 
+      {confirmSignOut && <SignOutDialog onCancel={() => setConfirmSignOut(false)} onConfirm={async () => {
+        if (onSignOut) { await onSignOut(); return; }
+        await logout();
+        navigate('/login', { replace: true });
+      }} />}
       {!interactionBlocked && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} pages={pages} label={searchLabel} />}
     </>
   );

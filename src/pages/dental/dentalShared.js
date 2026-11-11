@@ -97,5 +97,22 @@ export const saveDentalVisit = async ({ patientId, record = null, service = null
     if (error.code === '42501') throw new Error('Your account cannot save dental visits. Sign in again.');
     throw new Error('The visit could not be saved. Check the details and try again.');
   }
+  // Email the patient the booked session so they learn of it without opening the portal.
+  // Their notification settings are checked by the function; a failed email never fails the save.
+  if (next?.date) {
+    supabase.functions.invoke('send-patient-notification', {
+      body: {
+        type: 'appointment_confirmation',
+        patient_id: patientId,
+        appointment_data: {
+          appointment_date: next.date,
+          appointment_time: formatTimeLabel(next.time),
+          department: 'Dental Clinic',
+          service_type: next.procedure || 'Dental Consultation',
+          clinician_name: next.dentist || 'To be assigned',
+        },
+      },
+    }).catch((err) => console.warn('Dental appointment email was not sent:', err));
+  }
   return data;
 };

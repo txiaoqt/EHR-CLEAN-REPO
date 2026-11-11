@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient.js';
 import { logAudit } from '../utils.js';
 import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord, isOwnerOrPrivileged } from '../accessControl.js';
+import { canOpenStaffPage } from '../staffPageAccess.mjs';
 import { SearchIcon, CloseIcon, ChevronDownIcon, CalendarIcon, ClockIcon, ReportsIcon } from '../components/icons/Icons.jsx';
 import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
@@ -913,7 +914,7 @@ const Appointments = () => {
             <table className="table appointments-schedule-table" aria-label="Appointments table">
               <thead>
                 <tr>
-                  <th>Queue #</th>
+                  <th>Date</th>
                   <th>Patient ID</th>
                   <th>Department</th>
                   <th>Service</th>
@@ -934,28 +935,20 @@ const Appointments = () => {
                 ) : (
                   pagination.pageRows.map((appt) => (
                     <tr key={appt.id} data-date={appt.appointment_date}>
-                      <td>
-                        {/* A cancelled appointment holds no queue position, so the
-                            number is not shown even if one was assigned at booking. */}
-                        {appt.queue_number != null && appt.status !== 'Cancelled' ? (
-                          <span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>#{appt.queue_number}</span>
-                        ) : (
-                          <span
-                            className="badge badge-neutral"
-                            style={{ fontWeight: 'var(--font-weight-bold)', opacity: 0.7 }}
-                            title={appt.status === 'Cancelled' ? 'Queue position released — appointment cancelled' : 'No queue number assigned'}
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{formatSelectedDateLabel(appt.appointment_date)}</td>
                       <td>
                         <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{appt.patient_id}</div>
                         {appt.students?.name && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{appt.students.name}</div>}
                       </td>
                       <td>{appt.department || 'Medical Clinic'}</td>
                       <td>{appt.service_type || 'Consultation'}</td>
-                      <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{formatTime12(appt.appointment_time)}</td>
+                      <td style={{ fontWeight: 'var(--font-weight-semibold)', whiteSpace: 'nowrap' }}>
+                        {formatTime12(appt.appointment_time)}
+                        {/* Only same-day bookings get a queue number; a cancelled one has released it. */}
+                        {appt.queue_number != null && appt.status !== 'Cancelled' && (
+                          <span className="badge badge-neutral" style={{ marginLeft: 6, fontWeight: 'var(--font-weight-bold)' }} title="Same-day queue number">#{appt.queue_number}</span>
+                        )}
+                      </td>
                       <td>
                         <span className="badge badge-neutral">{appt.type}</span>
                       </td>
@@ -983,7 +976,8 @@ const Appointments = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                          {appt.status === 'Cancelled' ? (
+                          {/* Open leads to the encounter or Medical Log; without that access the guard only bounces to the dashboard. */}
+                          {!canOpenStaffPage(user, 'encounter') ? null : appt.status === 'Cancelled' ? (
                             <button
                               type="button"
                               className="btn secondary small"
