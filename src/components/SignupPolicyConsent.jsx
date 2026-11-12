@@ -88,7 +88,7 @@ export default function SignupPolicyConsent({ policy, ready, checking, error, ch
           </div>
         </div>
         <p className="signup-policy-hint" id={id + '-hint'}>
-          {checking ? 'Loading policies…' : 'Required before verification and account creation.'}
+          {checking ? 'Loading policies…' : 'Required to create your account.'}
         </p>
         {error && <div className="signup-policy-load-error" role="alert">
           <p>The policies could not be loaded. Your form details are kept here.</p>

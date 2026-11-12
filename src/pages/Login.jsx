@@ -208,6 +208,22 @@ const Login = () => {
     await logout({ scope: 'local' });
   };
 
+  // The code can be sent before agreeing; the agreement is recorded here, at
+  // Create Account, once the address is verified.
+  const recordSignupAgreement = async () => {
+    const { error } = await supabase.rpc('record_signup_policy_agreement', { p_policy_version: signupAgreement.version });
+    if (!error) return true;
+    console.warn('Could not record the policy agreement:', error.message);
+    if (String(error.message).includes('POLICY_VERSION_CHANGED')) {
+      setSignupAgreement(null);
+      signupPolicy.refresh();
+      setMsg('The portal policies were updated. Please review and agree to them again.');
+    } else {
+      setMsg('Your policy agreement could not be saved. Please try again.');
+    }
+    return false;
+  };
+
   // Handle Password Recovery Session (following Y-TRACE SignIn architecture)
   useEffect(() => {
     if (isPasswordRecoverySession) {
@@ -402,7 +418,6 @@ const Login = () => {
   };
 
   const handleSendOtp = async () => {
-    if (!await requireSignupPolicy()) return;
     const targetEmail = signupData.email.trim().toLowerCase();
     const studentId = signupData.studentId.trim().toUpperCase();
 
@@ -445,7 +460,6 @@ const Login = () => {
             surname: toProperName(signupData.lastName),
             suffix: signupData.suffix.trim(),
             role: 'patient',
-            policy_agreement: signupAgreement,
             patient_id: studentId,
           },
         },
@@ -532,7 +546,6 @@ const Login = () => {
    *     directory until they are elevated.
    */
   const handleEnrolleeSendOtp = async () => {
-    if (!await requireSignupPolicy()) return;
     const targetEmail = enrolleeData.email.trim().toLowerCase();
     const firstName = enrolleeData.firstName.trim();
     const lastName = enrolleeData.lastName.trim();
@@ -588,7 +601,6 @@ const Login = () => {
               lastName,
             }) || 'Enrollee',
             role: 'enrollee',
-            policy_agreement: signupAgreement,
             first_name: firstName,
             middle_name: enrolleeData.middleName.trim() || null,
             surname: lastName,
@@ -697,6 +709,10 @@ const Login = () => {
         // The code signed in an existing account; it must not stay signed in.
         await endVerifiedSignup();
         setMsg('This email is already linked to another account. Please sign in with that account.');
+        setLoading(false);
+        return;
+      }
+      if (!await recordSignupAgreement()) {
         setLoading(false);
         return;
       }
@@ -840,6 +856,10 @@ const Login = () => {
         setLoading(false);
         return;
       }
+      if (!await recordSignupAgreement()) {
+        setLoading(false);
+        return;
+      }
 
       // Same first name and surname under another Student ID is usually the same
       // student with a mistyped ID. Warn once; a second Create Account confirms.
@@ -971,7 +991,7 @@ const Login = () => {
         !enrolleeData.dateOfBirth && 'your date of birth',
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enrolleeData.email) && 'a valid email',
       ]
-  ).concat(!signupPolicyAgreed && 'agreement to both policies below').filter(Boolean);
+  ).filter(Boolean);
   const isSendDisabled = otpSending || otpCooldown > 0 || sendMissing.length > 0;
   const sendMissingHint = !otpSent && sendMissing.length > 0 && (
     <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
@@ -1034,8 +1054,7 @@ const Login = () => {
     boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.04)',
   };
 
-  // The form opens immediately. Agreement is requested inside the form, before
-  // sending a code, because that action starts account creation with Auth.
+  // Agreement is needed for Create Account, not for sending the code.
   const signupConsent = (
     <SignupPolicyConsent policy={signupPolicy.policy} ready={signupPolicy.ready}
       checking={signupPolicy.checking} error={signupPolicy.error}
@@ -1519,7 +1538,7 @@ const Login = () => {
                         />
                       )}
 
-                      {/* Last, just above Create Account; still required before Send. */}
+                      {/* Last, just above Create Account, which requires it. */}
                       {signupConsent}
                     </>
                   )}
@@ -1821,8 +1840,7 @@ const Login = () => {
                     />
                   )}
 
-                  {/* 10. Policy agreement — last, just above Create Account. It is still
-                      required before Send, since sending the code creates the Auth account. */}
+                  {/* 10. Policy agreement — last, just above Create Account, which requires it. */}
                   {signupConsent}
                 </>
               )}
