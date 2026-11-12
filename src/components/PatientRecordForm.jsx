@@ -134,6 +134,9 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
   const [missing, setMissing] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [open, setOpen] = useState(() => lockIdentity || !initial?.submitted_at);
+  // A signup detail is locked only when it is on file; older accounts have none
+  // and must be able to enter it, or the form can never be saved.
+  const isLocked = (key) => lockIdentity && SIGNUP_IDENTITY_KEYS.has(key) && Boolean(identity?.[key]);
 
   // The one list that decides what is required. The database enforces the same
   // set, so this is a courtesy that tells the applicant early rather than a
@@ -142,14 +145,15 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
     const keys = [];
     for (const section of SECTIONS) {
       for (const field of section.fields) {
-        if (!field.optional && !(lockIdentity && SIGNUP_IDENTITY_KEYS.has(field.key))) keys.push(field.key);
+        if (!field.optional && !isLocked(field.key)) keys.push(field.key);
       }
     }
     return keys;
-  }, [lockIdentity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockIdentity, identity?.college_course, identity?.sex, identity?.date_of_birth]);
 
   const set = (key, value) => {
-    if (readOnly || (lockIdentity && SIGNUP_IDENTITY_KEYS.has(key))) return;
+    if (readOnly || isLocked(key)) return;
     const field = FIELD_BY_KEY.get(key);
     const nextValue = field?.mobileNumber
       ? limitPhone(value)
@@ -192,6 +196,14 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
     }
     setFieldErrors({});
     try {
+      // A birthday entered here for an older account becomes the one on file.
+      if (lockIdentity && !identity?.date_of_birth && answers.date_of_birth) {
+        const { error: dobErr } = await supabase.rpc('set_my_date_of_birth', { p_date_of_birth: answers.date_of_birth });
+        if (dobErr) {
+          setMessage(`Your date of birth could not be saved: ${dobErr.message}`);
+          return;
+        }
+      }
       const { data, error } = await supabase.rpc('submit_record_form', {
         p_college_course: answers.college_course || null,
         p_sex: answers.sex || null,
@@ -239,7 +251,7 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
 
       setMessage('Saved.');
       setAnswers((prev) => ({ ...prev, submitted_at: new Date().toISOString() }));
-      if (onSaved) onSaved();
+      if (onSaved) onSaved(answers);
     } catch (err) {
       console.error('Record form save error:', {
         message: err?.message,
@@ -308,7 +320,7 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
                 {section.fields.map((field) => {
                   const isMissing = missing.includes(field.key);
                   const fieldError = fieldErrors[field.key];
-                  const isLockedIdentity = lockIdentity && SIGNUP_IDENTITY_KEYS.has(field.key);
+                  const isLockedIdentity = isLocked(field.key);
                   const common = {
                     id: `record-${field.key}`,
                     disabled: readOnly,

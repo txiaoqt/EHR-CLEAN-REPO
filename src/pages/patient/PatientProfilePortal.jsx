@@ -764,8 +764,12 @@ const PatientProfilePortal = () => {
               }}
               lockIdentity
               onCancel={() => setRecordEditing(false)}
-              onSaved={() => {
+              onSaved={(saved) => {
                 setRecordEditing(false);
+                if (!profile.date_of_birth && saved?.date_of_birth) {
+                  setProfile((prev) => ({ ...prev, date_of_birth: saved.date_of_birth }));
+                  originalProfileRef.current = { ...originalProfileRef.current, date_of_birth: saved.date_of_birth };
+                }
                 loadRecord();
               }}
             />
