@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import ToothChart from './ToothChart.jsx';
-import { RecordFields, NextAppointmentFields, emptyNext, nextPayload } from './DentalForms.jsx';
+import { RecordFields, NextAppointmentFields, emptyNext, nextPayload, contactOk } from './DentalForms.jsx';
 import { DentalDialog } from './DentalAppointments.jsx';
 import { dentalCardHtml, dentalSummaryHtml, printHtml, transactionId } from './printDentalCard.js';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../components/icons/Icons.jsx';
@@ -200,7 +200,7 @@ const DentalRecord = () => {
           <DentalDialog title="Edit Dental Record" subtitle="Page 1 of the pink form and the dental chart" onClose={close} busy={busy}
             footer={<>
               <button type="button" className="btn secondary" onClick={close} disabled={busy}>Cancel</button>
-              <button type="button" className="btn" disabled={busy || !dialog.record.surname.trim() || !dialog.record.first_name.trim()}
+              <button type="button" className="btn" disabled={busy || !dialog.record.surname.trim() || !dialog.record.first_name.trim() || !contactOk(dialog.record.emergency_contact)}
                 onClick={() => save({ record: recordPayload(dialog.record) }, 'Dental record updated.')}>{busy ? 'Saving…' : 'Save Record'}</button>
             </>}>
             <RecordFields record={dialog.record} onChange={(r) => setDialog({ ...dialog, record: r })} disabled={busy} />

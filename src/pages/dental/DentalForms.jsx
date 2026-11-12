@@ -13,6 +13,10 @@ const STUDENT_FIELDS = 'id, name, year, first_name, middle_name, surname, suffix
 // "G." or "A. B." is an initial, not the full middle name the pink form asks for.
 const isInitialOnly = (text) => /^[A-Za-z]\.?(\s+[A-Za-z]\.?)*$/.test((text || '').trim());
 
+export const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Spouse', 'Sibling', 'Grandparent', 'Son', 'Daughter', 'Aunt', 'Uncle', 'Cousin', 'Relative', 'Friend', 'Other'];
+// Empty, or the 'N/A' older records were saved with, or an 11-digit mobile number starting with 09.
+export const contactOk = (value) => !value || value === 'N/A' || /^09\d{9}$/.test(value);
+
 const formatIdDigits = (text) => {
   const digits = text.replace(/\D/g, '').slice(0, 6);
   return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
@@ -163,8 +167,8 @@ export const loadRecordFor = async (patient) => {
       address: profile?.address || '',
       // N/A marks what the student left blank, as the paper form would.
       emergency_name: profile?.emergency_contact?.trim() || 'N/A',
-      emergency_relationship: 'N/A',
-      emergency_contact: profile?.emergency_contact_number?.trim() || 'N/A',
+      emergency_relationship: '',
+      emergency_contact: /^09\d{9}$/.test(profile?.emergency_contact_number?.trim() || '') ? profile.emergency_contact_number.trim() : '',
       emergency_address: 'N/A',
     },
   };
@@ -227,8 +231,22 @@ export const RecordFields = ({ record, onChange, disabled }) => {
       <h3 className="dental-section-title" style={{ marginTop: 22 }}>In Case of Emergency, Please Notify</h3>
       <div className="dental-fields" style={{ marginTop: 10 }}>
         {text('emergency_name', 'Name')}
-        {text('emergency_relationship', 'Relationship', { max: 60 })}
-        {text('emergency_contact', 'Contact Number', { max: 40 })}
+        <Field label="Relationship">
+          <select className="input" value={record.emergency_relationship || ''} onChange={set('emergency_relationship')} disabled={disabled}>
+            <option value="">Select relationship</option>
+            {/* Keep a value saved before the list existed (e.g. 'N/A') visible instead of silently dropping it. */}
+            {record.emergency_relationship && !RELATIONSHIPS.includes(record.emergency_relationship) && <option value={record.emergency_relationship}>{record.emergency_relationship}</option>}
+            {RELATIONSHIPS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </Field>
+        <Field label="Contact Number">
+          <input className="input" type="tel" inputMode="numeric" value={record.emergency_contact || ''} disabled={disabled}
+            maxLength={11} pattern={record.emergency_contact === 'N/A' ? undefined : '09[0-9]{9}'} title="Enter 11 digits beginning with 09." placeholder="09XXXXXXXXX"
+            aria-invalid={!contactOk(record.emergency_contact) || undefined}
+            style={contactOk(record.emergency_contact) ? undefined : { borderColor: 'var(--color-rose-text)' }}
+            onChange={(e) => onChange({ ...record, emergency_contact: e.target.value.replace(/\D/g, '').slice(0, 11) })} />
+          {!contactOk(record.emergency_contact) && <small style={{ color: 'var(--color-rose-text)' }}>Enter 11 digits, starting with 09.</small>}
+        </Field>
         {text('emergency_address', 'Address', { wide: true, max: 300 })}
       </div>
     </>
