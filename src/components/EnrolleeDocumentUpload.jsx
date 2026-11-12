@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
 import ResultDialog from './ResultDialog.jsx';
-import { AlertIcon, CheckIcon } from './icons/Icons.jsx';
+import { AlertIcon, CheckIcon, CloseIcon } from './icons/Icons.jsx';
+import PdfJsDocumentPreview from './PdfJsDocumentPreview.jsx';
+import { createReviewPreviewCache } from '../utils/reviewPreviewCache.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -22,6 +24,9 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState('error');
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const previewCache = useMemo(() => createReviewPreviewCache(), []);
+  useEffect(() => previewCache.retain(), [previewCache]);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!user?.id) {
@@ -33,7 +38,7 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
     try {
       const { data, error } = await supabase
         .from('enrollee_documents')
-        .select('id, file_name, storage_path, status, revision_note, revision_due_at, submitted_at, mime_type')
+        .select('id, file_name, storage_path, status, revision_note, revision_due_at, submitted_at, mime_type, size_bytes')
         .eq('enrollee_id', user.id)
         .order('submitted_at', { ascending: false });
       if (error) throw error;
@@ -254,9 +259,32 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
   const submissions = docs.filter((doc) => doc.status !== 'draft');
   const pendingSubmissionCount = drafts.length + queuedFiles.length;
   const canSubmit = !locked && !busyAction && pendingSubmissionCount > 0;
+  // One approved certificate is all the clinic needs; no more uploads after that.
+  const approved = submissions.some((doc) => doc.status === 'approved');
+
+  const openPreview = (doc) => {
+    previewCache.setDocuments(submissions);
+    setPreviewDoc(doc);
+  };
 
   return (
     <>
+      <header className="settings-card-head">
+        <h2>Medical certificate</h2>
+        <p>{approved
+          ? 'The clinic has approved your medical certificate. No more files are needed.'
+          : 'Choose one or more clear photos or PDFs, up to 10 MB each. Files are not uploaded until you save or submit them.'}</p>
+      </header>
+
+      {approved && (
+        <div role="status" className="record-form-message"
+          style={{ marginTop: 0, marginBottom: 0, background: 'var(--color-emerald-bg)', color: 'var(--color-emerald-text)' }}>
+          <CheckIcon size={15} />
+          <span>Medical certificate approved. You can continue with TUP email verification.</span>
+        </div>
+      )}
+
+      {!approved && <>
       <div className="enrollee-drop" aria-disabled={locked || undefined}>
         <div className="enrollee-drop-title">
           {submissions.length || drafts.length ? 'Add more files' : 'Choose photos or PDFs'}
@@ -360,7 +388,9 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
         </section>
       )}
 
-      {message && (
+      </>}
+
+      {message && !approved && (
         <div
           role="status"
           className="record-form-message"
@@ -392,7 +422,7 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
           <div className="enrollee-document-group-head">
             <div>
               <h3 id="submissions-title">Submitted files</h3>
-              <p>Add more files any time; each submission is reviewed separately.</p>
+              <p>{approved ? 'Select Preview to view a file you submitted.' : 'Add more files any time; each submission is reviewed separately.'}</p>
             </div>
             <span className="enrollee-document-count">{submissions.length}</span>
           </div>
@@ -408,12 +438,17 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
                     </span>
                   )}
                 </div>
-                {statusPill(doc.status)}
+                <div className="enrollee-document-row-actions">
+                  {statusPill(doc.status)}
+                  <button type="button" className="btn secondary small" onClick={() => openPreview(doc)}>Preview</button>
+                </div>
               </div>
             ))}
           </div>
         </section>
       )}
+
+      {previewDoc && <FilePreviewDialog doc={previewDoc} cache={previewCache} onClose={() => setPreviewDoc(null)} />}
 
       <ResultDialog
         open={confirmSubmit}
@@ -431,6 +466,35 @@ const EnrolleeDocumentUpload = ({ locked = false }) => {
         onClose={() => setConfirmSubmit(false)}
       />
     </>
+  );
+};
+
+const FilePreviewDialog = ({ doc, cache, onClose }) => {
+  const dialogRef = useRef(null);
+  const [source, setSource] = useState(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog.open) dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, []);
+  const url = source?.url || '';
+
+  return (
+    <dialog ref={dialogRef} className="enrollee-file-preview-dialog" aria-labelledby="enrollee-file-preview-title"
+      onCancel={(event) => { event.preventDefault(); onClose(); }}>
+      <header className="enrollee-file-preview-head">
+        <h2 id="enrollee-file-preview-title" title={doc.file_name}>{doc.file_name}</h2>
+        <button type="button" className="btn secondary small" aria-label="Close preview" onClick={onClose}><CloseIcon size={16} /></button>
+      </header>
+      <div className="enrollee-review-preview-surface enrollee-file-preview-surface">
+        <PdfJsDocumentPreview document={doc} cache={cache} onSourceReady={setSource} />
+      </div>
+      {url && (
+        <footer className="enrollee-file-preview-foot">
+          <button type="button" className="btn secondary small" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>Open original</button>
+        </footer>
+      )}
+    </dialog>
   );
 };
 

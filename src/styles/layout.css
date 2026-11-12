@@ -73,7 +73,8 @@ main.main {
   transition: margin-left var(--sidebar-duration) var(--sidebar-easing),
               width var(--sidebar-duration) var(--sidebar-easing),
               padding 0.2s ease;
-  will-change: margin-left, width;
+  /* No will-change here: a permanent GPU layer on the scrolling page left the
+     lower half unpainted when content grew (enrollee elevation form). */
 }
 
 #app-root.sidebar-collapsed main,

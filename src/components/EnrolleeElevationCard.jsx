@@ -101,7 +101,7 @@ const EnrolleeElevationCard = ({ locked = false }) => {
         : 'The clinic must approve at least one medical certificate before you can begin elevation.');
       return;
     }
-    const cleanId = studentId.trim().toUpperCase();
+    const cleanId = `TUPM-${studentId.trim()}`;
     const cleanEmail = tupEmail.trim().toLowerCase();
 
     if (!isValidStudentId(cleanId)) {
@@ -293,7 +293,8 @@ const EnrolleeElevationCard = ({ locked = false }) => {
         </p>
       </header>
 
-      <div
+      {/* Once approved, the certificate card above says so; repeating it here is noise. */}
+      {!hasApprovedCertificate && <div
         role="status"
         className="record-form-message"
         style={{
@@ -313,7 +314,7 @@ const EnrolleeElevationCard = ({ locked = false }) => {
                 ? 'Medical certificate approved. You can continue with TUP email verification.'
                 : 'Account elevation unlocks after the clinic approves at least one submitted medical certificate.'}
         </span>
-      </div>
+      </div>}
 
       {message && (
         <div
@@ -338,14 +339,23 @@ const EnrolleeElevationCard = ({ locked = false }) => {
       >
         <div className="settings-field">
           <label htmlFor="elevate-student-id">Official Student ID</label>
-          <input
-            id="elevate-student-id"
-            className="input"
-            placeholder="e.g. TUPM-26-1234"
-            disabled={locked || otpSent || submitting}
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value.toUpperCase())}
-          />
+          <span className="dental-id-input">
+            <span className="dental-id-prefix" aria-hidden="true">TUPM-</span>
+            <input
+              id="elevate-student-id"
+              className="input"
+              inputMode="numeric"
+              aria-label="Official Student ID after TUPM-"
+              placeholder="26-1234"
+              disabled={locked || otpSent || submitting}
+              value={studentId}
+              onChange={(e) => {
+                // A pasted full ID keeps working; only the YY-XXXX digits are kept.
+                const digits = e.target.value.replace(/^TUPM-?/i, '').replace(/\D/g, '').slice(0, 6);
+                setStudentId(digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits);
+              }}
+            />
+          </span>
         </div>
 
         <div className="settings-field">
@@ -416,8 +426,8 @@ const EnrolleeElevationCard = ({ locked = false }) => {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
-                placeholder="Enter 6-digit code from your @tup.edu.ph email"
-                style={{ letterSpacing: '0.25em', textAlign: 'center', maxWidth: 280 }}
+                placeholder="6-digit code from your email"
+                style={{ letterSpacing: otpCode ? '0.25em' : undefined, textAlign: 'center', maxWidth: 280 }}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               />

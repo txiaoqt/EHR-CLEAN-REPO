@@ -72,11 +72,6 @@ const EnrolleeHome = () => {
         )}
 
         <div className="card settings-card" style={{ marginBottom: 20 }}>
-          <header className="settings-card-head">
-            <h2>Medical certificate</h2>
-            <p>Choose one or more clear photos or PDFs, up to 10 MB each. Files are not uploaded until you save or submit them.</p>
-          </header>
-
           <EnrolleeDocumentUpload locked={locked} />
         </div>
 
