@@ -2,9 +2,9 @@
 import React from 'react';
 import { DesktopIcon } from './icons/Icons.jsx';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
-import { IS_DENTAL_SURFACE } from '../deploySurface.js';
+import { IS_ADMIN_SURFACE, IS_DENTAL_SURFACE } from '../deploySurface.js';
 
-const PORTAL = IS_DENTAL_SURFACE ? 'Dental Portal' : 'Staff Portal';
+const PORTAL = IS_ADMIN_SURFACE ? 'Admin Portal' : IS_DENTAL_SURFACE ? 'Dental Portal' : 'Staff Portal';
 
 const PCAccessRequired = ({ onLogout }) => {
   return (

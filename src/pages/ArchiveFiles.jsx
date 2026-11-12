@@ -255,7 +255,7 @@ const ArchiveFiles = () => {
                 marginBottom: 16,
               }}
             >
-              <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 420 }}>
+              <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 220 }}>
                 <span
                   style={{
                     position: 'absolute',
@@ -270,7 +270,7 @@ const ArchiveFiles = () => {
                 </span>
                 <input
                   className="input"
-                  style={{ paddingLeft: 36 }}
+                  style={{ width: '100%', paddingLeft: 36 }}
                   placeholder="Search folders by name, TUPM ID, Applicant ID, or file name"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

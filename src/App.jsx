@@ -239,7 +239,8 @@ function AppShell() {
     return <StaffSetup />;
   }
   // Gating order: Evaluate PC/Laptop Access Safeguard BEFORE session initialization and Login
-  if (IS_CLINIC_SURFACE && !isStaffDeviceSupported) {
+  const isAdminSetup = IS_ADMIN_SURFACE && (location.pathname === '/admin/setup' || user?.staff_setup_required);
+  if ((IS_CLINIC_SURFACE || (IS_ADMIN_SURFACE && !isAdminSetup)) && !isStaffDeviceSupported) {
     return <PCAccessRequired viewport={viewport} onLogout={isAuthenticated ? logout : undefined} />;
   }
 
