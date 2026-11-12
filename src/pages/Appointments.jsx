@@ -932,10 +932,6 @@ const Appointments = () => {
                       <td>{appt.service_type || 'Consultation'}</td>
                       <td style={{ fontWeight: 'var(--font-weight-semibold)', whiteSpace: 'nowrap' }}>
                         {formatTime12(appt.appointment_time)}
-                        {/* Only same-day bookings get a queue number; a cancelled one has released it. */}
-                        {appt.queue_number != null && appt.status !== 'Cancelled' && (
-                          <span className="badge badge-neutral" style={{ marginLeft: 6, fontWeight: 'var(--font-weight-bold)' }} title="Same-day queue number">#{appt.queue_number}</span>
-                        )}
                       </td>
                       <td>
                         <span className="badge badge-neutral">{appt.type}</span>
@@ -964,7 +960,8 @@ const Appointments = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                          {/* Open leads to the encounter; without that access the guard only bounces to the dashboard. */}
+                          {/* Scheduled: Open starts the New Encounter form. Completed: View shows the saved encounter.
+                              Without encounter access the guard only bounces to the dashboard. */}
                           {!canOpenStaffPage(user, 'encounter') ? null : appt.status === 'Cancelled' ? (
                             <button
                               type="button"
@@ -982,7 +979,7 @@ const Appointments = () => {
                               onClick={() => handleAction(appt)}
                               disabled={openingApptId === appt.id}
                             >
-                              {openingApptId === appt.id ? 'Opening…' : 'Open'}
+                              {openingApptId === appt.id ? 'Opening…' : appt.status === 'Completed' ? 'View' : 'Open'}
                             </button>
                           )}
 

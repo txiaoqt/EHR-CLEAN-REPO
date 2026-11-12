@@ -673,6 +673,15 @@ const Encounter = () => {
       if (error) throw error;
       const encounterId = inserted?.id;
 
+      // Saving the encounter is the visit: complete the booking too, so an
+      // appointment is never left "Scheduled" with its encounter already recorded.
+      if (encounterId && appointmentContext?.id && appointmentContext.status !== 'Completed') {
+        const { data: done, error: completeErr } = await supabase.rpc('complete_visit', {
+          p_appointment_id: appointmentContext.id, p_encounter_id: encounterId,
+        });
+        if (completeErr || done?.success === false) console.warn('The appointment was not marked Completed:', completeErr || done?.error);
+      }
+
       // 1. Record the dispensing against this encounter, then draw the stock
       //    down so the catalogue and the history agree.
       if (encounterId && dispensed.length > 0) {

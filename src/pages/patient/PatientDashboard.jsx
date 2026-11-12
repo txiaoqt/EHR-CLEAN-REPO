@@ -187,7 +187,7 @@ const PatientDashboard = () => {
                 Next Scheduled Appointment
               </h3>
               <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
-                Your upcoming confirmed or queue booking with TUP Clinic
+                Your upcoming booking with TUP Clinic
               </div>
             </div>
             {nextAppointment && (
@@ -234,10 +234,10 @@ const PatientDashboard = () => {
                 </div>
                 <div>
                   <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--muted)' }}>
-                    {nextAppointment.queue_number ? 'Queue Number:' : 'Booking Reference:'}
+                    Booking Reference:
                   </span>
                   <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-rose-text, #fda4af)', marginTop: 2 }}>
-                    {nextAppointment.queue_number ? `#${nextAppointment.queue_number}` : nextAppointment.reference_code || 'Confirmed'}
+                    {nextAppointment.reference_code || 'Confirmed'}
                   </div>
                 </div>
               </div>

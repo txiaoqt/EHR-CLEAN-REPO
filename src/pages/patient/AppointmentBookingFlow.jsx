@@ -789,17 +789,11 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
 
       setForm((p) => ({ ...p, appointment_time: '' }));
       await loadAppointments();
-      // The queue number is assigned by the database trigger — read it back
-      // rather than trusting a client-side guess.
-      const booked = await loadActiveAppointment(form.patient_id);
-      const assignedQueue = booked?.queue_number ?? null;
+      // Refresh the active booking shown on the Schedule card.
+      await loadActiveAppointment(form.patient_id);
 
       if (form.appointment_type === 'Same-day Appointment') {
-        setNotice(
-          assignedQueue != null
-            ? `Appointment reserved! Queue Number: #${assignedQueue}. Status: Scheduled. Please proceed to the clinic waiting area.`
-            : 'Appointment reserved! Status: Scheduled. Please proceed to the clinic waiting area.',
-        );
+        setNotice('Appointment reserved! Status: Scheduled. Please proceed to the clinic waiting area.');
       } else {
         setNotice(`Appointment confirmed! Reference Code: ${referenceCode}. Status: Scheduled.`);
       }
@@ -821,7 +815,6 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
               department: form.department,
               service_type: form.service_type,
               appointment_type: form.appointment_type,
-              queue_number: assignedQueue,
               reference_code: referenceCode,
               clinician_name: form.clinician_name || 'To be assigned',
             },
@@ -928,11 +921,6 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                       {activeAppointment.status}
                     </span>
                   </div>
-                  {activeAppointment.queue_number && (
-                    <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
-                      Queue #{activeAppointment.queue_number}
-                    </span>
-                  )}
                   {activeAppointment.reference_code && (
                     <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
                       Ref: {activeAppointment.reference_code}

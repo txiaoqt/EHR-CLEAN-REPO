@@ -33,7 +33,7 @@ const Help = () => {
     },
     {
       question: "How are patient appointments triaged?",
-      answer: "Students book appointments through the Patient Portal or on-site kiosk and receive a queue number for same-day visits. Medical personnel review upcoming queues in the Appointments page, where each appointment is Scheduled, Completed once the visit is done, or Cancelled. Completing an appointment frees the slot and moves the visit into the patient's records."
+      answer: "Students book appointments through the Patient Portal or on-site kiosk and receive a booking reference. Medical personnel review upcoming appointments in the Appointments page, where each appointment is Scheduled, Completed once the visit is done, or Cancelled. Completing an appointment frees the slot and moves the visit into the patient's records."
     }
   ];
 

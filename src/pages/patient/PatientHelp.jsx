@@ -82,7 +82,7 @@ const PatientHelp = () => {
     {
       question: 'How are appointments seen in order?',
       answer:
-        "Same-day appointments are seen in queue order. Your queue number is assigned when you book, and a cancelled booking releases its number so the queue stays compact. Future bookings keep a reference code rather than a queue number until the day.",
+        "Patients are seen in the order of their booked time slot. Each booking has a reference code you can show at the clinic.",
     },
     {
       question: 'What if I cannot attend my appointment?',
