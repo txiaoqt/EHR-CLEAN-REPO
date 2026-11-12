@@ -1,6 +1,7 @@
 // src/components/sidebar/PatientSidebar.jsx
 import React, { useState } from 'react';
 import SignOutDialog from '../SignOutDialog.jsx';
+import useUnreadMessages from '../../hooks/useUnreadMessages.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
@@ -45,6 +46,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
+  const unread = useUnreadMessages(user?.role);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const isEnrollee = (user?.role || '').toLowerCase() === 'enrollee';
@@ -156,13 +158,14 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
           <div className="nav-group">
             {navItems.map(({ path, label, icon: IconComponent }) => {
               const isActive = location.pathname === path;
+              const unreadHere = path.endsWith('/messages') ? unread.total : 0;
               return (
                 <div
                   key={path}
                   className={`menu-item patient-menu-item ${isActive ? 'active' : ''}`}
                   onClick={() => handleNavigation(path)}
                   title={collapsed ? label : undefined}
-                  aria-label={label}
+                  aria-label={unreadHere ? `${label}, ${unreadHere} unread` : label}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
@@ -173,6 +176,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
                     {IconComponent ? <IconComponent size={18} /> : null}
                   </span>
                   <span className="nav-label">{label}</span>
+                  {unreadHere > 0 && <span className="nav-unread-badge" aria-hidden="true">{unreadHere > 99 ? '99+' : unreadHere}</span>}
                 </div>
               );
             })}

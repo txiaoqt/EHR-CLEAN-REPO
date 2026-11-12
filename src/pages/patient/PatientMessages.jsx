@@ -8,6 +8,7 @@ import { MessagesIcon, SearchIcon, SendIcon, PlusIcon, CloseIcon, ChevronLeftIco
 import avatarPlaceholder from '../../assets/images/avatar-placeholder.jpg';
 import MessageAttachment from '../../components/MessageAttachment.jsx';
 import MessageReactions from '../../components/MessageReactions.jsx';
+import useUnreadMessages, { markConversationRead } from '../../hooks/useUnreadMessages.js';
 import {
   uploadMessageAttachment,
   validateAttachmentFile,
@@ -73,6 +74,7 @@ const getDateDividerLabel = (isoString) => {
 
 const PatientMessages = () => {
   const { user } = useAuth();
+  const unread = useUnreadMessages(user?.role);
   const {
     staffList, onlineStaff, checking: checkingStaff, availabilityUnavailable,
     statusForAuthId, findConversationStaff, conversationStatus, refreshStaff,
@@ -267,6 +269,15 @@ const PatientMessages = () => {
   }, [conversations, activeConversationId]);
 
   const isCurrentConversationResolved = (activeConversation?.status || 'open').toLowerCase() !== 'open';
+
+  // The open thread counts as read, including replies that arrive while it is on screen.
+  useEffect(() => {
+    if (!activeConversationId || activeConversation?.isFallback) return undefined;
+    const mark = () => { if (document.visibilityState !== 'hidden') markConversationRead(activeConversationId); };
+    mark();
+    document.addEventListener('visibilitychange', mark);
+    return () => document.removeEventListener('visibilitychange', mark);
+  }, [activeConversationId, activeConversation?.isFallback, messages.length]);
   const activeStaffStatus = conversationStatus(activeConversation);
   const inquiryClinic = CLINICS[inquiryForm.clinic];
   const clinicOnlineStaff = onlineStaff.filter((staff) => inquiryClinic.roles.includes(staff.role));
@@ -864,6 +875,7 @@ const PatientMessages = () => {
                   filteredConversations.map((c) => {
                     const isActive = activeConversationId === c.id;
                     const isResolved = (c.status || 'open').toLowerCase() !== 'open';
+                    const unreadCount = isActive ? 0 : (unread.byConversation[c.id] || 0);
                     return (
                       <button
                         key={c.id}
@@ -889,8 +901,9 @@ const PatientMessages = () => {
                             <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.recipient_name}
                             </div>
-                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
+                              {unreadCount > 0 && <span className="conversation-unread-badge">{unreadCount}<span className="sr-only"> unread</span></span>}
                             </span>
                           </div>
                           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 'var(--font-weight-medium)', marginTop: 1 }}>

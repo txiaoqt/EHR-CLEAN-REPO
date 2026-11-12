@@ -1,6 +1,7 @@
 // src/components/sidebar/Sidebar.jsx
 import React, { useEffect, useState } from 'react';
 import SignOutDialog from '../SignOutDialog.jsx';
+import useUnreadMessages from '../../hooks/useUnreadMessages.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { translate } from '../../utils';
 import { useAuth } from '../../AuthContext.jsx';
@@ -109,6 +110,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
+  const unread = useUnreadMessages(user?.role, canOpenStaffPage(user, 'patient-messages'));
   const { selfStatus } = useStaffPresence();
   const [languageChange, setLanguageChange] = useState(0);
 
@@ -221,6 +223,7 @@ const Sidebar = ({ collapsed = false, toggle }) => {
                   || location.pathname.startsWith(`/${page}/`)
                   || (page === 'dashboard' && location.pathname === '/');
                 const navTitle = translate(label) || label;
+                const unreadHere = page === 'patient-messages' ? unread.total : 0;
                 return (
                   <div
                     key={page + label}
@@ -228,13 +231,14 @@ const Sidebar = ({ collapsed = false, toggle }) => {
                     data-page={page}
                     onClick={() => handleNavigation(page)}
                     title={collapsed ? navTitle : undefined}
-                    aria-label={navTitle}
+                    aria-label={unreadHere ? `${navTitle}, ${unreadHere} unread` : navTitle}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleNavigation(page); }}
                   >
                     <span className="nav-icon" aria-hidden="true">{IconComponent ? <IconComponent /> : null}</span>
                     <span className="nav-label">{navTitle}</span>
+                    {unreadHere > 0 && <span className="nav-unread-badge" aria-hidden="true">{unreadHere > 99 ? '99+' : unreadHere}</span>}
                   </div>
                 );
               })}

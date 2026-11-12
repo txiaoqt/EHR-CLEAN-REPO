@@ -42,3 +42,11 @@ Checked against the code and the live Supabase database (read-only).
 ## Open item found during review
 
 - `send-patient-notification` accepts a `recipient_email` from any signed-in caller, so a signed-in user could make it email any address. It is not part of this round; it should be restricted to the patient's own email on file.
+
+## Follow-up (2026-11-13)
+
+| # | Item | Finding | Action taken |
+|---|---|---|---|
+| 18 | **Doctor:** Appointments → Open still returns to the Dashboard | Already fixed in `e91be37e`, and the live staff portal has that build: Open is hidden for roles without Encounter access. The tester was likely on a tab opened before the deploy. | No change. Refresh or reopen the portal. |
+| 19 | **Patient:** Cancel their own appointment | Missing. The Help page already told patients to "cancel it from Schedule", but there was no button. Patients already had permission to update their own appointments, so no migration was needed. | **Cancel Appointment** on the active-appointment card in Schedule, with a "Keep Appointment / Cancel Appointment" confirmation. The database releases the slot and any same-day queue number. Hidden in kiosk mode. |
+| 20 | **Patient/Staff:** Message notifications like Messenger | Missing. Messages had no read tracking at all. | Migration `20261113100000_message_read_tracking.sql` records when each side last read a conversation. Red unread count on the **Messages** / **Patient Messages** nav item (staff, dental, patient, enrollee), a red dot on the patient's mobile menu button, and an unread count on each conversation in the inbox. It updates live when a message arrives, and the open thread is marked read. Existing threads start as read. |

@@ -14,6 +14,7 @@ import {
 } from '../utils/messageAttachments.js';
 import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 import { emailEnabled } from '../utils.js';
+import useUnreadMessages, { markConversationRead } from '../hooks/useUnreadMessages.js';
 
 // Date/time formatting helpers
 const formatMessageTime = (isoString) => {
@@ -58,6 +59,7 @@ const getDateDividerLabel = (isoString) => {
 
 const StaffPatientMessages = () => {
   const { user } = useAuth();
+  const unread = useUnreadMessages(user?.role);
   const userRole = (user?.role || '').toLowerCase();
   const isStaff = ['physician', 'nurse', 'dentist', 'clerk', 'admin'].includes(userRole);
 
@@ -242,6 +244,15 @@ const StaffPatientMessages = () => {
   }, [conversations, activeConversationId]);
 
   const isCurrentConversationResolved = (activeConversation?.status || 'open').toLowerCase() !== 'open';
+
+  // The open thread counts as read, including messages that arrive while it is on screen.
+  useEffect(() => {
+    if (!activeConversationId || activeConversation?.isFallback) return undefined;
+    const mark = () => { if (document.visibilityState !== 'hidden') markConversationRead(activeConversationId); };
+    mark();
+    document.addEventListener('visibilitychange', mark);
+    return () => document.removeEventListener('visibilitychange', mark);
+  }, [activeConversationId, activeConversation?.isFallback, messages.length]);
 
   // 2. Load messages for active conversation
   useEffect(() => {
@@ -900,6 +911,7 @@ const StaffPatientMessages = () => {
                   filteredConversations.map((c) => {
                     const isActive = activeConversationId === c.id;
                     const isResolved = (c.status || 'open').toLowerCase() !== 'open';
+                    const unreadCount = isActive ? 0 : (unread.byConversation[c.id] || 0);
                     return (
                       <button
                         key={c.id}
@@ -924,8 +936,9 @@ const StaffPatientMessages = () => {
                             <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-sm)', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {c.patient_name || 'Patient'}
                             </div>
-                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               {formatInboxDate(c.updated_at).split(' · ')[0]}
+                              {unreadCount > 0 && <span className="conversation-unread-badge">{unreadCount}<span className="sr-only"> unread</span></span>}
                             </span>
                           </div>
                           <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)' }}>

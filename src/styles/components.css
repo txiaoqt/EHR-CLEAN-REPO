@@ -7459,3 +7459,9 @@ select {
 .signup-review-dialog dd { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
 .signup-review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
 @media (max-width: 480px) { .signup-review-dialog dl > div { grid-template-columns: 1fr; gap: 2px; } }
+
+/* Unread message count on the Messages nav item (hooks/useUnreadMessages.js). */
+.nav-unread-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--danger, #dc2626); color: #fff; font-size: 11px; font-weight: var(--font-weight-bold); line-height: 1; flex-shrink: 0; }
+.sidebar.collapsed .nav-unread-badge { position: absolute; top: 2px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; margin: 0; }
+.nav-unread-dot { position: absolute; top: 4px; right: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger, #dc2626); box-shadow: 0 0 0 2px var(--panel, #fff); }
+.conversation-unread-badge { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--danger, #dc2626); color: #fff; font-size: 10px; font-weight: var(--font-weight-bold); flex-shrink: 0; }

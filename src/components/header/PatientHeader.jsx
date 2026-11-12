@@ -1,6 +1,7 @@
 // src/components/header/PatientHeader.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import SignOutDialog from '../SignOutDialog.jsx';
+import useUnreadMessages from '../../hooks/useUnreadMessages.js';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
 import { useTheme } from '../../ThemeContext.jsx';
@@ -11,6 +12,7 @@ import { UserIcon, SettingsIcon, LogoutIcon, SunIcon, MoonIcon } from '../icons/
 const PatientHeader = ({ onToggleNav }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const unread = useUnreadMessages(user?.role);
   const { theme, toggleTheme, isDark } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -61,9 +63,11 @@ const PatientHeader = ({ onToggleNav }) => {
             type="button"
             className="patient-header-menu-btn"
             onClick={onToggleNav}
-            aria-label="Toggle navigation menu"
+            aria-label={unread.total ? `Toggle navigation menu, ${unread.total} unread messages` : 'Toggle navigation menu'}
+            style={{ position: 'relative' }}
           >
             <span style={{ fontSize: 'var(--font-size-xl)', lineHeight: 1 }}>☰</span>
+            {unread.total > 0 && <span className="nav-unread-dot" aria-hidden="true" />}
           </button>
 
           <div

@@ -4,6 +4,7 @@ import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import { emailEnabled } from '../../utils.js';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
 const SLOT_TIMES = ['09:00-12:00', '13:00-16:00', '16:00-19:00'];
 const SLOT_CAPACITY = 1;
@@ -110,6 +111,7 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
   const [notice, setNotice] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [appointmentDescription, setAppointmentDescription] = useState('');
   const [appointmentPhoto, setAppointmentPhoto] = useState(null);
   const [appointmentPhotoPreview, setAppointmentPhotoPreview] = useState('');
@@ -198,6 +200,29 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     } finally {
       setLoadingActiveAppt(false);
     }
+  };
+
+  // A patient can cancel their own scheduled booking (e.g. an emergency); the slot and
+  // any same-day queue number are released by the database on cancellation.
+  const cancelActiveAppointment = async () => {
+    if (!activeAppointment) return;
+    const { data, error } = await supabase
+      .from('appointments')
+      .update({ status: 'Cancelled' })
+      .eq('id', activeAppointment.id)
+      .eq('status', 'Scheduled')
+      .select('id');
+    setConfirmCancel(false);
+    if (error || !data?.length) {
+      setNotice('Your appointment could not be cancelled. Refresh the page and try again, or contact the clinic.');
+      setNoticeOpen(true);
+      await loadActiveAppointment(form.patient_id);
+      return;
+    }
+    setActiveAppointment(null);
+    setNotice('Your appointment was cancelled. You can book a new one anytime.');
+    setNoticeOpen(true);
+    await loadAppointments();
   };
 
   const loadAppointments = async () => {
@@ -917,6 +942,26 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
                 <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text)', fontWeight: 'var(--font-weight-medium)', marginTop: 2 }}>
                   You already have an active appointment. Please complete or cancel your current appointment before booking another.
                 </div>
+                {!kioskMode && (
+                  <div>
+                    <button type="button" className="btn secondary small" onClick={() => setConfirmCancel(true)}>
+                      Cancel Appointment
+                    </button>
+                  </div>
+                )}
+                {confirmCancel && (
+                  <ConfirmDialog
+                    title="Cancel this appointment?"
+                    message={`Your ${activeAppointment.department} appointment on ${activeAppointment.appointment_date} at ${activeAppointment.appointment_time} will be cancelled and the slot released. This cannot be undone, but you can book again.`}
+                    busyMessage="Cancelling your appointment…"
+                    confirmLabel="Cancel Appointment"
+                    busyLabel="Cancelling…"
+                    cancelLabel="Keep Appointment"
+                    danger
+                    onCancel={() => setConfirmCancel(false)}
+                    onConfirm={cancelActiveAppointment}
+                  />
+                )}
               </div>
             )}
 
