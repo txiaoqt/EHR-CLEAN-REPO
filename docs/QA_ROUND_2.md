@@ -6,7 +6,7 @@ Checked against the code and the live Supabase database (read-only).
 
 | # | Bug | Cause | Action taken |
 |---|---|---|---|
-| 1 | **Admin:** Staff invitation link does not work when setting the password | The invitation expiry setting is **5 minutes** in production. The physician invite sent 11/11 expired at 5 minutes and is still "pending". Brevo delivery plus opening the email often takes longer. | No code change. **Set "Invitation expiry" to 60 minutes in Admin → Settings** (allowed range 5–60), then resend the pending invitations. |
+| 1 | **Admin:** Staff invitation link does not work when setting the password | The invitation expiry setting is **5 minutes** in production. The physician invite sent 11/11 expired at 5 minutes and is still "pending". Brevo delivery plus opening the email often takes longer. | Expiry set to **60 minutes** (the maximum) directly in the live settings on 2026-11-13; there is no admin screen for it. Resend the pending invitations. |
 | 2 | **Patient:** Cannot book a Medical appointment while a Dental appointment exists ("You already have an active appointment…") | The app and the database trigger already check per clinic, but an older unique index (`idx_appointments_one_active_per_student`) still allowed only **one scheduled appointment per patient across both clinics**. | Migration `20261112100000_booking_per_clinic_and_own_birthday.sql` rebuilds the index per patient **per clinic**. |
 | 3 | **Dental:** In Edit Record, typing in any field (Place of Birth, address…) jumps into Surname | The dialog re-ran its "focus the first field" step on every keystroke, because the page passed it a new close handler each render. The Reschedule and Cancel dialogs had the same problem. | `DentalDialog` focuses the first field only when it opens. Tested: typing "Manila" in Place of Birth stays there; Surname stays empty. |
 | 4 | **Doctor:** Appointments → "Open" just goes to the Dashboard | Open leads to Encounter / Medical Log. The physician has no access to either page, so the page guard sends them to the Dashboard. | Open is hidden for roles without Encounter access. Nurses still have it. |
@@ -37,7 +37,7 @@ Checked against the code and the live Supabase database (read-only).
    - `20261112100000_booking_per_clinic_and_own_birthday.sql`
    - `20261112110000_patient_archive.sql`
 2. Deploy the frontend for all four portals.
-3. In Admin → Settings, set Invitation expiry to 60 minutes, then resend the pending invitations.
+3. Invitation expiry is already 60 minutes (set 2026-11-13). Resend the pending invitations.
 
 ## Open item found during review
 
@@ -50,3 +50,7 @@ Checked against the code and the live Supabase database (read-only).
 | 18 | **Doctor:** Appointments → Open still returns to the Dashboard | Already fixed in `e91be37e`, and the live staff portal has that build: Open is hidden for roles without Encounter access. The tester was likely on a tab opened before the deploy. | No change. Refresh or reopen the portal. |
 | 19 | **Patient:** Cancel their own appointment | Missing. The Help page already told patients to "cancel it from Schedule", but there was no button. Patients already had permission to update their own appointments, so no migration was needed. | **Cancel Appointment** on the active-appointment card in Schedule, with a "Keep Appointment / Cancel Appointment" confirmation. The database releases the slot and any same-day queue number. Hidden in kiosk mode. |
 | 20 | **Patient/Staff:** Message notifications like Messenger | Missing. Messages had no read tracking at all. | Migration `20261113100000_message_read_tracking.sql` records when each side last read a conversation. Red unread count on the **Messages** / **Patient Messages** nav item (staff, dental, patient, enrollee), a red dot on the patient's mobile menu button, and an unread count on each conversation in the inbox. It updates live when a message arrives, and the open thread is marked read. Existing threads start as read. |
+| 21 | **Medical (dark mode):** Dashboard/KPI numbers stay black | `.kpi-value` forced `color: #000 !important`. Archive Files draws its own cards, so it was fine there. | Uses the theme text colour. |
+| 22 | **Reset password notice** is hard to read | The notice box is always white, but its message used the theme's secondary text colour, which is light in dark mode. | Message text fixed to dark grey on the white box. |
+| 23 | **Export CSV** does not download | Every config builds its CSV correctly (checked). The download link was revoked immediately after the click, which can cancel the download; PDF uses jsPDF's save, which waits 40s. | All CSV downloads (exports, Reports, Dental Reports) go through one helper that waits 40s. Not reproduced in a staff session. |
+| 24 | **Admin:** sidebar Sign Out skipped the confirmation | Only the top-bar menu asked. | The sidebar button opens the same Sign Out? dialog. |

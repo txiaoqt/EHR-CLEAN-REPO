@@ -477,12 +477,6 @@ const Appointments = () => {
         .maybeSingle();
       if (encounterError) throw encounterError;
 
-      if (linkedEncounter?.id) {
-        showToast('An encounter is already recorded for this appointment. Opening the Medical Log.', 'info');
-        navigate('/medical-log');
-        return;
-      }
-
       let patientName = appt.patient_name || appt.students?.name || '';
       if (!patientName) {
         const { data: studentRecord, error: studentErr } = await supabase
@@ -494,7 +488,11 @@ const Appointments = () => {
         patientName = studentRecord?.name || '';
       }
 
-      navigate(`/encounter?appointmentId=${encodeURIComponent(appt.id)}`, {
+      // An appointment that already has an encounter opens that encounter instead of a new one.
+      const target = linkedEncounter?.id
+        ? `/encounter?encounterId=${encodeURIComponent(linkedEncounter.id)}`
+        : `/encounter?appointmentId=${encodeURIComponent(appt.id)}`;
+      navigate(target, {
         state: {
           patientId,
           patientName: patientName || patientId,
@@ -966,7 +964,7 @@ const Appointments = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                          {/* Open leads to the encounter or Medical Log; without that access the guard only bounces to the dashboard. */}
+                          {/* Open leads to the encounter; without that access the guard only bounces to the dashboard. */}
                           {!canOpenStaffPage(user, 'encounter') ? null : appt.status === 'Cancelled' ? (
                             <button
                               type="button"

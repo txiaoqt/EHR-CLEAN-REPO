@@ -20,6 +20,7 @@ import {
 import { Bar, Pie } from 'react-chartjs-2';
 import 'jspdf-autotable';
 import { formatDate, logAudit } from '../utils.js';
+import { downloadBlob } from '../utils/export/csv.js';
 import { useTheme } from '../ThemeContext.jsx';
 import { CloseIcon, ChevronDownIcon } from '../components/icons/Icons.jsx';
 import tupehrlogo from '../assets/images/tupehrlogo.jpg';
@@ -221,13 +222,7 @@ const Reports = () => {
       return [date, patient, clinician, complaint, id].join(',');
     });
     const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tup_report_${type}_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), `tup_report_${type}_${new Date().toISOString().slice(0,10)}.csv`);
     setShowExportMenu(false);
   };
 

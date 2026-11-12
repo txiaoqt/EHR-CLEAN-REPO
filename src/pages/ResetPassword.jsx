@@ -551,7 +551,7 @@ const ResetPassword = () => {
             <h3 style={{ margin: '0 0 10px 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: '#0f172a' }}>
               {msg.toLowerCase().includes('success') ? 'Success' : 'Notice'}
             </h3>
-            <div style={{ color: msg.toLowerCase().includes('error') || msg.toLowerCase().includes('unable') ? 'var(--danger, #dc2626)' : 'var(--text-secondary, #334155)', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
+            <div style={{ color: msg.toLowerCase().includes('error') || msg.toLowerCase().includes('unable') ? 'var(--danger, #dc2626)' : '#334155', fontSize: 'var(--font-size-base)', lineHeight: 1.5 }}>
               {msg}
             </div>
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>

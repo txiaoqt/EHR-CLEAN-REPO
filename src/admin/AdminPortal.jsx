@@ -13,6 +13,7 @@ import ResetPassword from '../pages/ResetPassword.jsx';
 import LegalPolicy from '../pages/LegalPolicy.jsx';
 import StaffSetup from './StaffSetup.jsx';
 import StaffTopBar from '../components/header/StaffTopBar.jsx';
+import SignOutDialog from '../components/SignOutDialog.jsx';
 import logo from '../assets/images/tupehrlogo.jpg';
 import { DashboardIcon, UsersIcon, UserIcon, HistoryIcon, BackupIcon, MailIcon,
   ChevronLeftIcon, ChevronRightIcon, LogoutIcon, EyeIcon, EyeOffIcon, CloseIcon, LockIcon } from '../components/icons/Icons.jsx';
@@ -106,6 +107,7 @@ export default function AdminPortal() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountDialog, setAccountDialog] = useState(null);
   const [accountMessage, setAccountMessage] = useState('');
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [mobile, setMobile] = useState(() => window.innerWidth < 1024);
   const railCollapsed = collapsed && !mobile;
   useEffect(() => {
@@ -151,7 +153,7 @@ export default function AdminPortal() {
             <NavLink className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} to={path} title={label}><span className="nav-icon"><Icon /></span><span className="nav-label">{label}</span></NavLink>
           </React.Fragment>)}
         </nav>
-        <div className="sidebar-footer"><div className="sidebar-profile-card"><div className="system-admin-muted">Logged in as</div><strong>{user.name}</strong><div className="system-admin-muted">System Administrator</div></div><button className="btn secondary system-admin-signout" onClick={signOut}><LogoutIcon /><span className="nav-label">Sign Out</span></button></div>
+        <div className="sidebar-footer"><div className="sidebar-profile-card"><div className="system-admin-muted">Logged in as</div><strong>{user.name}</strong><div className="system-admin-muted">System Administrator</div></div><button className="btn secondary system-admin-signout" onClick={() => setConfirmSignOut(true)}><LogoutIcon /><span className="nav-label">Sign Out</span></button></div>
       </aside>
     </div>
     {mobileOpen && <button className="system-admin-backdrop" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
@@ -176,6 +178,7 @@ export default function AdminPortal() {
     {(user.must_change_password || accountDialog) && <AdminAccountDialog key={user.must_change_password ? 'required-password' : accountDialog}
       type={user.must_change_password ? 'password' : accountDialog} required={Boolean(user.must_change_password)} onClose={() => setAccountDialog(null)}
       onSaved={message => { setAccountDialog(null); setAccountMessage(message); }} onSignOut={signOut} />}
+    {confirmSignOut && <SignOutDialog onCancel={() => setConfirmSignOut(false)} onConfirm={signOut} />}
     {accountMessage && <div className="system-admin-notice system-admin-account-notice" role="status"><span>{accountMessage}</span><button type="button" className="system-admin-icon-btn" aria-label="Dismiss message" onClick={() => setAccountMessage('')}><CloseIcon size={16} /></button></div>}
   </div>;
 }

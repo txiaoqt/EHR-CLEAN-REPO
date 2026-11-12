@@ -362,7 +362,7 @@ textarea::placeholder {
 .kpi-value {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
-  color: #000 !important;
+  color: var(--text) !important;
   line-height: 1.15;
   margin: 0;
   font-variant-numeric: tabular-nums;
@@ -3691,7 +3691,16 @@ input.enrollee-review-checkbox:focus-visible,
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   margin-bottom: 10px;
-  overflow: hidden;
+}
+
+/* Rounded here instead of overflow:hidden on the section, which clipped the course dropdown. */
+.record-form-section > .record-form-head {
+  border-radius: inherit;
+}
+
+.record-form-section > .record-form-head:not(:only-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .record-form-head {

@@ -1,18 +1,13 @@
 // Utility functions
 import { supabase } from './supabaseClient.js';
+import { downloadBlob } from './utils/export/csv.js';
 const normalizeTheme = (value) => {
   const mode = typeof value === 'string' ? value.trim().toLowerCase() : '';
   return mode === 'dark' ? 'dark' : 'light';
 };
 
 export const exportCsv = (filename = 'report.csv', csvData = "name,data\ndemo,1") => {
-  const blob = new Blob([csvData], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([csvData], { type: 'text/csv' }), filename);
 };
 
 // Settings management

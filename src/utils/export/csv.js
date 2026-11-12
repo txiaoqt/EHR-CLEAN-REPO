@@ -61,8 +61,8 @@ export const downloadBlob = (blob, filename) => {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Revoke on the next tick so Safari has time to start the download.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Revoking too soon can cancel the download; jsPDF's save() waits 40s too.
+  setTimeout(() => URL.revokeObjectURL(url), 40000);
 };
 
 const manilaDate = (date = new Date()) =>
