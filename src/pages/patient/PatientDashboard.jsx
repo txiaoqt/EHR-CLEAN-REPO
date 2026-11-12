@@ -7,6 +7,7 @@ import { RecordIncompleteBanner } from '../../components/RecordGate.jsx';
 import { CalendarIcon, ClockIcon, CheckIcon, MessagesIcon } from '../../components/icons/Icons.jsx';
 import KpiCard from '../../components/KpiCard.jsx';
 import { isVisitCompleted } from '../../utils/visitStatus.js';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
@@ -20,6 +21,9 @@ const PatientDashboard = () => {
 
   const studentName = user?.name || 'Angel Keith Carbon';
 
+  const [tick, setTick] = useState(0);
+  useVisibleRefresh(() => setTick((t) => t + 1));
+
   useEffect(() => {
     let mounted = true;
     const loadDashboardData = async () => {
@@ -27,7 +31,7 @@ const PatientDashboard = () => {
         if (mounted) setLoading(false);
         return;
       }
-      setLoading(true);
+      if (!tick) setLoading(true);
       try {
         const [
           { data: appts },
@@ -106,7 +110,7 @@ const PatientDashboard = () => {
 
     loadDashboardData();
     return () => { mounted = false; };
-  }, [user?.patient_id]);
+  }, [user?.patient_id, tick]);
 
   const nextAppointment = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);

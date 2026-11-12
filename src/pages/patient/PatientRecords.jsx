@@ -9,6 +9,7 @@ import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { CloseIcon } from '../../components/icons/Icons.jsx';
 import { isVisitCompleted } from '../../utils/visitStatus.js';
 import PatientDentalHistory from './PatientDentalHistory.jsx';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 
 // Patient acknowledgements live in the same public bucket as clinician
 // signatures, under a distinct folder so the two can never be confused.
@@ -51,12 +52,12 @@ const PatientRecords = () => {
   const [signError, setSignError] = useState('');
   const [savingSignature, setSavingSignature] = useState(false);
 
-  const loadRecords = async () => {
+  const loadRecords = async (quiet = false) => {
     if (!user?.patient_id) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!quiet) setLoading(true);
     try {
       // The shared visit view includes completed appointments even when no
       // clinical note was written. Evaluate each row by its source so a
@@ -102,6 +103,8 @@ const PatientRecords = () => {
       setLoading(false);
     }
   };
+
+  useVisibleRefresh(() => loadRecords(true));
 
   useEffect(() => {
     let mounted = true;

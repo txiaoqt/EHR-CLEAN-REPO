@@ -5,6 +5,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import { emailEnabled } from '../../utils.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 
 const SLOT_TIMES = ['09:00-12:00', '13:00-16:00', '16:00-19:00'];
 const SLOT_CAPACITY = 1;
@@ -225,8 +226,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
     await loadAppointments();
   };
 
-  const loadAppointments = async () => {
-    setAvailabilityLoading(true);
+  const loadAppointments = async (quiet = false) => {
+    if (!quiet) setAvailabilityLoading(true);
     try {
       // 1. Fetch global slot occupancy across all students via secure RPC (privacy-preserving, works with RLS)
       const maxDate = toDateKey(addMonths(new Date(), 3));
@@ -285,6 +286,8 @@ const AppointmentBookingFlow = ({ source = 'portal', kioskMode = false }) => {
       setAvailabilityLoading(false);
     }
   };
+
+  useVisibleRefresh(() => loadAppointments(true));
 
   // Lifecycle synchronization triggers: initial load, focus, visibility, and Realtime subscription
   useEffect(() => {

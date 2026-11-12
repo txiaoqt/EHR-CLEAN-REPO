@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import { ClockIcon, MessagesIcon, UserIcon } from '../../components/icons/Icons.jsx';
 import { formatDay, formatTimeLabel, todayIso } from '../dental/dentalShared.js';
 import '../dental/dental.css';
@@ -28,6 +29,8 @@ const PatientDentalAppointments = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');
+  const [tick, setTick] = useState(0);
+  useVisibleRefresh(() => setTick((t) => t + 1));
 
   useEffect(() => {
     if (!user?.patient_id) { setRows([]); return; }
@@ -36,10 +39,10 @@ const PatientDentalAppointments = () => {
       .eq('patient_id', user.patient_id).eq('department', 'Dental Clinic')
       .order('appointment_date', { ascending: false }).order('appointment_time', { ascending: false })
       .then(({ data, error: loadError }) => {
-        if (loadError) setError('Your dental appointments could not be loaded. Refresh the page to try again.');
+        setError(loadError ? 'Your dental appointments could not be loaded. Refresh the page to try again.' : '');
         setRows(data || []);
       });
-  }, [user?.patient_id]);
+  }, [user?.patient_id, tick]);
 
   const today = todayIso();
   const upcoming = (rows || []).filter((a) => a.status === 'Scheduled' && a.appointment_date >= today).reverse();

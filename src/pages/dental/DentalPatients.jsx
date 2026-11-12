@@ -4,6 +4,7 @@ import { supabase } from '../../supabaseClient.js';
 import { SearchIcon, CloseIcon } from '../../components/icons/Icons.jsx';
 import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import { ageFrom, formatDay, recordSortName } from './dentalShared.js';
 import './dental.css';
 
@@ -20,6 +21,8 @@ const DentalPatients = () => {
   const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [view, setView] = useState('active');
+  const [tick, setTick] = useState(0);
+  useVisibleRefresh(() => setTick((t) => t + 1));
 
   useEffect(() => {
     (async () => {
@@ -29,7 +32,7 @@ const DentalPatients = () => {
         supabase.from('dental_services').select('patient_id, service_date').order('service_date', { ascending: false }),
         supabase.from('patient_profiles').select('patient_id, sex, course'),
       ]);
-      if (patientsRes.error || recordsRes.error) setLoadError('Patients could not be loaded. Refresh the page to try again.');
+      setLoadError(patientsRes.error || recordsRes.error ? 'Patients could not be loaded. Refresh the page to try again.' : '');
       const last = {};
       (visits || []).forEach((v) => { if (!last[v.patient_id]) last[v.patient_id] = v.service_date; });
       const profileOf = Object.fromEntries((profiles || []).map((p) => [p.patient_id, p]));
@@ -46,7 +49,7 @@ const DentalPatients = () => {
         .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       setLoading(false);
     })();
-  }, []);
+  }, [tick]);
 
   // Archived in the Medical Portal (graduated, left TUP, account deleted); records stay readable.
   const archivedCount = rows.filter((r) => r.archived_reason).length;

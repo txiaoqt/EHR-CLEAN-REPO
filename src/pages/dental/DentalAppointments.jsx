@@ -4,6 +4,7 @@ import { supabase } from '../../supabaseClient.js';
 import { SearchIcon, CloseIcon, ChevronDownIcon } from '../../components/icons/Icons.jsx';
 import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import { NextAppointmentFields } from './DentalForms.jsx';
 import { STATUS_BADGE, formatDay, formatTimeLabel, loadDentists, todayIso } from './dentalShared.js';
 import './dental.css';
@@ -52,8 +53,9 @@ const DentalAppointments = () => {
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true); setLoadError('');
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setLoadError('');
     const { data, error } = await supabase.from('appointments')
       .select('id, patient_id, patient_name, appointment_date, appointment_time, service_type, clinician_name, status')
       .eq('department', 'Dental Clinic').order('appointment_date').order('appointment_time').limit(2000);
@@ -61,6 +63,7 @@ const DentalAppointments = () => {
     setRows(data || []); setLoading(false);
   }, []);
   useEffect(() => { load(); loadDentists().then(setDentists); }, [load]);
+  useVisibleRefresh(() => load(true));
 
   const filtered = useMemo(() => {
     const today = todayIso();
@@ -128,7 +131,7 @@ const DentalAppointments = () => {
               </div>
             </div>
           </div>
-          {loadError && <p className="dental-alert" role="alert" style={{ margin: '0 24px 16px' }}>{loadError} <button type="button" className="btn secondary small" onClick={load}>Retry</button></p>}
+          {loadError && <p className="dental-alert" role="alert" style={{ margin: '0 24px 16px' }}>{loadError} <button type="button" className="btn secondary small" onClick={() => load()}>Retry</button></p>}
           <div className="table-responsive">
             <table className="table" aria-label="Dental appointments">
               <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Procedure</th><th>Dentist</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>

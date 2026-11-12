@@ -13,6 +13,7 @@ import { useTableExport } from '../hooks/useTableExport.js';
 import { patientsExportConfig } from '../utils/export/configs.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import { findSameNamePatients } from '../utils/duplicatePatients.js';
+import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 
 const ARCHIVE_REASONS = ['Graduated', 'No longer at TUP', 'Account deleted', 'Other'];
 
@@ -122,19 +123,19 @@ const Patients = () => {
   // ---------------------------------------------------------------
 
   // fetch patients
-  const fetchPatients = async () => {
-    setLoading(true);
+  const fetchPatients = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const { data, error } = await supabase.from('patients').select('*').order('name', { ascending: true });
       if (error) {
         console.error('Error fetching patients:', error);
-        showToast('Failed to fetch patients', 'error');
+        if (!quiet) showToast('Failed to fetch patients', 'error');
       } else {
         setPatients(data || []);
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to fetch patients', 'error');
+      if (!quiet) showToast('Failed to fetch patients', 'error');
     } finally {
       setLoading(false);
     }
@@ -142,18 +143,12 @@ const Patients = () => {
 
   useEffect(() => {
     fetchPatients();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchPatients();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useVisibleRefresh(() => fetchPatients(true));
 
   // Handle auto-open register from Appointments or external routes with pre-filled student
   useEffect(() => {

@@ -5,6 +5,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import KpiCard from '../../components/KpiCard.jsx';
 import { CalendarIcon, ClockIcon, EncountersIcon, InventoryIcon } from '../../components/icons/Icons.jsx';
 import { formatDay, formatTimeLabel, todayIso } from './dentalShared.js';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import './dental.css';
 
 const LOW_STOCK_SHOWN = 5;
@@ -16,6 +17,8 @@ const DentalDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [tick, setTick] = useState(0);
+  useVisibleRefresh(() => setTick((t) => t + 1));
 
   useEffect(() => {
     const today = todayIso();
@@ -41,7 +44,7 @@ const DentalDashboard = () => {
         failed: [todayRes, upcomingRes, servicesRes, inventoryRes].some((r) => r.error),
       });
     });
-  }, []);
+  }, [tick]);
 
   const first = (user?.name || '').split(' ')[0];
   const waiting = data?.today.filter((a) => a.status === 'Scheduled') || [];

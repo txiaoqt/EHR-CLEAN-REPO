@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { canDeleteRecord } from '../accessControl.js';
 import { SearchIcon, AlertIcon, CloseIcon, ChevronDownIcon, HistoryIcon, InventoryIcon, CheckIcon } from '../components/icons/Icons.jsx';
 import KpiCard from '../components/KpiCard.jsx';
+import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 import TablePagination from '../components/table/TablePagination.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
 import { useTablePagination } from '../hooks/useTablePagination.js';
@@ -109,16 +110,6 @@ const Inventory = () => {
       }
     };
     fetchData();
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchData();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
   }, []);
 
   const refreshData = async () => {
@@ -131,6 +122,7 @@ const Inventory = () => {
       console.error('Error refreshing data:', err);
     }
   };
+  useVisibleRefresh(refreshData);
 
   const categories = [
     'Medications',

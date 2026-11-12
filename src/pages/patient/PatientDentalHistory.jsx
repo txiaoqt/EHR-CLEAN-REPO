@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
 import { formatDay } from '../dental/dentalShared.js';
@@ -13,6 +14,8 @@ const PatientDentalHistory = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');
+  const [tick, setTick] = useState(0);
+  useVisibleRefresh(() => setTick((t) => t + 1));
   const pages = useTablePagination(rows || []);
 
   useEffect(() => {
@@ -22,10 +25,10 @@ const PatientDentalHistory = () => {
       .eq('patient_id', user.patient_id)
       .order('service_date', { ascending: false }).order('created_at', { ascending: false })
       .then(({ data, error: loadError }) => {
-        if (loadError) setError('Your dental history could not be loaded. Refresh the page to try again.');
+        setError(loadError ? 'Your dental history could not be loaded. Refresh the page to try again.' : '');
         setRows(data || []);
       });
-  }, [user?.patient_id]);
+  }, [user?.patient_id, tick]);
 
   const teeth = (r) => (r.teeth?.length ? r.teeth.join(', ') : muted);
   const given = (r) => [r.medicine, r.anesthesia && `Anesthesia: ${r.anesthesia}`].filter(Boolean).join(' · ') || muted;

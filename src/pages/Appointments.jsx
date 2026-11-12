@@ -13,6 +13,7 @@ import { useTablePagination } from '../hooks/useTablePagination.js';
 import { useTableExport } from '../hooks/useTableExport.js';
 import { appointmentsExportConfig } from '../utils/export/configs.js';
 import KpiCard from '../components/KpiCard.jsx';
+import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 
 const Appointments = () => {
   const navigate = useNavigate();
@@ -84,10 +85,9 @@ const Appointments = () => {
     };
   }, [showDatePicker]);
 
-  // fetch appointments
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      setLoading(true);
+  // fetch appointments; quiet refreshes keep the table on screen
+  const fetchAppointments = async (quiet = false) => {
+      if (!quiet) setLoading(true);
       const { data, error } = await supabase
         .from('appointments')
         .select('*')
@@ -96,19 +96,9 @@ const Appointments = () => {
       if (!error) setAppointments(data || []);
       else console.error('Error fetching appointments:', error);
       setLoading(false);
-    };
-    fetchAppointments();
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchAppointments();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, []);
+  };
+  useEffect(() => { fetchAppointments(); }, []);
+  useVisibleRefresh(() => fetchAppointments(true));
 
   // patient suggestions
   useEffect(() => {
