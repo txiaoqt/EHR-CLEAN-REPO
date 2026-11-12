@@ -64,9 +64,17 @@ const RecordSummaryCard = ({ subjectType, subjectId, person, collapsible = true,
     setDownloadError('');
     try {
       const ref = recordFormReference(record);
+      // Patients keep one PSA-order name; the form needs the surname first,
+      // so take the name parts from the student record.
+      let named = person;
+      if (subjectType === 'patient' && !person?.surname) {
+        const { data: parts } = await supabase.from('students')
+          .select('first_name, middle_name, surname, suffix').eq('id', subjectId).maybeSingle();
+        if (parts?.surname) named = { ...person, ...parts };
+      }
       const doc = await buildRecordFormPdf({
         record,
-        person,
+        person: named,
         enrolmentRef: person?.applicant_id || person?.id || subjectId,
       });
       const safeId = String(person?.applicant_id || person?.id || subjectId || 'record')

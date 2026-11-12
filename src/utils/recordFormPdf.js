@@ -224,7 +224,7 @@ const fmtDate = (value) => {
 
 const personName = (p) => {
   if (!p) return '';
-  const surname = (p.surname || '').trim();
+  const surname = [p.surname, p.suffix].map((s) => (s || '').trim()).filter(Boolean).join(' ');
   const given = [p.first_name, p.middle_name].map((s) => (s || '').trim()).filter(Boolean).join(' ');
   if (surname && given) return `${surname}, ${given}`;
   return surname || given || (p.name || '').trim();
