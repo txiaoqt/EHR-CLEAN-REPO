@@ -12,7 +12,7 @@ import {
   isUserSurfaceRole,
   surfaceHomeForRole,
 } from '../deploySurface.js';
-import { useAuth } from '../AuthContext.jsx';
+import { useAuth, SIGNOUT_MESSAGE_KEY } from '../AuthContext.jsx';
 import { logAudit } from '../utils.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import PasswordRequirements from '../components/PasswordRequirements.jsx';
@@ -267,7 +267,9 @@ const Login = () => {
 
   // Location Session Message
   useEffect(() => {
-    const sessionMessage = location?.state?.sessionMessage;
+    let signedOutMessage = null;
+    try { signedOutMessage = localStorage.getItem(SIGNOUT_MESSAGE_KEY); localStorage.removeItem(SIGNOUT_MESSAGE_KEY); } catch (_) {}
+    const sessionMessage = signedOutMessage || location?.state?.sessionMessage;
     if (sessionMessage) setMsg(sessionMessage);
   }, [location]);
 

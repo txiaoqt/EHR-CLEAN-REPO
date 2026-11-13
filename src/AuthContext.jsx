@@ -16,6 +16,9 @@ export { isRoleCompatibleWithSurface };
 
 const AuthContext = createContext();
 
+// Why an open portal was signed out, shown once on the login page.
+export const SIGNOUT_MESSAGE_KEY = 'icare_signout_message';
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
@@ -340,8 +343,15 @@ export const AuthProvider = ({ children }) => {
       pending = true;
       try {
         const { data, error } = await supabase.rpc('get_my_portal_identity');
-        if (!mounted || error) return;
-        if (!data || data.active === false || !isRoleCompatibleWithSurface(data.role)) {
+        if (!mounted) return;
+        // A rejected token means its session was revoked; any other error is a network blip.
+        const tokenRejected = Boolean(error) && (['PGRST301', 'PGRST303'].includes(error.code) || /jwt/i.test(error.message || ''));
+        if (error && !tokenRejected) return;
+        if (tokenRejected || !data || data.active === false || !isRoleCompatibleWithSurface(data.role)) {
+          try {
+            localStorage.setItem(SIGNOUT_MESSAGE_KEY, data?.access_message
+              || 'You were signed out because your account access changed. Contact the clinic administrator if this was unexpected.');
+          } catch (_) {}
           await logout({ scope: 'local' });
         } else {
           setUser(data);
