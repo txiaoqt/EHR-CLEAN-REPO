@@ -622,7 +622,7 @@ const PatientSettings = () => {
             <div className="patient-account-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
               <div className="patient-account-id-item">
                 <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                  Student ID Number
+                  {String(user?.patient_id || '').startsWith('TUPM-') || !user?.patient_id ? 'Student ID Number' : 'Employee ID Number'}
                 </div>
                 <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)', marginTop: 4 }}>
                   {user?.patient_id || 'TUPM-XX-XXXX'}

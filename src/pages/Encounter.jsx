@@ -1096,7 +1096,7 @@ const Encounter = () => {
                             onClick={() => handleSelectSuggestion(s)}
                           >
                             <strong>{s.name}</strong>
-                            <span>{s.id} · Year {s.year}</span>
+                            <span>{s.id} · {s.year ? `Year ${s.year}` : 'Faculty'}</span>
                           </button>
                         ))}
                       </div>

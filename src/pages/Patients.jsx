@@ -13,6 +13,7 @@ import { useTableExport } from '../hooks/useTableExport.js';
 import { patientsExportConfig } from '../utils/export/configs.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import { findSameNamePatients } from '../utils/duplicatePatients.js';
+import { patientTypeOf } from '../utils/authValidation.js';
 import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 
 const ARCHIVE_REASONS = ['Graduated', 'No longer at TUP', 'Account deleted', 'Other'];
@@ -63,6 +64,7 @@ const Patients = () => {
   // search & sort (separate field and direction)
   const [search, setSearch] = useState('');
   const [view, setView] = useState('active'); // 'active' | 'archived'
+  const [kind, setKind] = useState('student'); // 'student' | 'faculty'
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -203,12 +205,14 @@ const Patients = () => {
   }, [studentSearch]);
 
   // Sorting and filtering
-  const filteredPatients = patients.filter(p => (view === 'archived') === Boolean(p.archived_at) && (
+  const ofKind = patients.filter(p => (p.patient_type || patientTypeOf(p.id)) === kind);
+  const filteredPatients = ofKind.filter(p => (view === 'archived') === Boolean(p.archived_at) && (
     search.trim() === '' ||
     (p.name && p.name.toLowerCase().includes(search.toLowerCase())) ||
     (p.id && p.id.toString().toLowerCase().includes(search.toLowerCase()))
   ));
-  const archivedCount = patients.filter(p => p.archived_at).length;
+  const archivedCount = ofKind.filter(p => p.archived_at).length;
+  const facultyCount = patients.length - patients.filter(p => (p.patient_type || patientTypeOf(p.id)) === 'student').length;
 
   const sortedPatients = React.useMemo(() => {
     const arr = (filteredPatients || []).slice();
@@ -228,7 +232,7 @@ const Patients = () => {
   }, [filteredPatients, sortField, sortDirection]);
 
   const pagination = useTablePagination(sortedPatients, {
-    resetKey: `${view}|${search}|${sortField}|${sortDirection}`,
+    resetKey: `${kind}|${view}|${search}|${sortField}|${sortDirection}`,
   });
 
   const exporter = useTableExport({
@@ -273,7 +277,7 @@ const Patients = () => {
 
     try {
       const payload = {
-        id, name, year: Number(manualStudent.year || 1),
+        id, name, year: patientTypeOf(id) === 'faculty' ? null : Number(manualStudent.year || 1),
         first_name: toProperName(manualStudent.first), middle_name: toProperName(manualStudent.middle) || null,
         surname: toProperName(manualStudent.last), suffix: manualStudent.suffix.trim() || null,
       };
@@ -348,7 +352,7 @@ const Patients = () => {
       const payload = {
         id: sId,
         name: sName,
-        year: s.year || 1,
+        year: patientTypeOf(sId) === 'faculty' ? null : (s.year || 1),
         last_visit_date: lastVisit
       };
       const { error } = await supabase.from('patients').insert([payload]);
@@ -538,11 +542,11 @@ const Patients = () => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Student ID</label>
+                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Student / Employee ID</label>
                           <input
                             value={manualStudent.id}
                             onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value }))}
-                            placeholder="e.g. 2023-01234"
+                            placeholder="TUPM-23-0123 or TUPM120172-001"
                             className="input"
                             style={{ width: '100%' }}
                           />
@@ -588,7 +592,7 @@ const Patients = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div className="card" style={{ padding: 16, background: 'var(--panel)' }}>
                         <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>{previewStudent.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>{previewStudent.id} • Year {previewStudent.year || '—'}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>{previewStudent.id} • {patientTypeOf(previewStudent.id) === 'faculty' ? 'Faculty' : `Year ${previewStudent.year || '—'}`}</div>
                         <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
                           Clicking register will create an active EHR record and log the registration date.
                         </div>
@@ -633,9 +637,14 @@ const Patients = () => {
             </div>
           </div>
 
-          <div className="table-section-header">
+          <div className="table-section-header" style={{ gap: 12, flexWrap: 'wrap' }}>
+            <div className="segmented-control-container" role="tablist" aria-label="Patient type">
+              {[['student', `Students (${patients.length - facultyCount})`], ['faculty', `Faculty (${facultyCount})`]].map(([id, label]) => (
+                <button key={id} type="button" role="tab" aria-selected={kind === id} className={`segmented-tab-btn ${kind === id ? 'active' : ''}`} onClick={() => setKind(id)}>{label}</button>
+              ))}
+            </div>
             <div className="segmented-control-container" role="tablist" aria-label="Patient list">
-              {[['active', `Active (${patients.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
+              {[['active', `Active (${ofKind.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
                 <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>{label}</button>
               ))}
             </div>
@@ -706,8 +715,8 @@ const Patients = () => {
               <thead>
                 <tr>
                   <th>Patient Name</th>
-                  <th>Student ID</th>
-                  <th>Year Level</th>
+                  <th>{kind === 'faculty' ? 'Employee ID' : 'Student ID'}</th>
+                  <th>{kind === 'faculty' ? 'Type' : 'Year Level'}</th>
                   <th>Last Visit</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -716,7 +725,7 @@ const Patients = () => {
                 {loading ? (
                   <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading patient records…</td></tr>
                 ) : sortedPatients.length === 0 ? (
-                  <tr className="table-empty-row"><td colSpan={5}>{patients.length === 0 ? 'No patients yet' : view === 'archived' && !search.trim() ? 'No archived patients' : 'No matching patients'}</td></tr>
+                  <tr className="table-empty-row"><td colSpan={5}>{ofKind.length === 0 ? `No ${kind} patients yet` : view === 'archived' && !search.trim() ? 'No archived patients' : 'No matching patients'}</td></tr>
                 ) : (
                   pagination.pageRows.map(pat => (
                     <tr key={pat.id}>
@@ -737,7 +746,7 @@ const Patients = () => {
                         <span className="badge badge-neutral" style={{ fontWeight: 'var(--font-weight-bold)' }}>{pat.id}</span>
                       </td>
                       <td>
-                        <span className="badge badge-info">Year {pat.year}</span>
+                        <span className="badge badge-info">{pat.year ? `Year ${pat.year}` : 'Faculty'}</span>
                       </td>
                       <td style={{ color: 'var(--text-muted)' }}>
                         {pat.last_visit_date || '—'}

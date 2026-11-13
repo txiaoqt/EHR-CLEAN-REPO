@@ -6,6 +6,7 @@ import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
 import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import { ageFrom, formatDay, recordSortName } from './dentalShared.js';
+import { patientTypeOf } from '../../utils/authValidation.js';
 import './dental.css';
 
 const sexLetter = (sex) => ({ f: 'F', female: 'F', m: 'M', male: 'M' }[String(sex || '').toLowerCase()] || '');
@@ -21,6 +22,7 @@ const DentalPatients = () => {
   const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [view, setView] = useState('active');
+  const [kind, setKind] = useState('student'); // 'student' | 'faculty', by ID format
   const [tick, setTick] = useState(0);
   useVisibleRefresh(() => setTick((t) => t + 1));
 
@@ -38,7 +40,7 @@ const DentalPatients = () => {
       const profileOf = Object.fromEntries((profiles || []).map((p) => [p.patient_id, p]));
       const byId = new Map();
       (patientsRes.data || []).forEach((p) => byId.set(p.id, {
-        patient_id: p.id, name: p.name, date_of_birth: p.date_of_birth, archived_reason: p.archived_at ? (p.archived_reason || 'Archived') : null, classification: 'Student',
+        patient_id: p.id, name: p.name, date_of_birth: p.date_of_birth, archived_reason: p.archived_at ? (p.archived_reason || 'Archived') : null, classification: patientTypeOf(p.id) === 'faculty' ? 'Faculty' : 'Student',
         college_course_unit: profileOf[p.id]?.course || '', sex: sexLetter(profileOf[p.id]?.sex), hasRecord: false,
       }));
       (recordsRes.data || []).forEach((r) => byId.set(r.patient_id, {
@@ -52,13 +54,15 @@ const DentalPatients = () => {
   }, [tick]);
 
   // Archived in the Medical Portal (graduated, left TUP, account deleted); records stay readable.
-  const archivedCount = rows.filter((r) => r.archived_reason).length;
+  const ofKind = rows.filter((r) => patientTypeOf(r.patient_id) === kind);
+  const facultyCount = rows.filter((r) => patientTypeOf(r.patient_id) === 'faculty').length;
+  const archivedCount = ofKind.filter((r) => r.archived_reason).length;
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const inView = rows.filter((r) => (view === 'archived') === Boolean(r.archived_reason));
+    const inView = ofKind.filter((r) => (view === 'archived') === Boolean(r.archived_reason));
     return q ? inView.filter((r) => [r.name, r.patient_id, r.college_course_unit].some((v) => (v || '').toLowerCase().includes(q))) : inView;
-  }, [rows, search, view]);
-  const pagination = useTablePagination(filtered, { resetKey: `${view}|${search}` });
+  }, [ofKind, search, view]);
+  const pagination = useTablePagination(filtered, { resetKey: `${kind}|${view}|${search}` });
 
   return (
     <main className="main">
@@ -71,9 +75,14 @@ const DentalPatients = () => {
         </div>
 
         <div className="card table-section-card">
-          <div className="table-section-header">
+          <div className="table-section-header" style={{ gap: 12, flexWrap: 'wrap' }}>
+            <div className="segmented-control-container" role="tablist" aria-label="Patient type">
+              {[['student', `Students (${rows.length - facultyCount})`], ['faculty', `Faculty (${facultyCount})`]].map(([id, label]) => (
+                <button key={id} type="button" role="tab" aria-selected={kind === id} className={`segmented-tab-btn ${kind === id ? 'active' : ''}`} onClick={() => setKind(id)}>{label}</button>
+              ))}
+            </div>
             <div className="segmented-control-container" role="tablist" aria-label="Patient list">
-              {[['active', `Active (${rows.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
+              {[['active', `Active (${ofKind.length - archivedCount})`], ['archived', `Archived (${archivedCount})`]].map(([id, label]) => (
                 <button key={id} type="button" role="tab" aria-selected={view === id} className={`segmented-tab-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>{label}</button>
               ))}
             </div>

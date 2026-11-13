@@ -732,6 +732,13 @@ main.login-page-main,
   border-radius: 0 !important;
 }
 
+/* These searches draw their own Clear button, so hide the browser's. */
+.patients-search-input::-webkit-search-cancel-button,
+.appointments-search-input::-webkit-search-cancel-button,
+.inventory-search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
 .patients-search-wrapper input[type="search"]:focus,
 .patients-search-input:focus {
   border: none !important;

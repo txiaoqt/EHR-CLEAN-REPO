@@ -37,6 +37,9 @@ import {
   STUDENT_ID_REGEX,
   isValidTupEmail,
   isValidStudentId,
+  isValidFacultyId,
+  isStudentTupEmail,
+  isFacultyTupEmail,
 } from '../utils/authValidation.js';
 
 export { ALLOWED_USER_EMAIL_DOMAIN, STUDENT_ID_REGEX, isValidTupEmail, isValidStudentId };
@@ -143,7 +146,13 @@ const Login = () => {
   });
   // Which sign-up the visitor is completing. Defaults to the enrolled student
   // path, since that is the one that already existed.
-  const [signupKind, setSignupKind] = useState('student');
+  const [signupKind, setSignupKind] = useState('student'); // 'student' | 'faculty' | 'enrollee'
+  // Faculty use the student form with an employee ID, no year level and a department.
+  const isFaculty = signupKind === 'faculty';
+  const isValidPatientId = (id) => (isFaculty ? isValidFacultyId(id) : isValidStudentId(id));
+  const idFormatHint = isFaculty
+    ? 'Format must be TUPM + birthdate (MMDDYY) + employee number (e.g. TUPM120172-001).'
+    : 'Format must be TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).';
   // Details shown for a last check before Create Account goes ahead.
   const [signupReview, setSignupReview] = useState(null);
 
@@ -431,8 +440,8 @@ const Login = () => {
     }
     // Required here: the account is provisioned under this ID when the code is
     // sent, so a blank or different ID would not match the one registered.
-    if (!isValidStudentId(studentId)) {
-      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).');
+    if (!isValidPatientId(studentId)) {
+      setMsg(idFormatHint);
       return;
     }
     if (otpSending || otpCooldown > 0) return;
@@ -788,7 +797,7 @@ const Login = () => {
     const payload = {
       studentId: signupData.studentId.trim().toUpperCase(),
       fullName,
-      year: Number(signupData.year || 1),
+      year: isFaculty ? null : Number(signupData.year || 1),
       dateOfBirth: signupData.dateOfBirth || null,
       sex: signupData.sex,
       course: signupData.course,
@@ -807,15 +816,15 @@ const Login = () => {
       return;
     }
     if (!payload.sex || !payload.course) {
-      setMsg('Please select your sex and degree program.');
+      setMsg(isFaculty ? 'Please select your sex and enter your department.' : 'Please select your sex and degree program.');
       return;
     }
-    if (!isValidStudentId(payload.studentId)) {
-      setMsg('Please enter a valid Student ID in format TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).');
+    if (!isValidPatientId(payload.studentId)) {
+      setMsg(idFormatHint);
       return;
     }
-    if (!isValidTupEmail(payload.email)) {
-      setMsg('Please use your official TUP email address ending in @tup.edu.ph.');
+    if (!isSignupEmailValid) {
+      setMsg(signupEmailHint);
       return;
     }
     if (payload.password !== payload.confirmPassword) {
@@ -833,15 +842,15 @@ const Login = () => {
     if (!reviewed) {
       setSignupReview({
         rows: [
-          ['Student ID', payload.studentId],
+          [isFaculty ? 'Employee ID' : 'Student ID', payload.studentId],
           ['Name', payload.fullName],
           ['Date of Birth', payload.dateOfBirth, 'date'],
           ['Sex', payload.sex],
-          ['Degree Program', payload.course],
-          ['Year Level', String(payload.year)],
+          [isFaculty ? 'Department / Office' : 'Degree Program', payload.course],
+          ...(isFaculty ? [] : [['Year Level', String(payload.year)]]),
           ['Email', payload.email],
         ],
-        note: 'Your name and Student ID cannot be changed from your profile once the account is created.',
+        note: `Your name and ${isFaculty ? 'Employee' : 'Student'} ID cannot be changed from your profile once the account is created.`,
         onConfirm: () => handlePatientSignup(true),
       });
       return;
@@ -975,16 +984,19 @@ const Login = () => {
 
   const isLoginDisabled = loading || !email.trim() || !pass;
 
-  const isStudentIdValid = isValidStudentId(signupData.studentId);
+  const isStudentIdValid = isValidPatientId(signupData.studentId);
   const showStudentIdError = signupData.studentId.length > 0 && !isStudentIdValid;
 
-  const isSignupEmailValid = isValidTupEmail(signupData.email);
+  const isSignupEmailValid = isFaculty ? isFacultyTupEmail(signupData.email) : isStudentTupEmail(signupData.email);
   const showSignupEmailError = signupData.email.length > 0 && !isSignupEmailValid;
+  const signupEmailHint = isFaculty
+    ? 'Please use your official TUP faculty email in the form firstname_lastname@tup.edu.ph.'
+    : 'Please use your official TUP student email in the form firstname.lastname@tup.edu.ph.';
 
   // What Send still needs, in form order. The same list disables the button and
   // is shown beneath it, so a disabled Send always says why.
-  const sendMissing = (signupKind === 'student'
-    ? [!isStudentIdValid && 'a valid Student ID', !isSignupEmailValid && 'your TUP email']
+  const sendMissing = (signupKind !== 'enrollee'
+    ? [!isStudentIdValid && `a valid ${isFaculty ? 'Employee' : 'Student'} ID`, !isSignupEmailValid && 'your TUP email']
     : [
         !enrolleeData.applicantId.trim() && 'your Applicant ID',
         (!enrolleeData.firstName.trim() || !enrolleeData.lastName.trim()) && 'your first and last name',
@@ -1009,7 +1021,7 @@ const Login = () => {
     !isStudentIdValid ||
     !signupData.firstName.trim() ||
     !signupData.lastName.trim() ||
-    !signupData.year ||
+    (!isFaculty && !signupData.year) ||
     !signupData.sex ||
     !signupData.course ||
     !isSignupEmailValid ||
@@ -1315,7 +1327,7 @@ const Login = () => {
                     aria-label="Type of account"
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
+                      gridTemplateColumns: '1fr 1fr 1fr',
                       gap: 6,
                       padding: 4,
                       margin: '0 0 16px 0',
@@ -1326,6 +1338,7 @@ const Login = () => {
                   >
                     {[
                       { id: 'student', label: 'Enrolled Student' },
+                      { id: 'faculty', label: 'Faculty' },
                       { id: 'enrollee', label: 'Enrollee' },
                     ].map(({ id, label }) => {
                       const active = signupKind === id;
@@ -1543,23 +1556,23 @@ const Login = () => {
                     </>
                   )}
 
-                  {signupKind === 'student' && (
+                  {signupKind !== 'enrollee' && (
                   <>
-                  {/* 1. Student ID */}
+                  {/* 1. Student / Employee ID */}
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <label htmlFor="signup-student-id" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Student ID</label>
+                    <label htmlFor="signup-student-id" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>{isFaculty ? 'Employee ID' : 'Student ID'}</label>
                     <input
                       id="signup-student-id"
                       className="input"
                       style={authInputStyle}
-                      placeholder="e.g. TUPM-XX-XXXX"
+                      placeholder={isFaculty ? 'e.g. TUPM120172-001' : 'e.g. TUPM-XX-XXXX'}
                       value={signupData.studentId}
                       onChange={(e) => setSignupData((p) => ({ ...p, studentId: e.target.value.toUpperCase() }))}
                       disabled={otpSent}
                     />
                     {showStudentIdError && (
                       <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
-                        Format must be TUPM-YY-XXXX (e.g. TUPM-XX-XXXX).
+                        {idFormatHint}
                       </div>
                     )}
                   </div>
@@ -1641,7 +1654,8 @@ const Login = () => {
                     </div>
                   </div>
 
-                  {/* 4. Year */}
+                  {/* 4. Year (students only) */}
+                  {!isFaculty && (
                   <div className="field" style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <label htmlFor="signup-year" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Year</label>
                     <select
@@ -1658,6 +1672,7 @@ const Login = () => {
                       <option value="5">5th Year</option>
                     </select>
                   </div>
+                  )}
 
                   {/* 3b. Sex + Degree Program — the Medical Log prints both, so
                       they are captured at account creation. */}
@@ -1679,12 +1694,14 @@ const Login = () => {
                     </div>
 
                     <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <label htmlFor="signup-course" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Degree Program</label>
+                      <label htmlFor="signup-course" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>{isFaculty ? 'Department / Office' : 'Degree Program'}</label>
                       <CourseSearch
                         id="signup-course"
                         inputStyle={authInputStyle}
                         value={signupData.course}
                         onChange={(course) => setSignupData((p) => ({ ...p, course }))}
+                        allowCustom={isFaculty}
+                        placeholder={isFaculty ? 'e.g. College of Science' : undefined}
                         required
                       />
                     </div>
@@ -1783,7 +1800,7 @@ const Login = () => {
                         className="input"
                         style={{ ...authInputStyle, flex: 1 }}
                         type="email"
-                        placeholder="student@tup.edu.ph"
+                        placeholder={isFaculty ? 'firstname_lastname@tup.edu.ph' : 'firstname.lastname@tup.edu.ph'}
                         value={signupData.email}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -1818,7 +1835,7 @@ const Login = () => {
                     </div>
                     {showSignupEmailError && (
                       <div style={{ color: '#fed7d7', fontSize: 'var(--font-size-xs)', marginTop: 2, lineHeight: 1.35 }}>
-                        Please use your official TUP email address ending in @tup.edu.ph.
+                        {signupEmailHint}
                       </div>
                     )}
                     {sendMissingHint}

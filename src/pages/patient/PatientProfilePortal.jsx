@@ -6,6 +6,7 @@ import PatientRecordForm from '../../components/PatientRecordForm.jsx';
 import { CheckIcon } from '../../components/icons/Icons.jsx';
 import PatientAvatar from '../../components/PatientAvatar.jsx';
 import { isValidPhMobile, limitPhone, normalizePhMobile } from '../../utils/courses.js';
+import { patientTypeOf } from '../../utils/authValidation.js';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -369,7 +370,8 @@ const PatientProfilePortal = () => {
     setMsg('');
 
     const authoritativeName = originalProfileRef.current?.name || user?.name || profile.name;
-    const parsedYear = Number(profile.year) || 1;
+    // Faculty have no year level; a default of 1 would mislabel them as freshmen.
+    const parsedYear = patientTypeOf(user.patient_id) === 'faculty' ? null : (Number(profile.year) || 1);
     const trimmedContact = normalizePhMobile(profile.contact_number) || null;
     const trimmedAddress = profile.address?.trim() || null;
     const trimmedEmergencyContact = profile.emergency_contact?.trim() || null;
@@ -638,7 +640,7 @@ const PatientProfilePortal = () => {
                 <strong>{formatProfileDate(profile.date_of_birth)}</strong>
               )}
             </div>
-            <div><span>Degree / Course</span><strong>{profile.course || 'Not on file'}</strong></div>
+            <div><span>{patientTypeOf(user?.patient_id) === 'faculty' ? 'Department / Office' : 'Degree / Course'}</span><strong>{profile.course || 'Not on file'}</strong></div>
             <div><span>Last visit</span><strong>{formatProfileDate(profile.last_visit_date)}</strong></div>
           </div>
         </section>
