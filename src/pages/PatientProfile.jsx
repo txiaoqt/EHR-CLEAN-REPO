@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { useAuth } from '../AuthContext.jsx';
+import { patientTypeOf } from '../utils/authValidation.js';
 import { canDeleteRecord, canViewSensitiveField, getSensitivityLevel, isPhysician } from '../accessControl.js';
 import { CloseIcon } from '../components/icons/Icons.jsx';
 import ExportDialog from '../components/export/ExportDialog.jsx';
@@ -329,11 +330,11 @@ const PatientProfile = () => {
     ? patientProfile.profile_data.health_disclosure.categories
     : [];
   const disclosureStatus = disclosureCategories.length
-    ? 'Student reported · not clinically verified'
+    ? 'Patient reported · not clinically verified'
     : healthDisclosureChoices.includes('none')
-      ? 'Student reports no conditions'
+      ? 'Patient reports no conditions'
       : healthDisclosureChoices.includes('prefer_not_to_disclose')
-        ? 'Student chose not to disclose'
+        ? 'Patient chose not to disclose'
         : 'No health information shared';
   const healthDisclosureNotes = patientProfile?.profile_data?.health_disclosure?.notes?.trim() || '';
 
@@ -365,7 +366,7 @@ const PatientProfile = () => {
                       {patient.name}
                     </h1>
                     <span className="badge badge-neutral" style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', fontWeight: 'var(--font-weight-semibold)' }}>
-                      Student / Patient
+                      {patientTypeOf(id) === 'faculty' ? 'Faculty / Patient' : 'Student / Patient'}
                     </span>
                   </div>
                   <div className="page-header-subtitle" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 4 }}>
@@ -540,7 +541,7 @@ const PatientProfile = () => {
                   <div className="patient-profile-health-disclosure">
                     <div>
                       <span className="patient-profile-detail-label">Health conditions or disability</span>
-                      <p className="patient-profile-health-help">Optional information shared by the student to help clinic staff prepare.</p>
+                      <p className="patient-profile-health-help">Optional information shared by the patient to help clinic staff prepare.</p>
                     </div>
                     <div className="patient-profile-health-view">
                       {disclosureCategories.length > 0 && (
@@ -552,7 +553,7 @@ const PatientProfile = () => {
                       )}
                       <strong>{disclosureStatus}</strong>
                       {healthDisclosureNotes && <p>{healthDisclosureNotes}</p>}
-                      <span>Student-reported; not a clinical diagnosis.</span>
+                      <span>Patient-reported; not a clinical diagnosis.</span>
                     </div>
                   </div>
                 </section>

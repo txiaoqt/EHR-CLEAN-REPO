@@ -99,7 +99,7 @@ const RecordSummaryCard = ({ subjectType, subjectId, person, collapsible = true,
   if (!record) {
     return (
       <div className="settings-row-note" style={{ margin: 0 }}>
-        The {subjectType === 'enrollee' ? 'applicant' : 'student'} has not completed the clinic record form yet.
+        The {subjectType === 'enrollee' ? 'applicant' : 'patient'} has not completed the clinic record form yet.
       </div>
     );
   }

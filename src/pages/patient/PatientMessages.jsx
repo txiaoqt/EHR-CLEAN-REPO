@@ -590,9 +590,9 @@ const PatientMessages = () => {
         const insertPayload = {
           patient_id: user.patient_id,
           auth_user_id: authUid,
-          patient_name: user?.name || 'Student',
+          patient_name: user?.name || 'Patient',
           sender_role: 'patient',
-          sender_name: user?.name || 'Student',
+          sender_name: user?.name || 'Patient',
           recipient_name: activeConversation?.recipient_name || 'Clinic Personnel (General)',
           concern_type: activeConversation?.concern_type || 'General clinic inquiry',
           message_text: textToSend,

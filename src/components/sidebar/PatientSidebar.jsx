@@ -4,6 +4,7 @@ import SignOutDialog from '../SignOutDialog.jsx';
 import useUnreadMessages from '../../hooks/useUnreadMessages.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
+import { patientTypeOf } from '../../utils/authValidation.js';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import PatientAvatar from '../PatientAvatar.jsx';
 import {
@@ -51,7 +52,7 @@ const PatientSidebar = ({ collapsed = false, toggle, onClose }) => {
 
   const isEnrollee = (user?.role || '').toLowerCase() === 'enrollee';
   const displayName = user?.name || 'Angel Keith Carbon';
-  const displayRole = isEnrollee ? 'Enrollee' : 'Student / Patient';
+  const displayRole = isEnrollee ? 'Enrollee' : patientTypeOf(user?.patient_id) === 'faculty' ? 'Faculty / Patient' : 'Student / Patient';
   const navItems = isEnrollee ? ENROLLEE_NAV : PATIENT_NAV;
 
   const handleNavigation = (path) => {

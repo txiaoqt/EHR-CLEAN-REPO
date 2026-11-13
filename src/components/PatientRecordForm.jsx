@@ -332,7 +332,7 @@ const PatientRecordForm = ({ initial = null, onSaved = null, readOnly = false, i
                       <div className="settings-field record-form-identity-field" key={field.key}>
                         <span className="record-form-identity-label">
                           {field.label}
-                          <span>From student registration · read-only</span>
+                          <span>From registration · read-only</span>
                         </span>
                         <div className="record-form-identity-value" aria-readonly="true">
                           {formatIdentityValue(field.key, answers[field.key])}

@@ -556,7 +556,7 @@ const PatientProfilePortal = () => {
           </div>
         </header>
 
-        <section className="card patient-profile-hero" aria-label="Student profile summary">
+        <section className="card patient-profile-hero" aria-label="Profile summary">
           <div className="patient-profile-hero-top">
             <div className="patient-profile-identity">
               <div className="patient-profile-avatar-column">
@@ -589,8 +589,8 @@ const PatientProfilePortal = () => {
 
               <div className="patient-profile-identity-copy">
                 <div className="patient-profile-name-row">
-                  <h2>{profile.name || user?.name || 'Student Patient'}</h2>
-                  <span className="badge badge-neutral">Student / Patient</span>
+                  <h2>{profile.name || user?.name || 'Patient'}</h2>
+                  <span className="badge badge-neutral">{patientTypeOf(user?.patient_id) === 'faculty' ? 'Faculty / Patient' : 'Student / Patient'}</span>
                   <span className="badge badge-success">Active</span>
                 </div>
                 <p className="patient-profile-student-id">{profile.id || user?.patient_id || 'TUPM ID not on file'}</p>
@@ -724,7 +724,7 @@ const PatientProfilePortal = () => {
                     <div className="patient-profile-health-view">
                       <strong>{healthDisclosureSummary}</strong>
                       {profile.health_condition_notes && <p>{profile.health_condition_notes}</p>}
-                      <span>Shared by the student; not verified as a diagnosis.</span>
+                      <span>Shared by you; not verified as a diagnosis.</span>
                     </div>
                   )}
                 </div>
@@ -744,7 +744,7 @@ const PatientProfilePortal = () => {
           <div className="clinic-record-heading">
             <div>
               <h2>Clinic record form</h2>
-              <p>Optional for enrolled students. Your student details are already on file; add or update your health details whenever you choose.</p>
+              <p>Optional. Your details are already on file; add or update your health details whenever you choose.</p>
             </div>
           </div>
 

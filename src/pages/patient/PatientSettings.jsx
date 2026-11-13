@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { useAuth } from '../../AuthContext.jsx';
+import { patientTypeOf } from '../../utils/authValidation.js';
 import { useTheme, getSystemTheme } from '../../ThemeContext.jsx';
 import PasswordRequirements from '../../components/PasswordRequirements.jsx';
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../../utils/passwordPolicy.js';
@@ -586,7 +587,7 @@ const PatientSettings = () => {
                     Email Notifications
                   </div>
                   <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted)', marginTop: 2, maxWidth: 520, lineHeight: 1.4 }}>
-                    Deliver summaries and updates directly to your registered institutional student email.
+                    Deliver summaries and updates directly to your registered TUP email.
                   </div>
                 </div>
                 <ToggleSwitch
@@ -606,7 +607,7 @@ const PatientSettings = () => {
                   Account & Security
                 </h3>
                 <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)', marginTop: 2 }}>
-                  Institutional student credentials and Supabase authentication status
+                  Institutional credentials and Supabase authentication status
                 </div>
               </div>
               <button
@@ -634,7 +635,7 @@ const PatientSettings = () => {
                   Registered Email
                 </div>
                 <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text)', marginTop: 4 }}>
-                  {user?.email || 'student@tup.edu.ph'}
+                  {user?.email || '—'}
                 </div>
               </div>
 
@@ -644,7 +645,7 @@ const PatientSettings = () => {
                 </div>
                 <div style={{ marginTop: 4 }}>
                   <span className="badge badge-primary" style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                    Student / Patient
+                    {patientTypeOf(user?.patient_id) === 'faculty' ? 'Faculty / Patient' : 'Student / Patient'}
                   </span>
                 </div>
               </div>

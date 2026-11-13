@@ -115,7 +115,7 @@ export const RecordIncompleteBanner = ({ onOpen, className = '' }) => {
         <div>
           {isEnrollee
             ? 'The clinic needs your medical history and contact details before it can accept your medical certificate.'
-            : 'The clinic already has your student information. Add your health details here if you would like; this form will not limit portal access.'}
+            : 'The clinic already has your information. Add your health details here if you would like; this form will not limit portal access.'}
         </div>
         {onOpen && (
           <button type="button" className="btn" style={{ marginTop: 12 }} onClick={onOpen}>

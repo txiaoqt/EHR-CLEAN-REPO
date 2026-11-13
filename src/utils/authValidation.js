@@ -31,7 +31,8 @@ export const isValidFacultyId = (val) => {
 };
 
 // 'student' or 'faculty', from the ID format alone (the same rule as patients.patient_type).
-export const patientTypeOf = (id) => (String(id || '').toUpperCase().startsWith('TUPM-') ? 'student' : 'faculty');
+// No ID yet (session still loading) counts as student, the default.
+export const patientTypeOf = (id) => (!id || String(id).toUpperCase().startsWith('TUPM-') ? 'student' : 'faculty');
 
 export default {
   ALLOWED_USER_EMAIL_DOMAIN,

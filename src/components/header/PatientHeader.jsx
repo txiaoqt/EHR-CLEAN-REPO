@@ -4,6 +4,7 @@ import SignOutDialog from '../SignOutDialog.jsx';
 import useUnreadMessages from '../../hooks/useUnreadMessages.js';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
+import { patientTypeOf } from '../../utils/authValidation.js';
 import { useTheme } from '../../ThemeContext.jsx';
 import tupehrlogo from '../../assets/images/tupehrlogo.jpg';
 import PatientAvatar from '../PatientAvatar.jsx';
@@ -19,7 +20,7 @@ const PatientHeader = ({ onToggleNav }) => {
   const menuRef = useRef(null);
 
   const displayName = user?.name || 'Angel Keith Carbon';
-  const displayRole = (user?.role || '').toLowerCase() === 'enrollee' ? 'Enrollee' : 'Student / Patient';
+  const displayRole = (user?.role || '').toLowerCase() === 'enrollee' ? 'Enrollee' : patientTypeOf(user?.patient_id) === 'faculty' ? 'Faculty / Patient' : 'Student / Patient';
   const studentId = user?.patient_id || 'TUPM-XX-XXXX';
 
   // Close dropdown menu on outside click
