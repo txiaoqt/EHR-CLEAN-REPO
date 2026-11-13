@@ -1079,13 +1079,13 @@ textarea::placeholder {
 }
 
 .appointments-schedule-table {
-  min-width: 1179px;
+  min-width: 1170px;
   table-layout: fixed;
   font-size: var(--font-size-sm);
 }
 
 .appointments-schedule-table th {
-  padding: 12px 18px;
+  padding: 12px 14px;
   background: var(--surface-raised);
   color: var(--text-muted);
   border-top: 1px solid var(--input-border, #cbd5e1);
@@ -1100,54 +1100,55 @@ textarea::placeholder {
 
 .appointments-schedule-table td {
   height: 62px;
-  padding: 12px 18px;
+  padding: 12px 14px;
   border-bottom-color: var(--input-border, #cbd5e1);
   vertical-align: middle;
 }
 
+/* The first column holds a full date ("Nov 14, 2026"); 72px made it run into the Patient ID. */
 .appointments-schedule-table th:first-child,
 .appointments-schedule-table td:first-child {
-  width: 72px;
+  width: 125px;
 }
 
 .appointments-schedule-table th:nth-child(2),
 .appointments-schedule-table td:nth-child(2) {
-  width: 160px;
+  width: 165px;
 }
 
 .appointments-schedule-table th:nth-child(3),
 .appointments-schedule-table td:nth-child(3) {
-  width: 125px;
+  width: 120px;
 }
 
 .appointments-schedule-table th:nth-child(4),
 .appointments-schedule-table td:nth-child(4) {
-  width: 135px;
+  width: 120px;
 }
 
 .appointments-schedule-table th:nth-child(5),
 .appointments-schedule-table td:nth-child(5) {
-  width: 100px;
+  width: 95px;
 }
 
 .appointments-schedule-table th:nth-child(6),
 .appointments-schedule-table td:nth-child(6) {
-  width: 95px;
+  width: 85px;
 }
 
 .appointments-schedule-table th:nth-child(7),
 .appointments-schedule-table td:nth-child(7) {
-  width: 140px;
+  width: 130px;
 }
 
 .appointments-schedule-table th:nth-child(8),
 .appointments-schedule-table td:nth-child(8) {
-  width: 170px;
+  width: 160px;
 }
 
 .appointments-schedule-table th:last-child,
 .appointments-schedule-table td:last-child {
-  width: 182px;
+  width: 170px;
 }
 
 .appointments-schedule-table td:first-child,
