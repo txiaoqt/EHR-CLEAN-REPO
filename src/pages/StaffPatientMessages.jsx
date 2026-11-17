@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { MessagesIcon, SearchIcon, SendIcon, ChevronLeftIcon, CheckIcon, CloseIcon, PlusIcon } from '../components/icons/Icons.jsx';
 import MessageAttachment from '../components/MessageAttachment.jsx';
 import MessageReactions from '../components/MessageReactions.jsx';
+import PatientAvatar from '../components/PatientAvatar.jsx';
 import {
   uploadMessageAttachment,
   deleteMessageAttachments,
