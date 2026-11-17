@@ -50,6 +50,10 @@ const ConsultationForm = ({ initialPatientId, onDone, onCancel }) => {
         const { error: studentError } = await supabase.from('students').insert({ id: patient.id, name: patient.name, year: patient.year,
           first_name: patient.first_name, middle_name: patient.middle_name || null, surname: patient.surname, suffix: patient.suffix || null });
         if (studentError && studentError.code !== '23505') throw new Error('The new patient could not be registered. Check the ID number.');
+        // The shared list the Medical Clinic and admin directory read; without it the
+        // patient existed only on the dental side.
+        const { error: patientError } = await supabase.from('patients').insert({ id: patient.id, name: patient.name, year: patient.year });
+        if (patientError && patientError.code !== '23505') throw new Error('The new patient could not be registered. Check the ID number.');
       }
       await saveDentalVisit({ patientId: patient.id, record: recordPayload(record), service, next: nextPayload(next) });
       onDone(next.date

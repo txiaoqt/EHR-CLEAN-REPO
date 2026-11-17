@@ -11,6 +11,12 @@ export async function adminAction(action, payload = {}) {
   return data;
 }
 
+// Not-signed-up patients have no sign-in for the system-admin function to act on.
+export async function deletePatientRecord(patientId, confirmation) {
+  const { error } = await supabase.rpc('admin_delete_unregistered_patient', { p_patient_id: patientId, p_confirmation: confirmation });
+  if (error) throw new Error(error.code === '42501' ? 'Administrator access is unavailable. Sign in again.' : error.message || 'The record could not be deleted. Try again.');
+}
+
 export async function adminData(section, { search = '', status = 'all', page = 0, signal } = {}) {
   const { data, error } = await supabase.rpc('admin_portal_data', {
     p_section: section, p_search: search.trim(), p_status: status, p_page: page + 1,

@@ -75,6 +75,7 @@ const Login = () => {
   const location = useLocation();
   const { login, logout, fetchUserProfile, isPasswordRecoverySession, setRegistrationInProgress } = useAuth();
   const [vw, setVw] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
+  const [vh, setVh] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 900));
 
   // Authentication Mode: 'login' | 'signup' | 'forgot'
   const [authMode, setAuthMode] = useState('login');
@@ -263,7 +264,7 @@ const Login = () => {
 
   // Window Resize Listener
   useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
+    const onResize = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -966,6 +967,9 @@ const Login = () => {
         p_name: payload.fullName,
         p_year: payload.year,
         p_date_of_birth: payload.dateOfBirth,
+        // Checked against a record the clinic already registered under this ID.
+        p_first_name: signupData.firstName,
+        p_surname: signupData.lastName,
       });
 
       if (rpcErr || !rpcData?.success) {
@@ -994,7 +998,9 @@ const Login = () => {
       if (profileErr) console.warn('Could not store sex/course on the patient profile:', profileErr.message);
 
       await endVerifiedSignup();
-      setMsg('Account created and verified. Sign in to review and accept the portal policies.');
+      setMsg(rpcData.linked_existing
+        ? 'Account created and verified. A clinic record with this TUPM ID was found, so your account uses the name recorded by the clinic, which cannot be changed here. If it is wrong, contact the clinic. Sign in to review and accept the portal policies.'
+        : 'Account created and verified. Sign in to review and accept the portal policies.');
       setAuthMode('login');
       setEmail(payload.email);
       setPass('');
@@ -1124,7 +1130,11 @@ const Login = () => {
   const isTabletPortrait = vw >= 600 && vw < 900;
   const isTabletLandscape = vw >= 900 && vw < 1024;
   const isTablet = isTabletPortrait || isTabletLandscape;
-  const isSingleColumn = vw < 900;
+  // Portrait counts too: a phone in "desktop site" mode reports ~980px wide, too
+  // narrow for two columns, and is far taller than wide.
+  // Portrait counts too: a phone in "desktop site" mode reports ~980px wide, too
+  // narrow for two columns, and is far taller than wide.
+  const isSingleColumn = vw < 900 || vh > vw * 1.2;
 
   const authInputStyle = {
     background: 'rgba(255,255,255,0.94)',

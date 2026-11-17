@@ -6,8 +6,101 @@ import TablePagination from '../../components/table/TablePagination.jsx';
 import { useTablePagination } from '../../hooks/useTablePagination.js';
 import useVisibleRefresh from '../../hooks/useVisibleRefresh.js';
 import { ageFrom, formatDay, recordSortName } from './dentalShared.js';
-import { patientTypeOf } from '../../utils/authValidation.js';
+import { patientTypeOf, isValidStudentId, isValidFacultyId } from '../../utils/authValidation.js';
+import { composeFullName, toProperName } from '../../utils/nameFormat.js';
+import { findSameNamePatients } from '../../utils/duplicatePatients.js';
+import { DentalDialog } from './DentalAppointments.jsx';
 import './dental.css';
+
+const EMPTY_FORM = { kind: 'student', id: '', first: '', middle: '', last: '', suffix: '', year: '1' };
+
+/**
+ * Registers into the same patients list the Medical Clinic uses, keyed by TUPM ID,
+ * so the patient appears in both clinics and in the admin directory, and their own
+ * portal sign-up with that ID joins this record instead of making a second one.
+ */
+const RegisterPatientDialog = ({ onClose, onDone }) => {
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [sameName, setSameName] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const faculty = form.kind === 'faculty';
+  const id = form.id.trim().toUpperCase();
+  const set = (key, value) => { setSameName(null); setError(''); setForm((f) => ({ ...f, [key]: value })); };
+
+  const save = async (differentPerson = false) => {
+    if (!form.first.trim() || !form.last.trim()) { setError('Enter the first name and surname.'); return; }
+    if (faculty ? !isValidFacultyId(id) : !isValidStudentId(id)) {
+      setError(faculty ? 'Employee ID must look like TUPM120172-001.' : 'Student ID must look like TUPM-23-0123.');
+      return;
+    }
+    setBusy(true); setError('');
+    try {
+      if (!differentPerson) {
+        const matches = await findSameNamePatients({ firstName: form.first, surname: form.last, excludeId: id });
+        if (matches.length) { setSameName(matches); return; }
+      }
+      const parts = { first_name: toProperName(form.first), middle_name: toProperName(form.middle) || null, surname: toProperName(form.last), suffix: form.suffix.trim() || null };
+      const name = composeFullName({ firstName: parts.first_name, middleName: parts.middle_name, lastName: parts.surname, suffix: parts.suffix });
+      const year = faculty ? null : Number(form.year);
+      const { error: studentError } = await supabase.from('students').insert({ id, name, year, ...parts });
+      if (studentError && studentError.code !== '23505') throw studentError;
+      const { error: patientError } = await supabase.from('patients').insert({ id, name, year });
+      if (patientError?.code === '23505') { setError(`${id} is already registered. Search for it in the list.`); return; }
+      if (patientError) throw patientError;
+      onDone(`${name} (${id}) registered. They now appear in the Dental and Medical Clinic and in the admin directory.`);
+    } catch (e) {
+      console.warn('[Dental] register patient', e);
+      setError('The patient could not be registered. Check the details and try again.');
+    } finally { setBusy(false); }
+  };
+
+  const field = (key, label, placeholder, optional) => (
+    <label className="dental-field"><span>{label}{optional && ' (optional)'}</span>
+      <input className="input" value={form[key]} maxLength={80} placeholder={placeholder} disabled={busy}
+        onChange={(e) => set(key, e.target.value)}
+        onBlur={(e) => key !== 'suffix' && setForm((f) => ({ ...f, [key]: toProperName(e.target.value) }))} /></label>
+  );
+
+  return (
+    <DentalDialog title="Register Patient" subtitle="Shared with the Medical Clinic. The patient's own sign-up with this ID joins the same record." onClose={onClose} busy={busy}
+      footer={<>
+        <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="btn" onClick={() => save(false)} disabled={busy || Boolean(sameName)}>{busy ? 'Registering…' : 'Register Patient'}</button>
+      </>}>
+      <div className="dental-stack" style={{ gap: 12 }}>
+        <div className="segmented-control-container" role="radiogroup" aria-label="Patient type" style={{ alignSelf: 'flex-start' }}>
+          {[['student', 'Student'], ['faculty', 'Faculty']].map(([kind, label]) => (
+            <button key={kind} type="button" role="radio" aria-checked={form.kind === kind} disabled={busy}
+              className={`segmented-tab-btn ${form.kind === kind ? 'active' : ''}`} onClick={() => set('kind', kind)}>{label}</button>
+          ))}
+        </div>
+        <div className="dental-fields">
+          <label className="dental-field"><span>{faculty ? 'Employee ID' : 'Student ID'}</span>
+            <input className="input" value={form.id} disabled={busy} placeholder={faculty ? 'TUPM120172-001' : 'TUPM-23-0123'}
+              onChange={(e) => set('id', e.target.value.toUpperCase())} /></label>
+          {!faculty && <label className="dental-field"><span>Year Level</span>
+            <select className="input" value={form.year} disabled={busy} onChange={(e) => set('year', e.target.value)}>
+              {[1, 2, 3, 4, 5].map((y) => <option key={y} value={y}>Year {y}</option>)}
+            </select></label>}
+        </div>
+        <div className="dental-fields">
+          {field('last', 'Surname', 'e.g. Dela Cruz')}
+          {field('first', 'First Name', 'e.g. Juan')}
+          {field('middle', 'Middle Name', 'e.g. Santos', true)}
+          {field('suffix', 'Suffix', 'e.g. Jr., III', true)}
+        </div>
+        {sameName && (
+          <div className="dental-alert dental-alert--warn" role="alert">
+            <p style={{ margin: '0 0 10px' }}><strong>{sameName[0].name}</strong> is already registered as <strong>{sameName.map((m) => m.id).join(', ')}</strong>. Is this the same person? If so, close this and use that record.</p>
+            <button type="button" className="btn secondary small" onClick={() => save(true)} disabled={busy}>Register as a different person</button>
+          </div>
+        )}
+        {error && <p className="dental-alert" role="alert" style={{ margin: 0 }}>{error}</p>}
+      </div>
+    </DentalDialog>
+  );
+};
 
 const sexLetter = (sex) => ({ f: 'F', female: 'F', m: 'M', male: 'M' }[String(sex || '').toLowerCase()] || '');
 
@@ -24,6 +117,8 @@ const DentalPatients = () => {
   const [view, setView] = useState('active');
   const [kind, setKind] = useState('student'); // 'student' | 'faculty', by ID format
   const [tick, setTick] = useState(0);
+  const [registering, setRegistering] = useState(false);
+  const [notice, setNotice] = useState('');
   useVisibleRefresh(() => setTick((t) => t + 1));
 
   useEffect(() => {
@@ -72,7 +167,11 @@ const DentalPatients = () => {
             <h1 className="page-header-title">Patients</h1>
             <div className="page-header-subtitle">The clinic’s patient directory. Open a record for the pink form, visit history and Dental Card. Consultations are logged in the Consultation Log.</div>
           </div>
+          <button type="button" className="btn" onClick={() => { setNotice(''); setRegistering(true); }}>Register Patient</button>
         </div>
+        {notice && <p className="dental-alert dental-alert--ok" role="status" style={{ marginBottom: 16 }}>{notice}</p>}
+        {registering && <RegisterPatientDialog onClose={() => setRegistering(false)}
+          onDone={(message) => { setRegistering(false); setNotice(message); setTick((t) => t + 1); }} />}
 
         <div className="card table-section-card">
           <div className="table-section-header" style={{ gap: 12, flexWrap: 'wrap' }}>
