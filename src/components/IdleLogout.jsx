@@ -5,7 +5,9 @@ import { useAuth } from '../AuthContext.jsx';
 export const IDLE_LIMIT_MS = 15 * 60 * 1000;
 export const IDLE_WARNING_MS = 60 * 1000;
 const ACTIVITY_KEY = 'tup-last-activity';
-const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'];
+// No 'scroll': it also fires when a page moves by itself (lists refreshing, chats
+// jumping to the newest message), which kept an unattended portal signed in.
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
 
 // Shared across this portal's tabs, so working in one tab keeps the others signed in.
 const readActivity = () => {

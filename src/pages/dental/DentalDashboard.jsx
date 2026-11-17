@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
-import { useAuth } from '../../AuthContext.jsx';
 import KpiCard from '../../components/KpiCard.jsx';
 import { CalendarIcon, ClockIcon, EncountersIcon, InventoryIcon } from '../../components/icons/Icons.jsx';
 import { formatDay, formatTimeLabel, todayIso } from './dentalShared.js';
@@ -15,7 +14,6 @@ const quantity = (n, unit) => `${n} ${n === 1 && unit === 'boxes' ? 'box' : unit
 
 const DentalDashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [tick, setTick] = useState(0);
   useVisibleRefresh(() => setTick((t) => t + 1));
@@ -46,7 +44,6 @@ const DentalDashboard = () => {
     });
   }, [tick]);
 
-  const first = (user?.name || '').split(' ')[0];
   const waiting = data?.today.filter((a) => a.status === 'Scheduled') || [];
 
   return (
@@ -54,7 +51,7 @@ const DentalDashboard = () => {
       <div className="page">
         <div className="page-header">
           <div className="page-header-title-block">
-            <h1 className="page-header-title">{first ? `Good day, ${first}` : 'Dental Clinic'}</h1>
+            <h1 className="page-header-title">Dashboard</h1>
             <div className="page-header-subtitle">{formatDay(todayIso())} · Dental Clinic</div>
           </div>
         </div>

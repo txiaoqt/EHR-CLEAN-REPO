@@ -12,7 +12,6 @@ import {
   formatFileSize,
   RESOLVED_PHOTO_NOTICE,
 } from '../utils/messageAttachments.js';
-import avatarPlaceholder from '../assets/images/avatar-placeholder.jpg';
 import { emailEnabled } from '../utils.js';
 import useUnreadMessages, { markConversationRead } from '../hooks/useUnreadMessages.js';
 
@@ -209,7 +208,7 @@ const StaffPatientMessages = () => {
   }, [conversations]);
 
   const getPatientAvatar = (patientId) => {
-    return (patientId && patientAvatarMap[patientId]) || avatarPlaceholder;
+    return (patientId && patientAvatarMap[patientId]) || null; // none yet: PatientAvatar draws initials
   };
 
   // Split conversations into Active (open) and History (resolved/closed)
@@ -921,15 +920,11 @@ const StaffPatientMessages = () => {
                           setMobileViewingChat(true);
                         }}
                       >
-                        <img
+                        <PatientAvatar
                           src={getPatientAvatar(c.patient_id)}
-                          alt={c.patient_name || 'Patient'}
-                          className="tup-messenger-avatar tup-avatar-student"
+                          name={c.patient_name || 'Patient'}
+                          className="tup-messenger-avatar"
                           style={{ width: 36, height: 36 }}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = avatarPlaceholder;
-                          }}
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
@@ -972,15 +967,11 @@ const StaffPatientMessages = () => {
                     <span>{activeTab === 'active' ? 'Inbox' : 'History'}</span>
                   </button>
 
-                  <img
+                  <PatientAvatar
                     src={getPatientAvatar(activeConversation?.patient_id)}
-                    alt={activeConversation?.patient_name || 'Patient'}
-                    className="tup-messenger-avatar tup-avatar-student"
+                    name={activeConversation?.patient_name || 'Patient'}
+                    className="tup-messenger-avatar"
                     style={{ width: 40, height: 40 }}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = avatarPlaceholder;
-                    }}
                   />
                   <div>
                     <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>
