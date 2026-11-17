@@ -12,6 +12,7 @@ import AuthCallback from '../pages/AuthCallback.jsx';
 import ResetPassword from '../pages/ResetPassword.jsx';
 import LegalPolicy from '../pages/LegalPolicy.jsx';
 import StaffSetup from './StaffSetup.jsx';
+import PCAccessRequired from '../components/PCAccessRequired.jsx';
 import StaffTopBar from '../components/header/StaffTopBar.jsx';
 import SignOutDialog from '../components/SignOutDialog.jsx';
 import logo from '../assets/images/tupehrlogo.jpg';
@@ -133,6 +134,9 @@ export default function AdminPortal() {
   if (location.pathname === '/auth/callback') return <AuthCallback />;
   if (location.pathname === '/reset-password') return <ResetPassword />;
   if (location.pathname === '/privacy' || location.pathname === '/terms') return <LegalPolicy type={location.pathname === '/privacy' ? 'privacy' : 'terms'} />;
+  // Same PC/laptop-only rule as the Medical and Dental portals (under 1024px wide);
+  // invitation setup, password reset and the policies above stay usable on a phone.
+  if (mobile) return <PCAccessRequired onLogout={isAuthenticated ? logout : undefined} />;
   if (loading || initializing) return <div className="system-admin-loading" role="status">Loading your administrator session…</div>;
   if (isPasswordRecoverySession) return <Navigate to="/reset-password" replace />;
   if (!isAuthenticated || user?.role !== 'admin' || user.active === false) return <AdminLogin />;
