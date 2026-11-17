@@ -13,7 +13,7 @@ import { useTableExport } from '../hooks/useTableExport.js';
 import { patientsExportConfig } from '../utils/export/configs.js';
 import { composeFullName, toProperName } from '../utils/nameFormat.js';
 import { findSameNamePatients } from '../utils/duplicatePatients.js';
-import { patientTypeOf } from '../utils/authValidation.js';
+import { patientTypeOf, isValidStudentId, isValidFacultyId } from '../utils/authValidation.js';
 import useVisibleRefresh from '../hooks/useVisibleRefresh.js';
 
 const ARCHIVE_REASONS = ['Graduated', 'No longer at TUP', 'Account deleted', 'Other'];
@@ -49,7 +49,7 @@ const ArchivePatientDialog = ({ patient, onCancel, onConfirm }) => {
   );
 };
 
-const EMPTY_MANUAL = { first: '', middle: '', last: '', suffix: '', id: '', year: 1 };
+const EMPTY_MANUAL = { kind: 'student', first: '', middle: '', last: '', suffix: '', id: '', year: 1 };
 const manualName = (m) => composeFullName({ firstName: m.first, middleName: m.middle, lastName: m.last, suffix: m.suffix });
 
 const Patients = () => {
@@ -252,10 +252,20 @@ const Patients = () => {
   const submitCreateStudent = async (differentPerson = false) => {
     // VALIDATION: ensure name and id meet rules
     const name = manualName(manualStudent);
-    const id = (manualStudent.id || '').trim();
+    // Uppercase and strict format: the patient's own sign-up looks this ID up
+    // exactly, and only a match joins the two into one record.
+    const id = (manualStudent.id || '').trim().toUpperCase();
+    const faculty = manualStudent.kind === 'faculty';
 
     if (!manualStudent.first.trim() || !manualStudent.last.trim() || !id) {
-      showToast('First name, last name and student ID are required', 'error');
+      showToast(`First name, last name and ${faculty ? 'employee' : 'student'} ID are required`, 'error');
+      return;
+    }
+
+    if (faculty ? !isValidFacultyId(id) : !isValidStudentId(id)) {
+      showToast(faculty
+        ? 'Faculty ID must be TUPM + birthdate + employee number, e.g. TUPM120172-001.'
+        : 'Student ID must look like TUPM-23-0123.', 'error');
       return;
     }
 
@@ -277,7 +287,7 @@ const Patients = () => {
 
     try {
       const payload = {
-        id, name, year: patientTypeOf(id) === 'faculty' ? null : Number(manualStudent.year || 1),
+        id, name, year: faculty ? null : Number(manualStudent.year || 1),
         first_name: toProperName(manualStudent.first), middle_name: toProperName(manualStudent.middle) || null,
         surname: toProperName(manualStudent.last), suffix: manualStudent.suffix.trim() || null,
       };
@@ -498,7 +508,7 @@ const Patients = () => {
                           studentSuggestions.map(s => (
                             <div key={s.id} onClick={() => { setSelectedStudent(s); setStudentSearch(`${s.name} (${s.id})`); setStudentSuggestions([]); }} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.12s' }}>
                               <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{s.name}</div>
-                              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{s.id} — Year {s.year}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{s.id} — {s.year ? `Year ${s.year}` : 'Faculty'}</div>
                             </div>
                           ))
                         ) : (
@@ -510,9 +520,9 @@ const Patients = () => {
 
                       {selectedStudent && (
                         <div style={{ marginTop: 16, padding: 14, background: 'var(--color-primary-tint)', border: '1px solid var(--color-primary-border)', borderRadius: 10 }}>
-                          <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-text, #fda4af)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase' }}>Selected Student</div>
+                          <div style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-text, #fda4af)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase' }}>Selected Patient</div>
                           <div style={{ marginTop: 4, fontWeight: 'var(--font-weight-bold)', color: 'var(--text)' }}>{selectedStudent.name}</div>
-                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{selectedStudent.id} • Year {selectedStudent.year}</div>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{selectedStudent.id} • {selectedStudent.year ? `Year ${selectedStudent.year}` : 'Faculty'}</div>
                         </div>
                       )}
                     </>
@@ -540,21 +550,39 @@ const Patients = () => {
                         ))}
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
+                      <div role="radiogroup" aria-label="Patient type" style={{ display: 'flex', gap: 8 }}>
+                        {[['student', 'Student'], ['faculty', 'Faculty']].map(([kind, label]) => (
+                          <button
+                            key={kind}
+                            type="button"
+                            role="radio"
+                            aria-checked={manualStudent.kind === kind}
+                            className={manualStudent.kind === kind ? 'btn small' : 'btn secondary small'}
+                            onClick={() => { setSameName(null); setManualStudent(prev => ({ ...prev, kind })); }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: manualStudent.kind === 'faculty' ? '1fr' : '1fr 120px', gap: 10 }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Student / Employee ID</label>
+                          <label htmlFor="manual-id" style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>{manualStudent.kind === 'faculty' ? 'Employee ID' : 'Student ID'}</label>
                           <input
+                            id="manual-id"
                             value={manualStudent.id}
-                            onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value }))}
-                            placeholder="TUPM-23-0123 or TUPM120172-001"
+                            onChange={(e) => setManualStudent(prev => ({ ...prev, id: e.target.value.toUpperCase() }))}
+                            placeholder={manualStudent.kind === 'faculty' ? 'TUPM120172-001' : 'TUPM-23-0123'}
                             className="input"
                             style={{ width: '100%' }}
                           />
                         </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Year</label>
-                          <input value={manualStudent.year} onChange={(e) => setManualStudent(prev => ({ ...prev, year: Number(e.target.value || 1) }))} type="number" min={1} max={5} className="input" style={{ width: '100%' }} />
-                        </div>
+                        {manualStudent.kind !== 'faculty' && (
+                          <div>
+                            <label htmlFor="manual-year" style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-muted)', marginBottom: 6 }}>Year</label>
+                            <input id="manual-year" value={manualStudent.year} onChange={(e) => setManualStudent(prev => ({ ...prev, year: Number(e.target.value || 1) }))} type="number" min={1} max={5} className="input" style={{ width: '100%' }} />
+                          </div>
+                        )}
                       </div>
 
                       {sameName && (
@@ -592,7 +620,7 @@ const Patients = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div className="card" style={{ padding: 16, background: 'var(--panel)' }}>
                         <div style={{ fontWeight: 'var(--font-weight-extrabold)', fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>{previewStudent.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>{previewStudent.id} • {patientTypeOf(previewStudent.id) === 'faculty' ? 'Faculty' : `Year ${previewStudent.year || '—'}`}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>{previewStudent.id} • {(previewStudent.kind || patientTypeOf(previewStudent.id)) === 'faculty' ? 'Faculty' : `Year ${previewStudent.year || '—'}`}</div>
                         <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' }}>
                           Clicking register will create an active EHR record and log the registration date.
                         </div>
