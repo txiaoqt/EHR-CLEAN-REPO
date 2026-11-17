@@ -171,6 +171,9 @@ const Login = () => {
   const [msg, setMsg] = useState('');
   const [msgOpen, setMsgOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Second sign-in step: { email } while the emailed code is awaited.
+  const [codeStep, setCodeStep] = useState(null);
+  const [loginCode, setLoginCode] = useState('');
 
   const requireSignupPolicy = async () => {
     if (!signupPolicyAgreed) {
@@ -382,6 +385,80 @@ const Login = () => {
         return;
       }
 
+      if (profile.verification_required) {
+        setLoginCode('');
+        setCodeStep({ email: profile.email || normalizedEmail });
+        await sendLoginCode();
+        return;
+      }
+      await finishLogin(profile, normalizedEmail);
+    } catch (e) {
+      console.error('Login error:', e);
+      setMsg('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendLoginCode = async () => {
+    const { data, error } = await supabase.functions.invoke('send-login-code');
+    if (error) {
+      let text = 'The sign-in code could not be sent. Try again in a moment.';
+      try { text = (await error.context.json()).error || text; } catch (_) {}
+      setMsg(text);
+      return false;
+    }
+    if (data?.verified) return true;
+    setMsg(`A 6-digit code was sent to your email. It expires in 10 minutes.`);
+    return true;
+  };
+
+  const cancelCodeStep = async () => {
+    setCodeStep(null);
+    setLoginCode('');
+    setPass('');
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
+  const handleVerifyCode = async () => {
+    const code = loginCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      setMsg('Enter the 6-digit code from your email.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: result, error } = await supabase.rpc('verify_login_code', { p_code: code });
+      if (error) throw error;
+      if (result === 'wrong') { setMsg('Incorrect code. Check the latest email and try again.'); return; }
+      if (result !== 'ok') {
+        setMsg(result === 'locked'
+          ? 'Too many incorrect codes. Sign in again to get a new code.'
+          : 'This code has expired. Sign in again to get a new code.');
+        await cancelCodeStep();
+        return;
+      }
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const profile = await fetchUserProfile(authUser);
+      if (!profile || profile.verification_required || profile.active === false) {
+        setMsg(profile?.access_message || 'Login failed. Please try again.');
+        await cancelCodeStep();
+        return;
+      }
+      const normalizedEmail = codeStep?.email || '';
+      setCodeStep(null);
+      setLoginCode('');
+      await finishLogin(profile, normalizedEmail);
+    } catch (e) {
+      console.error('Code verification error:', e);
+      setMsg('Code verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finishLogin = async (profile, normalizedEmail) => {
+    const userRole = (profile.role || '').toLowerCase();
       // 3. Clear failed login lockout counters on success
       try {
         await supabase.rpc('clear_login_lockout', { p_email: normalizedEmail, p_touch_last_login: true });
@@ -420,12 +497,6 @@ const Login = () => {
             ? '/patient/dashboard'
             : '/dashboard'
       );
-    } catch (e) {
-      console.error('Login error:', e);
-      setMsg('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSendOtp = async () => {
@@ -1241,7 +1312,8 @@ const Login = () => {
               className="login-card"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (IS_USER_SURFACE) {
+                if (codeStep) handleVerifyCode();
+                else if (IS_USER_SURFACE) {
                   if (authMode === 'signup') {
                     if (signupKind === 'enrollee') handleEnrolleeSignup();
                     else handlePatientSignup();
@@ -2009,7 +2081,66 @@ const Login = () => {
               {/* ========================================================= */}
               {/* 3. LOGIN VIEW (DEFAULT FOR USER & ALWAYS FOR STAFF)       */}
               {/* ========================================================= */}
-              {authMode === 'login' && (
+              {codeStep && (
+                <>
+                  <h2
+                    id="login-code-title"
+                    style={{
+                      textAlign: 'center',
+                      margin: '0 0 12px 0',
+                      fontSize: isMobile ? 'var(--font-size-xl)' : isTabletLandscape ? 'var(--font-size-2xl)' : 'var(--font-size-page-title)',
+                      fontWeight: 'var(--font-weight-extrabold)',
+                      fontFamily: `"Merriweather", serif`,
+                    }}
+                  >
+                    Check your email
+                  </h2>
+                  <p style={{ textAlign: 'center', margin: '0 0 12px 0', fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.92)', lineHeight: 1.5 }}>
+                    Enter the 6-digit code sent to <strong>{codeStep.email}</strong>.
+                  </p>
+                  <div className="field" style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label htmlFor="login-code" style={{ fontSize: 'var(--font-size-sm)', color: 'rgba(255,255,255,0.95)', fontWeight: 'var(--font-weight-semibold)' }}>Verification code</label>
+                    <input
+                      id="login-code"
+                      className="input"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={loginCode}
+                      onChange={(e) => setLoginCode(e.target.value.replace(/\D/g, ''))}
+                      style={{ ...authInputStyle, letterSpacing: 6, textAlign: 'center', fontSize: 'var(--font-size-lg)' }}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn"
+                    disabled={loading || loginCode.length !== 6}
+                    style={{
+                      width: '100%', marginTop: 14, minHeight: 44, padding: '11px 14px', border: 'none',
+                      borderRadius: isMobile ? 8 : 10, fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-base)',
+                      background: loading || loginCode.length !== 6 ? 'rgba(255,255,255,0.35)' : '#fff',
+                      color: loading || loginCode.length !== 6 ? 'rgba(255,255,255,0.75)' : '#931b1b',
+                      cursor: loading || loginCode.length !== 6 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {loading ? 'Verifying…' : 'Verify and sign in'}
+                  </button>
+                  <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)' }}>
+                    <button type="button" onClick={cancelCodeStep} disabled={loading}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.92)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                      Back to sign in
+                    </button>
+                    <button type="button" onClick={sendLoginCode} disabled={loading}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.92)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                      Resend code
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {authMode === 'login' && !codeStep && (
                 <>
                   <h2
                     id="login-title"

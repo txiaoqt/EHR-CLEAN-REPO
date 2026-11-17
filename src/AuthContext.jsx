@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }) => {
         if (initSession?.user) {
           const profile = await fetchUserProfile(initSession.user);
           if (mounted && sessionUserId.current === initSession.user.id) {
-            if (profile && isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
+            if (profile && isRoleCompatibleWithSurface(profile.role) && profile.active !== false && !profile.verification_required) {
               setUser(profile);
               try {
                 localStorage.setItem('ehr_user', JSON.stringify(profile));
@@ -256,7 +256,7 @@ export const AuthProvider = ({ children }) => {
           }
           fetchUserProfile(currentSession.user).then((profile) => {
             if (mounted && profile && sessionUserId.current === currentSession.user.id) {
-              if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false) {
+              if (isRoleCompatibleWithSurface(profile.role) && profile.active !== false && !profile.verification_required) {
                 setUser(profile);
                 try {
                   localStorage.setItem('ehr_user', JSON.stringify(profile));
@@ -290,7 +290,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (profile) => {
-    if (!profile || !isRoleCompatibleWithSurface(profile.role)) {
+    if (!profile || !isRoleCompatibleWithSurface(profile.role) || profile.verification_required) {
       console.warn('[Auth] Rejected login: profile role incompatible with surface', { role: profile?.role, DEPLOY_SURFACE });
       return;
     }
@@ -347,7 +347,7 @@ export const AuthProvider = ({ children }) => {
         // A rejected token means its session was revoked; any other error is a network blip.
         const tokenRejected = Boolean(error) && (['PGRST301', 'PGRST303'].includes(error.code) || /jwt/i.test(error.message || ''));
         if (error && !tokenRejected) return;
-        if (tokenRejected || !data || data.active === false || !isRoleCompatibleWithSurface(data.role)) {
+        if (tokenRejected || !data || data.active === false || data.verification_required || !isRoleCompatibleWithSurface(data.role)) {
           try {
             localStorage.setItem(SIGNOUT_MESSAGE_KEY, data?.access_message
               || 'You were signed out because your account access changed. Contact the clinic administrator if this was unexpected.');

@@ -264,13 +264,11 @@ const PatientProfile = () => {
 
     setDeleting(true);
     try {
-      // Verify password with Supabase Auth
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user?.email,
-        password: deletePassword,
-      });
+      // Checked in the database: signing in again would open a new session
+      // that has not passed the emailed sign-in code.
+      const { data: passwordOk, error: verifyError } = await supabase.rpc('verify_my_password', { p_password: deletePassword });
 
-      if (verifyError) {
+      if (verifyError || !passwordOk) {
         setDeleteMessage('Incorrect password.');
         setDeleting(false);
         return;
