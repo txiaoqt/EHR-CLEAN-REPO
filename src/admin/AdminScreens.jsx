@@ -319,7 +319,9 @@ export function AdminAccounts({ kind }) {
     if (invitations) {
       if (row.status === 'accepted') return <span className="system-admin-muted">Setup completed</span>;
       if (row.deletion_pending) return deleteButton('delete_invitation', row);
-      if (row.status === 'sending') return <span className="system-admin-muted">Sending invitation…</span>;
+      // Still sending only briefly: after two minutes the email went out but recording it
+      // failed, and Resend or Delete is the way to recover.
+      if (row.status === 'sending' && Date.now() - Date.parse(row.last_sent_at) < 120000) return <span className="system-admin-muted">Sending invitation…</span>;
       return <><button className="btn secondary small" onClick={() => open('resend_invitation', row)}>Resend</button>{row.status !== 'revoked' && <button className="btn secondary small" onClick={() => open('revoke_invitation', row)}>Revoke</button>}{deleteButton('delete_invitation', row)}</>;
     }
     if (hasInvitations && row.invitation_id && !row.active && row.invitation_status !== 'accepted') {
