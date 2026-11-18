@@ -60,6 +60,9 @@ function AdminLogin() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(location.state?.sessionMessage || '');
+  const [codeEmail, setCodeEmail] = useState(null);
+  const [code, setCode] = useState('');
+  const [notice, setNotice] = useState('');
   const submit = async (event) => {
     event.preventDefault(); setBusy(true); setError('');
     try {
@@ -68,7 +71,51 @@ function AdminLogin() {
         access_token: result.session.access_token, refresh_token: result.session.refresh_token,
       });
       if (sessionError) throw new Error('Could not establish your session. Sign in again.');
+      if (result.profile.verification_required) {
+        setCode(''); setCodeEmail(result.profile.email || '');
+        await sendCode();
+        return;
+      }
       login(result.profile);
+      navigate('/admin/overview', { replace: true });
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+  // Same emailed sign-in code as the other portals (send-login-code + verify_login_code).
+  const sendCode = async () => {
+    setNotice('');
+    const { data, error: sendError } = await supabase.functions.invoke('send-login-code');
+    if (sendError) {
+      let text = 'The sign-in code could not be sent. Try again in a moment.';
+      try { text = (await sendError.context.json()).error || text; } catch (_) {}
+      setError(text);
+      return;
+    }
+    if (!data?.verified) setNotice('A 6-digit code was sent to your email. It expires in 10 minutes.');
+  };
+  const cancelCode = async () => {
+    setCodeEmail(null); setCode(''); setPassword(''); setNotice('');
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+  const verifyCode = async (event) => {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(code.trim())) { setError('Enter the 6-digit code from your email.'); return; }
+    setBusy(true); setError('');
+    try {
+      const { data: outcome, error: verifyError } = await supabase.rpc('verify_login_code', { p_code: code.trim() });
+      if (verifyError) throw new Error('Code verification failed. Please try again.');
+      if (outcome === 'wrong') { setError('Incorrect code. Check the latest email and try again.'); return; }
+      if (outcome !== 'ok') {
+        await cancelCode();
+        setError(outcome === 'locked' ? 'Too many incorrect codes. Sign in again to get a new code.' : 'This code has expired. Sign in again to get a new code.');
+        return;
+      }
+      const { data: profile } = await supabase.rpc('get_my_portal_identity');
+      if (profile?.role !== 'admin' || !profile.active || profile.verification_required) {
+        await cancelCode();
+        setError('Administrator access is unavailable.');
+        return;
+      }
+      login(profile);
       navigate('/admin/overview', { replace: true });
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
@@ -85,15 +132,24 @@ function AdminLogin() {
           <strong>TUP Manila Clinic</strong>
           <span>System Administration Portal</span>
         </div>
-        <h2 id="system-admin-login-title">Administrator Log In</h2>
-        <form onSubmit={submit}>
+        <h2 id="system-admin-login-title">{codeEmail !== null ? 'Check Your Email' : 'Administrator Log In'}</h2>
+        {codeEmail !== null ? <form onSubmit={verifyCode}>
+          <p>Enter the 6-digit code sent to <strong>{codeEmail || 'your email'}</strong>.</p>
+          <label>Sign-in Code<input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, ''))} required autoFocus /></label>
+          {error && <div className="system-admin-login-error" role="alert">{error}</div>}
+          {notice && <p role="status">{notice}</p>}
+          <button className="system-admin-login-submit" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify Code'}</button>
+          <button type="button" className="system-admin-login-link" disabled={busy} onClick={sendCode}>Resend code</button>
+          <button type="button" className="system-admin-login-link" disabled={busy} onClick={cancelCode}>Back to sign in</button>
+        </form> : <form onSubmit={submit}>
           <label>Username<input name="username" type="text" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={120} autoFocus /></label>
           <label>Password<span className="system-admin-password"><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} />
             <button type="button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}</button></span></label>
           {error && <div className="system-admin-login-error" role="alert">{error}</div>}
           {location.state?.message && <p role="status">{location.state.message}</p>}
           <button className="system-admin-login-submit" disabled={busy || !username.trim() || !password}>{busy ? 'Signing in…' : 'Log In'}</button>
-        </form>
+        </form>}
         <p className="system-admin-login-footer">© Technological University of the Philippines</p>
       </section>
     </div>

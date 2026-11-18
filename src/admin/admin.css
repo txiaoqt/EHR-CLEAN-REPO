@@ -233,6 +233,8 @@
 .system-admin-password button { display: grid; place-items: center; position: absolute; top: 0; right: 0; width: 40px; height: 100%; padding: 4px; border: 0; background: transparent; color: #666; cursor: pointer; }
 .system-admin-login-submit { display: flex; align-items: center; justify-content: center; margin-top: 2px; padding: 11px 14px; min-height: 44px; background: #fff; border: none; border-radius: var(--radius-button); color: #931b1b; width: 100%; font-size: var(--font-size-base); font-weight: var(--font-weight-bold); box-shadow: 0 6px 14px rgba(0,0,0,.08); cursor: pointer; }
 .system-admin-login-submit:disabled { background: rgba(255,255,255,.35); color: rgba(255,255,255,.75); opacity: 1; box-shadow: none; cursor: not-allowed; }
+.system-admin-login-link { padding: 6px; border: 0; background: transparent; color: #fff; font: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); text-decoration: underline; cursor: pointer; }
+.system-admin-login-link:disabled { opacity: .6; cursor: not-allowed; }
 .system-admin-login-card :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .system-admin-login-card input:focus-visible, .system-admin-password button:focus-visible { outline-color: #931b1b; }
 .system-admin-login-error { border: 1px solid #f2c4c6; padding: 12px; border-radius: 6px; line-height: 1.5; font-size: var(--font-size-sm); }
