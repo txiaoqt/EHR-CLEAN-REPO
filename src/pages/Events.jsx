@@ -335,7 +335,7 @@ const Events = () => {
       // Settings → Notifications can disable blasts. Checked here, at the only
       // place a blast is sent, rather than leaving the toggle decorative.
       if (!emailEnabled('blast')) {
-        setEmailResult({ ok: false, message: 'Email blasts are turned off in Settings.' });
+        setEmailResult({ error: 'Email blasts are turned off in Settings.' });
         return;
       }
       const selectedIdsArray = Array.from(selectedRecipientIds);
