@@ -66,6 +66,7 @@ const AuditTrail = ({ administration = false, accountId = null, accountLabel = '
     { value: 'ADMIN_REACTIVATE', label: 'Account reactivations' },
     { value: 'ADMIN_NAME_CHANGED', label: 'Administrator name changes' },
     { value: 'ADMIN_USER_ACCOUNT_DELETED', label: 'User account deletions' },
+    { value: 'ADMIN_STAFF_ACCOUNT_DELETED', label: 'Staff account deletions' },
     { value: 'ADMIN_ACCOUNT_DELETED', label: 'Administrator deletions' },
     { value: 'STAFF_INVITATION_DELETED', label: 'Invitation deletions' },
     { value: 'ADMIN_CHANGE_ROLE', label: 'Staff role changes' },

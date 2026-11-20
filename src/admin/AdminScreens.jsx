@@ -195,9 +195,9 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
   const [invite, setInvite] = useState({ ...emptyPersonName(), email: '', role: action.inviteRole || 'nurse' });
   const busyRef = useRef(busy);
   busyRef.current = busy;
-  const names = { invite_staff: 'Invite Staff Member', suspend_account: 'Suspend Account', reactivate_account: 'Reactivate Account', unlock_account: 'Unlock Account', change_staff_role: 'Change Staff Role', send_password_reset: 'Send Password Reset', resend_invitation: 'Resend Invitation', revoke_invitation: 'Revoke Invitation', delete_invitation: 'Delete Invitation', delete_administrator: 'Delete Administrator', delete_user_account: 'Delete Account', delete_patient_record: 'Delete Record' };
+  const names = { invite_staff: 'Invite Staff Member', suspend_account: 'Suspend Account', reactivate_account: 'Reactivate Account', unlock_account: 'Unlock Account', change_staff_role: 'Change Staff Role', send_password_reset: 'Send Password Reset', resend_invitation: 'Resend Invitation', revoke_invitation: 'Revoke Invitation', delete_invitation: 'Delete Invitation', delete_administrator: 'Delete Administrator', delete_staff_account: 'Delete Staff Account', delete_user_account: 'Delete Account', delete_patient_record: 'Delete Record' };
   const title = action.type === 'invite_staff' && invite.role === 'admin' ? 'Invite Administrator' : names[action.type];
-  const deleting = ['delete_invitation', 'delete_administrator', 'delete_user_account', 'delete_patient_record'].includes(action.type);
+  const deleting = ['delete_invitation', 'delete_administrator', 'delete_staff_account', 'delete_user_account', 'delete_patient_record'].includes(action.type);
   // A not-signed-up patient has no email; the TUPM ID is typed instead.
   const byPatientId = action.type === 'delete_patient_record';
   const confirmTarget = byPatientId ? action.row?.identifier : action.row?.email;
@@ -220,6 +220,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
         ? 'Invitation email sent. The recipient can now set up their account.'
         : action.type === 'delete_invitation' ? 'Invitation and pending sign-in deleted. You can invite this email again.'
         : action.type === 'delete_administrator' ? 'Administrator account deleted. Audit history has been retained.'
+        : action.type === 'delete_staff_account' ? 'Staff account deleted. Audit history and clinic records have been retained.'
         : action.type === 'delete_user_account' ? 'Account and all of its clinic data deleted. Audit history has been retained.'
         : byPatientId ? 'Patient record and all of its clinic data deleted. Audit history has been retained.'
         : action.type === 'send_password_reset' ? 'Password reset email sent.' : 'The account access change was saved.', result);
@@ -245,6 +246,7 @@ function ActionDialog({ action, onClose, onComplete, onFailed }) {
       {action.type === 'revoke_invitation' && <p>This setup link will stop working. The recipient will not gain access. You can resend an invitation later.</p>}
       {action.type === 'delete_invitation' && <p>This permanently removes the unaccepted invitation and its pending sign-in. The setup link will stop working. You can invite this email again. The deletion remains in the audit trail.</p>}
       {action.type === 'delete_administrator' && <p>This permanently removes this administrator’s sign-in and profile. Their sessions will end immediately. Audit history and clinic records are retained. This cannot be undone.</p>}
+      {action.type === 'delete_staff_account' && <p>This permanently removes this staff member’s profile and any linked sign-in. Any active sessions will end immediately. Audit history and clinic records are retained. This cannot be undone.</p>}
       {action.type === 'delete_user_account' && <p>This permanently deletes this account’s sign-in and <strong>all of its clinic data</strong>: appointments, encounters, dental records, record form, messages and submitted documents. Only the audit history is kept. This cannot be undone.</p>}
       {byPatientId && <p>This patient never signed up, so there is no sign-in. This permanently deletes their record and <strong>all of its clinic data</strong> in both clinics: appointments, encounters, dental records and record form. Only the audit history is kept. This cannot be undone.</p>}
       {deleting && <label>{byPatientId ? 'Type The Patient ID To Confirm' : 'Type The Email Address To Confirm'}<input type={byPatientId ? 'text' : 'email'} required autoFocus autoComplete="off" spellCheck={false} maxLength={254} value={confirmationEmail} onChange={e => setConfirmationEmail(e.target.value)} aria-describedby="admin-delete-hint" /><small id="admin-delete-hint">Enter the {byPatientId ? 'patient ID' : 'email'} shown above to enable {title.toLowerCase()}.</small></label>}
@@ -307,7 +309,7 @@ export function AdminAccounts({ kind }) {
   const emptyDescription = hasFilters ? 'Try adjusting your search or filters.' : invitations ? `Invite ${administration ? 'an administrator' : 'a staff member'} to get started.` : 'Accounts will appear here after they are added.';
   const statuses = invitations ? ['pending', 'accepted', 'expired', 'revoked', 'failed', 'sending', 'deletion_pending'] : ['active', 'suspended', 'locked', 'inactive', ...(hasInvitations ? ['invited', 'expired', 'revoked', 'failed', 'sending', 'deletion_pending'] : ['not_signed_up', 'retired', 'incomplete', 'deletion_pending'])];
   const renderActions = row => {
-    const deleteButton = (type, target) => <button className="btn danger small" onClick={() => open(type, target)}>{row.deletion_pending ? 'Retry Delete' : type === 'delete_invitation' ? 'Delete Invitation' : 'Delete Administrator'}</button>;
+    const deleteButton = (type, target) => <button className="btn danger small" onClick={() => open(type, target)}>{row.deletion_pending ? 'Retry Delete' : ({ delete_invitation: 'Delete Invitation', delete_administrator: 'Delete Administrator', delete_staff_account: 'Delete Staff Account' })[type]}</button>;
     const history = row.id && <Link className="btn secondary small" to={`/admin/audit-trail?account=${row.id}&name=${encodeURIComponent(row.name)}`}>History</Link>;
     // Registered by the clinic, no portal sign-up yet: there is no sign-in to manage.
     if (kind === 'users' && row.status === 'not_signed_up') return <button className="btn danger small" onClick={() => open('delete_patient_record', row)}>Delete Record</button>;
@@ -324,16 +326,21 @@ export function AdminAccounts({ kind }) {
       if (row.status === 'sending' && Date.now() - Date.parse(row.last_sent_at) < 120000) return <span className="system-admin-muted">Sending invitation…</span>;
       return <><button className="btn secondary small" onClick={() => open('resend_invitation', row)}>Resend</button>{row.status !== 'revoked' && <button className="btn secondary small" onClick={() => open('revoke_invitation', row)}>Revoke</button>}{deleteButton('delete_invitation', row)}</>;
     }
+    if (kind === 'staff' && row.deletion_pending) return deleteButton('delete_staff_account', { ...row, id: row.profile_id });
     if (hasInvitations && row.invitation_id && !row.active && row.invitation_status !== 'accepted') {
       return <><Link className="btn secondary small" to={`${directoryPath}?tab=invitations`}>View Invitation</Link>{row.invitation_status !== 'sending' && deleteButton('delete_invitation', { ...row, id: row.invitation_id })}</>;
     }
     if (row.role === 'admin') return <>{history}{row.id !== user?.auth_user_id && row.profile_id && deleteButton('delete_administrator', { ...row, id: row.profile_id })}</>;
-    if (!row.id || row.status === 'retired') return <span className="system-admin-muted">{row.status === 'retired' ? 'Elevated account' : 'No linked sign-in'}</span>;
+    if (!row.id || row.status === 'retired') {
+      if (kind === 'staff' && row.profile_id) return deleteButton('delete_staff_account', { ...row, id: row.profile_id });
+      return <span className="system-admin-muted">{row.status === 'retired' ? 'Elevated account' : 'No linked sign-in'}</span>;
+    }
     return <>
       <button className="btn secondary small" onClick={() => open(row.status === 'suspended' || row.status === 'inactive' ? 'reactivate_account' : 'suspend_account', row)}>{row.status === 'suspended' || row.status === 'inactive' ? 'Reactivate' : 'Suspend'}</button>
       {row.status === 'locked' && <button className="btn secondary small" onClick={() => open('unlock_account', row)}>Unlock</button>}
       {row.status === 'active' && <button className="btn secondary small" onClick={() => open('send_password_reset', row)}>Reset Password</button>}
       {kind === 'staff' && <button className="btn secondary small" onClick={() => open('change_staff_role', row)}>Change Role</button>}
+      {kind === 'staff' && row.profile_id && deleteButton('delete_staff_account', { ...row, id: row.profile_id })}
       {history}
     </>;
   };

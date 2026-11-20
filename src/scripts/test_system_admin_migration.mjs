@@ -438,5 +438,31 @@ await assert.rejects(db.query('select public.admin_account_history(null)'),/perm
 await assert.rejects(db.query('select public.record_my_sign_in()'),/permission denied/i);
 await assert.rejects(db.query("select public.admin_portal_data('overview')"),/permission denied/i);
 await assert.rejects(db.query('select public.get_my_portal_identity()'),/permission denied/i);
+
+// Apply the current staff deletion migration last so the legacy patient cleanup
+// fixtures above continue to exercise their historical migration state.
+await db.exec('reset role');
+await db.exec(await migration('staff_account_deletion'));
+await actAs(admin);
+const staffDeletionProfile=(await db.query('select id from public.admins where auth_user_id=$1',[staff])).rows[0].id;
+await assert.rejects(deletion(staff,'staff',staffDeletionProfile,'physician@test.invalid'),/administrator access required/i);
+const pendingStaffDeletion=await deletion(admin,'staff',staffDeletionProfile,'physician@test.invalid');
+assert.equal(pendingStaffDeletion.auth_user_id,staff);
+assert.equal(pendingStaffDeletion.completed,false);
+await actAs(admin);
+assert.equal((await one("select public.admin_portal_data('staff','physician@test.invalid') as result")).result.rows[0].status,'deletion_pending');
+await softDeleteFixture(staff);
+await deletion(admin,'staff',staffDeletionProfile,'physician@test.invalid','complete');
+await actAs(null);
+assert.equal((await db.query('select count(*)::int as n from public.admins where id=$1',[staffDeletionProfile])).rows[0].n,0,'staff profile is removed');
+assert.equal((await one('select count(*)::int as n from public.encounters')).n,1,'staff deletion retains clinic records');
+assert.equal((await one("select count(*)::int as n from public.audit_logs where action='ADMIN_STAFF_ACCOUNT_DELETED'")).n,1,'staff deletion is audited');
+await actAs(null);
+const unlinkedStaffProfile=(await db.query("insert into public.admins(name,email,role) values('Unlinked Staff','unlinked-staff@test.invalid','nurse') returning id")).rows[0].id;
+const unlinkedStaffPrepare=await deletion(admin,'staff',unlinkedStaffProfile,'unlinked-staff@test.invalid');
+assert.equal(unlinkedStaffPrepare.auth_user_id,null,'staff profiles without sign-ins can be removed');
+await deletion(admin,'staff',unlinkedStaffProfile,'unlinked-staff@test.invalid','complete');
+assert.equal((await db.query('select count(*)::int as n from public.admins where id=$1',[unlinkedStaffProfile])).rows[0].n,0);
+assert.equal((await one("select count(*)::int as n from public.audit_logs where action='ADMIN_STAFF_ACCOUNT_DELETED'")).n,2);
 await db.close();
-console.log('PASS: Live Auth-backed directory, user/admin/invitation deletion, retained clinic records, actor/target history, filters, pagination/export, session revocation and role guards.');
+console.log('PASS: Live Auth-backed directory, user/admin/staff/invitation deletion, retained clinic records, actor/target history, filters, pagination/export, session revocation and role guards.');

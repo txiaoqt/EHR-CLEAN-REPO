@@ -103,9 +103,9 @@ Deno.serve(async (req: Request) => {
       return json(result);
     }
     if (identity.role !== 'admin' || identity.staff_setup_required) throw new RequestError('System administrator access required.', 403);
-    if (['delete_invitation','delete_administrator','delete_user_account'].includes(action)) {
+    if (['delete_invitation','delete_administrator','delete_staff_account','delete_user_account'].includes(action)) {
       if (!uuid(payload.id)) throw new RequestError('Choose an account or invitation to delete.');
-      const parameters = { p_actor: user.id, p_kind: action === 'delete_invitation' ? 'invitation' : action === 'delete_user_account' ? 'user' : 'administrator',
+      const parameters = { p_actor: user.id, p_kind: action === 'delete_invitation' ? 'invitation' : action === 'delete_user_account' ? 'user' : action === 'delete_staff_account' ? 'staff' : 'administrator',
         p_target: payload.id, p_confirmation_email: String(payload.confirmation_email || '').trim().toLowerCase() };
       const deletion = async (stage: string) => {
         const { data, error } = await service.rpc('admin_delete_account', { ...parameters, p_stage: stage });
